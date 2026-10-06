@@ -2,6 +2,7 @@ import { buildCourse } from "./courseFactory";
 import { applyAuthoredLessons, applyProjectSolutions, beginnerMilestones, chapterPlan, intermediateMilestones, projectPlan, q, reviewRubric } from "./chapterPlanHelpers";
 import { htmlcssProjectSolutions } from "./htmlcssProjectSolutions";
 import { htmlcssAuthoredLessons } from "./htmlcssAuthoredLessons";
+import { htmlcssGapLessons } from "./htmlcssGapLessons";
 
 const webProject = (title: string, brief: string, scenario: string, prompt: string, requiredPatterns: string[], requirements: string[], acceptanceCriteria: string[], edgeCases: string[], hints: string[]) => projectPlan({
   title,
@@ -55,7 +56,7 @@ const cumulativeTests = {
   25: [q("What makes the HTML/CSS capstone genuinely cumulative?", ["It combines semantics, layout, responsiveness, accessibility, and maintainable styling in one page", "It only restyles a heading", "It removes navigation", "It ignores metadata"], 0, "A capstone should integrate the course."), q("Why is a semantic landmark structure still central at the end of the course?", ["Because a real page foundation must remain meaningful before decorative detail and scripting", "Because landmarks are only for beginners", "Because Grid replaces semantics", "Because metadata removes landmarks"], 0, "Semantics remain foundational."), q("Which claim would be dishonest in the capstone?", ["Saying automated cross-browser, screen-reader, or deployment validation ran when the course only previewed and structurally checked the page", "Saying the page has a header and main", "Saying focus-visible is used", "Saying Grid can be previewed"], 0, "The capstone should never overstate what was verified.")],
 } as const;
 
-const htmlPlans = applyAuthoredLessons(applyProjectSolutions([...rawHtmlPlans], htmlcssProjectSolutions), htmlcssAuthoredLessons);
+const htmlPlans = applyAuthoredLessons(applyAuthoredLessons(applyProjectSolutions([...rawHtmlPlans], htmlcssProjectSolutions), htmlcssAuthoredLessons), htmlcssGapLessons);
 
 export const htmlCssCourse = buildCourse({
   id: "htmlcss", name: "HTML/CSS", version: "HTML Living Standard + CSS", accent: "#d85c3e", icon: "</>",
