@@ -1,4 +1,5 @@
 import type { Chapter, ChapterTest, Example, Exercise, Lesson } from "../data/types";
+import { pythonGapLessons } from "./pythonGaps";
 
 type ExampleSeed = {
   title: string;
@@ -9,7 +10,7 @@ type ExampleSeed = {
   mistakes?: Example["mistakes"];
 };
 
-type LessonSeed = Omit<Lesson, "id" | "chapter" | "order" | "examples" | "exercise"> & {
+export type LessonSeed = Omit<Lesson, "id" | "chapter" | "order" | "examples" | "exercise"> & {
   title: string;
   examples: ExampleSeed[];
   exercise: Exercise;
@@ -67,7 +68,7 @@ function explainGeneratedLine(line: string) {
   return "Python evaluates this statement in top-to-bottom order. Its result or side effect contributes to the focused behavior demonstrated by the example.";
 }
 
-function makeLesson(chapter: number, seed: LessonSeed, order = 1): Lesson {
+export function makeLesson(chapter: number, seed: LessonSeed, order = 1): Lesson {
   return {
     id: `python-${chapter}-${order}`,
     chapter,
@@ -98,7 +99,8 @@ function buildChapter(seed: ChapterSeed): Chapter {
     number: seed.number,
     title: seed.title,
     description: seed.description,
-    lessons: [makeLesson(seed.number, seed.lesson), makeLesson(seed.number, masteryLessons[seed.number], 2), makeLesson(seed.number, appliedLessons[seed.number], 3), makeLesson(seed.number, implementationLessons[seed.number], 4), makeLesson(seed.number, integrationLessons[seed.number], 5), makeLesson(seed.number, caseStudyLessons[seed.number], 6), makeLesson(seed.number, challengeLessons[seed.number], 7), ...(gapLessons[seed.number] ? [makeLesson(seed.number, gapLessons[seed.number], 8)] : [])],
+    lessons: [makeLesson(seed.number, seed.lesson), makeLesson(seed.number, masteryLessons[seed.number], 2), makeLesson(seed.number, appliedLessons[seed.number], 3), makeLesson(seed.number, implementationLessons[seed.number], 4), makeLesson(seed.number, integrationLessons[seed.number], 5), makeLesson(seed.number, caseStudyLessons[seed.number], 6), makeLesson(seed.number, challengeLessons[seed.number], 7), ...(gapLessons[seed.number] ? [makeLesson(seed.number, gapLessons[seed.number], 8)] : []),
+      ...(pythonGapLessons[seed.number] ?? []).map((lesson, index) => makeLesson(seed.number, lesson, (gapLessons[seed.number] ? 9 : 8) + index))],
     project: seed.project,
     test: seed.test,
     cumulativeTest: seed.number % 5 === 0 ? cumulativeQuestions(seed.number) : undefined,

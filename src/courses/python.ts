@@ -1,6 +1,7 @@
 import type { Chapter, Course, Lesson } from "../data/types";
-import { pythonAdvancedChapters } from "./pythonAdvanced";
+import { makeLesson, pythonAdvancedChapters } from "./pythonAdvanced";
 import { foundationDeepDives } from "./pythonFoundations";
+import { pythonGapLessons } from "./pythonGaps";
 
 const helloWorld: Lesson = {
   id: "python-1-1",
@@ -448,6 +449,18 @@ const withReadingCheck = (lesson: Lesson): Lesson => {
   };
 };
 
+const chaptersWithGapLessons: Chapter[] = chapters.map((chapter) => {
+  // Chapters 4-25 are assembled by the advanced builder, which already appends
+  // its own gap lessons. Only the foundational chapters 1-3 are extended here.
+  const extras = chapter.number <= 3 ? pythonGapLessons[chapter.number] ?? [] : [];
+  if (!extras.length) return chapter;
+  const startOrder = chapter.lessons.length + 1;
+  return {
+    ...chapter,
+    lessons: [...chapter.lessons, ...extras.map((seed, index) => makeLesson(chapter.number, seed, startOrder + index))],
+  };
+});
+
 export const pythonCourse: Course = {
   id: "python",
   name: "Python",
@@ -455,5 +468,5 @@ export const pythonCourse: Course = {
   accent: "#5b6fe8",
   icon: "Py",
   description: "Build from your first output to production-ready Python with deliberate practice.",
-  chapters: chapters.map((chapter) => ({ ...chapter, lessons: chapter.lessons.map(withReadingCheck) })),
+  chapters: chaptersWithGapLessons.map((chapter) => ({ ...chapter, lessons: chapter.lessons.map(withReadingCheck) })),
 };

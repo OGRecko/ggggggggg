@@ -71,6 +71,15 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("never repeats a lesson title inside the same chapter", () => {
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
+        const titles = chapter.lessons.map((lesson) => lesson.title);
+        expect(new Set(titles).size).toBe(titles.length);
+      }
+    }
+  });
+
   it("keeps Python coverage broad across core and advanced language features", () => {
     const python = courseById("python")!;
     const chapter8 = JSON.stringify(python.chapters[7]);
@@ -93,6 +102,47 @@ describe("CodeForge curriculum integrity", () => {
     expect(chapter23).toMatch(/__next__/);
 
     expect(chapter24).toMatch(/pyproject|environment|logging|deployment/i);
+  });
+
+  it("keeps the newer Python gap lessons present across the built catalog", () => {
+    const python = courseById("python")!;
+    const chapterBlob = (number: number) => JSON.stringify(python.chapters[number - 1]);
+
+    expect(chapterBlob(2)).toMatch(/walrus/i);
+    expect(chapterBlob(2)).toMatch(/:=/);
+
+    expect(chapterBlob(4)).toMatch(/positional-only/i);
+    expect(chapterBlob(4)).toMatch(/keyword-only/i);
+
+    expect(chapterBlob(5)).toMatch(/frozenset/);
+    expect(chapterBlob(5)).toMatch(/hashable/i);
+
+    expect(chapterBlob(7)).toMatch(/fromisoformat/);
+    expect(chapterBlob(7)).toMatch(/timedelta/);
+
+    expect(chapterBlob(10)).toMatch(/Enum/);
+
+    expect(chapterBlob(13)).toMatch(/itertools/);
+    expect(chapterBlob(13)).toMatch(/yield from/);
+
+    expect(chapterBlob(14)).toMatch(/format_exc/);
+    expect(chapterBlob(14)).toMatch(/assert /);
+    expect(chapterBlob(14)).toMatch(/browser worker/i);
+
+    expect(chapterBlob(19)).toMatch(/__slots__/);
+    expect(chapterBlob(19)).toMatch(/weakref/);
+
+    expect(chapterBlob(21)).toMatch(/subprocess\.run/);
+    expect(chapterBlob(21)).toMatch(/cannot create operating-system processes/i);
+    expect(chapterBlob(21)).toMatch(/shell=True/);
+  });
+
+  it("keeps every Python gadget lesson free of unsupported runtime promises", () => {
+    const python = courseById("python")!;
+    const blob = JSON.stringify(python);
+    expect(blob).not.toMatch(/we (run|deploy|install) (pip|a real database|a server)/i);
+    expect(blob).not.toMatch(/CodeForge installs (packages|dependencies)/i);
+    expect(blob).not.toMatch(/CodeForge starts (a server|processes)/i);
   });
 
   it("keeps implementation practice in every non-Python major chapter and debugging coverage across most major chapters", () => {

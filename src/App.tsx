@@ -102,7 +102,7 @@ function updateLessonState(current: StoredProgress, id: string, patch: Partial<N
 }
 
 function lessonStageLabel(lesson: Lesson, index: number, courseId: LanguageId) {
-  if (courseId === "python") return ["Foundation", "Deepen", "Apply", "Implement", "Integrate", "Case study", "Challenge", "Gap fill"][index] ?? `Lesson ${index + 1}`;
+  if (courseId === "python") return ["Foundation", "Deepen", "Apply", "Implement", "Integrate", "Case study", "Challenge", "Gap fill", "Extension"][index] ?? "Extension";
   const kind = lesson.kind ?? "learn";
   return kind === "blank-page" ? "Blank page"
     : kind === "edge-case" ? "Edge case"
