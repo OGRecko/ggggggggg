@@ -55,6 +55,22 @@ const iterableExample = (title: string, code: string, output: string, explanatio
   title, code, output, explanation, lines, mistakes: iterableMistakes,
 });
 
+
+/**
+ * The invariant lesson is about the reasoning that justifies a loop, so its mistake list is
+ * about broken reasoning rather than broken syntax.
+ */
+const invariantMistakes: Example["mistakes"] = [
+  { mistake: "Writing an invariant that is not true before the loop starts", error: "A proof that looks complete but rests on a false starting point", fix: "Check the statement against the initial values, and seed the loop variables so it holds immediately." },
+  { mistake: "Changing a loop variable in two places and updating the reasoning in only one", error: "A pass that silently breaks the invariant", fix: "Keep one statement per loop variable, or re-derive the invariant from the code after each change." },
+  { mistake: "Treating an assertion as a replacement for a test", error: "Development checks that prove nothing once the assertion is removed for production", fix: "Keep the assertion while developing and move the same statement into the test suite." },
+  { mistake: "Keeping a loop that needs two unrelated invariants", error: "A loop whose correctness argument has to be read twice to be believed", fix: "Split the loop so each one has a single statement about what it maintains." },
+];
+
+const invariantExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: invariantMistakes,
+});
+
 export const javascriptAuthoredLessons: LessonOverrideLibrary = {
   1: {
     compare: authoredLesson({
@@ -579,6 +595,114 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
       ],
       verification: ["structurally-checked", "pattern-checked"],
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  11: {
+    read: authoredLesson({
+      title: "Reasoning about loops with invariants",
+      minutes: 24,
+      summary: "State what is true before, during, and after a loop, use that statement to check the code is correct, and turn it into a runnable assertion while developing.",
+      learningGoals: [
+        "State a loop invariant as something true before the loop, after every pass, and after the loop ends",
+        "Use the invariant to explain why a search, an accumulation, or a maximum is correct",
+        "Check an invariant with a runtime assertion while the code is still being written",
+      ],
+      explanation: "An invariant is one sentence that is true when the loop starts, stays true after every pass, and is still true when the loop ends. It is the shortest honest answer to why a loop computes the right answer, and it is written about the loop rather than inside it. A linear search carries the invariant that every position before the cursor has been checked and did not match, so when the cursor stops, either it points at the target or it ran past the end and nothing matched. An accumulation carries the invariant that the running total is the sum of the first counted values, which is why adding one more value per pass leaves the statement true and why the total after the last pass is the sum of everything. A maximum keeps the invariant that the best value seen so far is the largest among the positions already visited, so a single comparison per pass is enough. Reading code with invariants changes the questions asked: instead of tracing every pass, you check that the statement holds at the start, that one pass preserves it, and that the exit condition combined with the statement gives the result. The statement can also be checked while developing by asserting it inside the loop, which is a rehearsal for a test rather than a replacement for one: the assertion fails loudly the moment a change breaks the reasoning, and it costs nothing in production code, which is why assertions belong in development and tests rather than on hot paths.",
+      keywordNotes: [
+        "An invariant is true before the loop, after every pass, and after the loop ends.",
+        "The invariant plus the exit condition is what proves the result, so it is stated about the loop rather than inside it.",
+        "A search invariant describes the checked prefix, an accumulation invariant describes the running total, and a maximum invariant describes the best value seen so far.",
+        "An invariant becomes a development check when it is asserted inside the loop and a test when the assertion moves into the test suite.",
+        "If no invariant can be stated, the loop is probably doing two jobs and should be split.",
+      ],
+      examples: [
+        invariantExample(
+          "A search whose invariant describes the checked prefix",
+          'const values = [4, 9, 16, 25];\nconst target = 16;\nlet index = 0;\n// Invariant: every position before index was checked and did not match.\nwhile (index < values.length && values[index] !== target) {\n  index += 1;\n}\nconsole.log(index, values[index]);',
+          "2 16",
+          "The loop advances the cursor while the current value does not match, so every position left behind has been checked and rejected, and that statement is the whole correctness argument. The loop stops at the matching position, which is why both the index and the value it points at can be printed.",
+          [
+            "Line 1: the array is the data the search walks.",
+            "Line 2: the target is the value being looked for.",
+            "Line 3: the cursor starts at the first position, which is the prefix of length zero.",
+            "Line 4: the comment states the invariant, which is what makes the loop readable.",
+            "Line 5: the condition tests both that positions remain and that the current one is not a match.",
+            "Line 6: advancing the cursor preserves the invariant, because the position just left was rejected.",
+            "Line 7: the loop closes, and the invariant is now true for the whole prefix before the cursor.",
+            "Line 8: the index and the value at that index show the loop stopped on a match.",
+          ],
+        ),
+        invariantExample(
+          "An accumulation whose invariant is checked while it runs",
+          'const scores = [72, 91, 58];\nlet total = 0;\nlet seen = 0;\nfor (const score of scores) {\n  total += score;\n  seen += 1;\n  // Invariant: total is the sum of the first seen scores.\n  console.assert(total === scores.slice(0, seen).reduce((sum, n) => sum + n, 0), "invariant broken");\n}\nconsole.log(total, seen);',
+          "221 3",
+          "The invariant says the total is the sum of the first counted values, and the assertion re-derives that sum from the source array on every pass, so the reasoning is tested rather than trusted. The assertion holds, so nothing extra is printed, and the final log shows the full sum and the number of values that produced it.",
+          [
+            "Line 1: the array is the input the accumulation walks.",
+            "Line 2: the running total starts at zero, which is the sum of no values.",
+            "Line 3: the count of values folded in so far starts at zero as well.",
+            "Line 4: the loop walks the values in order.",
+            "Line 5: one value is added per pass, which is what preserves the invariant.",
+            "Line 6: the count grows with the total so the two stay in step.",
+            "Line 7: the comment states the invariant the assertion will check.",
+            "Line 8: the assertion recomputes the sum of the same prefix and passes the invariant loose if it ever disagrees.",
+            "Line 9: the loop closes after the last value was folded in.",
+            "Line 10: the total and the count show the invariant held all the way to the end.",
+          ],
+        ),
+        invariantExample(
+          "A maximum whose invariant is the answer at the end",
+          'const readings = [3, 17, 8];\nlet best = readings[0];\n// Invariant: best is the largest value among the positions already visited.\nfor (let position = 1; position < readings.length; position += 1) {\n  if (readings[position] > best) {\n    best = readings[position];\n  }\n}\nconsole.log(best);',
+          "17",
+          "Starting from the first reading makes the invariant true before the loop, because the best value among the visited positions is that first value. Each pass compares one new reading and keeps the larger, so the invariant survives every pass and the value left over is the maximum of the whole array.",
+          [
+            "Line 1: the readings are the data the loop scans.",
+            "Line 2: the first reading seeds the best-so-far value so the invariant holds before the loop starts.",
+            "Line 3: the comment states what best means at every step.",
+            "Line 4: the loop starts at the second position because the first one is already the seed.",
+            "Line 5: each pass compares the current reading with the best value seen so far.",
+            "Line 6: a larger reading replaces the seed, which is what keeps the invariant true.",
+            "Line 7: the closing brace ends the replacement branch.",
+            "Line 8: the loop closes after every position was visited.",
+            "Line 9: the printed value is the maximum, because the invariant covers the whole array once the loop ends.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Walk the values with an index and stop at the first value above the limit. Keep the invariant that every position before the found index holds a value at or below the limit, then log the index and the value that broke it.",
+        starterCode: "const values = [3, 8, 15, 21];\nconst limit = 10;\nlet found = -1;\n// walk with an index, stop at the first value above the limit, then log found and values[found]\n",
+        solution: 'const values = [3, 8, 15, 21];\nconst limit = 10;\nlet found = -1;\nfor (let index = 0; index < values.length; index += 1) {\n  if (values[index] > limit) {\n    found = index;\n    break;\n  }\n}\nconsole.log(found, values[found]);',
+        solutionExplanation: "The loop compares each value with the limit while preserving the invariant that all earlier positions stayed at or below it, and the break records the first position that broke the pattern, so printing the index and its value shows exactly where the scan stopped.",
+        testCases: [{ label: "Worker output", expected: "2 15" }],
+        hints: [
+          "Keep an index in the loop header so the found position can be recorded.",
+          "Compare each value with the limit rather than collecting matches.",
+          "Break as soon as the first value above the limit appears.",
+        ],
+      },
+      recap: [
+        "An invariant is true before the loop, after every pass, and after the loop ends, and it is what explains why the result is correct.",
+        "Search, accumulation, and maximum loops each have a one-sentence invariant that makes the code readable without tracing every pass.",
+        "Asserting the invariant while developing turns the reasoning into a check, and the same statement becomes a test later.",
+      ],
+      readingCheck: {
+        prompt: "What makes a statement a usable loop invariant?",
+        choices: [
+          "It is true before the loop, preserved by every pass, and still true after the loop ends",
+          "It is printed on every iteration so the log shows progress",
+          "It is written after the loop once the result is known",
+          "It only needs to be true on the final pass",
+        ],
+        correctIndex: 0,
+        explanation: "The three-part rule is the whole idea: true at the start, preserved by one pass, and true at the end, which is what lets the exit condition plus the invariant prove the result.",
+      },
+      decisionGuide: [
+        { use: "a one-sentence invariant for a loop that is hard to read", insteadOf: "tracing several passes to convince yourself", reason: "The statement plus the exit condition is the argument, and it survives refactoring because it is written about the loop rather than a specific pass." },
+        { use: "an assertion inside the loop while developing", insteadOf: "trusting the reasoning until something breaks later", reason: "The assertion fails at the exact pass where the invariant stopped holding, which is far easier to debug than a wrong total at the end." },
+        { use: "splitting a loop when no invariant can be stated", insteadOf: "adding more comments to describe two jobs at once", reason: "A loop with two unrelated invariants is two loops, and the split usually removes the comment as well." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, edgeCase: true },
     }),
   },
   18: {

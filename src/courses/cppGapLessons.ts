@@ -20,6 +20,21 @@ const example = (title: string, code: string, output: string, explanation: strin
   title, code, output, explanation, lines, mistakes: cppGapMistakes,
 });
 
+/**
+ * The invariant lesson is about the reasoning that justifies a loop, so it carries mistakes
+ * about broken reasoning rather than about container or algorithm misuse.
+ */
+const invariantMistakes: Example["mistakes"] = [
+  { mistake: "Stating an invariant that is not true before the loop starts", error: "A correctness argument that rests on a false starting point", fix: "Check the statement against the initial values and seed the loop variables so it holds immediately." },
+  { mistake: "Updating a loop variable in two places and preserving the invariant in only one", error: "A pass that silently breaks the statement", fix: "Keep one update per loop variable, or re-derive the invariant from the code after every change." },
+  { mistake: "Depending on assert in a release build", error: "A check that disappears wherever NDEBUG is defined", fix: "Treat assertions as development and test tools, and validate release behavior with conditions the code keeps." },
+  { mistake: "Keeping a loop that needs two unrelated invariants", error: "A correctness argument that has to be read twice to be believed", fix: "Split the loop so each one maintains a single statement." },
+];
+
+const invariantExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: invariantMistakes,
+});
+
 export const cppGapLessons: LessonOverrideLibrary = {
   5: {
     compare: authoredLesson({
@@ -386,6 +401,141 @@ export const cppGapLessons: LessonOverrideLibrary = {
       ],
       verification: ["structurally-checked"],
       quality: { codeReading: true, prediction: true, debugging: true },
+    }),
+    design: authoredLesson({
+      title: "Reasoning about loops with invariants",
+      minutes: 24,
+      summary: "State what stays true across a loop, use that statement to justify a search, an accumulation, and a maximum, and check it with an assertion while developing.",
+      learningGoals: [
+        "State a loop invariant as something true before the loop, after every pass, and after the loop ends",
+        "Use the invariant to explain why a search, an accumulation, or a maximum is correct",
+        "Check an invariant with an assertion while developing and understand when assertions disappear",
+      ],
+      explanation: "An invariant is one sentence that is true when the loop starts, stays true after every pass, and is still true when the loop ends. It is the shortest honest answer to why a loop computes what it claims, and it is written about the loop rather than inside it. A linear search carries the invariant that every position before the cursor has been checked and did not match, so when the loop stops either the cursor is a match or it ran past the end and nothing matched. An accumulation carries the invariant that the running total is the sum of the first counted values, which is why adding one value per pass leaves the statement true and why the total after the last pass is the sum of everything. A maximum keeps the invariant that the best value seen so far is the largest among the positions already visited, so one comparison per pass is enough. Reading code this way changes the questions asked: instead of tracing every pass, check that the statement holds before the loop starts, that a single pass preserves it, and that the exit condition combined with the statement gives the result. In C++ the statement can also be checked while developing with an assertion from cassert, which aborts the program at the exact pass where the invariant stopped holding instead of letting a wrong result travel onwards; assertions are compiled into the program unless NDEBUG is defined, which is why they belong in development and tests rather than on a hot path in a release build.",
+      keywordNotes: [
+        "An invariant is true before the loop, after every pass, and after the loop ends.",
+        "The invariant combined with the exit condition is what proves the result, so it is stated about the loop rather than inside it.",
+        "A search invariant describes the checked prefix, an accumulation invariant describes the running total, and a maximum invariant describes the best value seen so far.",
+        "assert from cassert checks the statement during development and aborts at the failing pass, which is far easier to debug than a wrong total later.",
+        "Assertions stay in the program unless NDEBUG is defined, so they are development and test tools rather than release checks.",
+      ],
+      examples: [
+        invariantExample(
+          "A search whose invariant describes the checked prefix",
+          '#include <cstddef>\n#include <iostream>\n#include <vector>\n\nint main() {\n    const std::vector<int> values{4, 9, 16, 25};\n    const int target = 16;\n    std::size_t index = 0;\n    // Invariant: every position before index was checked and did not match.\n    while (index < values.size() && values[index] != target) {\n        ++index;\n    }\n    const bool found = index < values.size();\n    std::cout << (found ? "found at " : "missing at ") << index << \'\\n\';\n    return 0;\n}',
+          "found at 2",
+          "The loop advances the cursor while the current value does not match, so every position left behind has been checked and rejected, and that statement is the whole correctness argument. The short-circuit condition also prevents reading past the end, which is why the found flag can be computed after the loop instead of inside it.",
+          [
+            "Line 1: cstddef provides the size type used for the index.",
+            "Line 2: iostream provides the printing used at the end.",
+            "Line 3: vector supplies the container and its initializer-list construction.",
+            "Line 4: the blank line keeps the includes separate from the entry point.",
+            "Line 5: main is the function the runtime calls.",
+            "Line 6: the values are const because the search never modifies them.",
+            "Line 7: the target is the value being looked for.",
+            "Line 8: the cursor starts at the first position, which is the empty checked prefix.",
+            "Line 9: the comment states the invariant that makes the loop readable.",
+            "Line 10: the condition first checks that positions remain, so the element access is only evaluated while it is valid.",
+            "Line 11: advancing the cursor preserves the invariant, because the position just left was rejected.",
+            "Line 12: the loop closes with the invariant true for the whole checked prefix.",
+            "Line 13: the found flag restates the exit condition, which is what turns the invariant into a conclusion.",
+            "Line 14: the output names which outcome occurred and reports the index either way.",
+            "Line 15: main returns zero to report success to the caller.",
+            "Line 16: the function and program end, having proved the search by its own loop condition.",
+          ],
+        ),
+        invariantExample(
+          "An accumulation whose invariant is asserted while it runs",
+          '#include <cassert>\n#include <cstddef>\n#include <iostream>\n#include <numeric>\n#include <vector>\n\nint main() {\n    const std::vector<int> scores{72, 91, 58};\n    int total = 0;\n    std::size_t seen = 0;\n    for (const int score : scores) {\n        total += score;\n        ++seen;\n        // Invariant: total is the sum of the first seen scores.\n        assert(total == std::accumulate(scores.begin(), scores.begin() + static_cast<std::ptrdiff_t>(seen), 0));\n    }\n    std::cout << total << \' \' << seen << \'\\n\';\n    return 0;\n}',
+          "221 3",
+          "The invariant says the total is the sum of the first counted values, and the assertion recomputes that sum from the same container on every pass, so the reasoning is checked rather than trusted. The assertion holds, so the program runs to the end and prints the full sum with the number of values that produced it.",
+          [
+            "Line 1: cassert provides the assertion that checks the invariant.",
+            "Line 2: cstddef provides the size type used for the count.",
+            "Line 3: iostream provides the output stream.",
+            "Line 4: numeric provides accumulate, which recomputes the sum for the check.",
+            "Line 5: vector supplies the container being accumulated.",
+            "Line 6: the blank line separates the includes from the entry point.",
+            "Line 7: main is the function the runtime calls.",
+            "Line 8: the scores are const because the accumulation only reads them.",
+            "Line 9: the running total starts at zero, which is the sum of no values.",
+            "Line 10: the count of values folded in so far starts at zero as well.",
+            "Line 11: the range-based loop walks the scores in order.",
+            "Line 12: one value is added per pass, which is what preserves the invariant.",
+            "Line 13: the count grows with the total so the two stay in step.",
+            "Line 14: the comment states the invariant the assertion is about to check.",
+            "Line 15: accumulate recomputes the sum of the same prefix, and the assertion aborts if the two disagree.",
+            "Line 16: the loop closes after the last value was folded in.",
+            "Line 17: the total and the count are printed together, so both halves of the invariant are visible.",
+            "Line 18: main returns zero after the assertion held for every pass.",
+            "Line 19: the program ends, and the check disappears only when NDEBUG is defined.",
+          ],
+        ),
+        invariantExample(
+          "A maximum whose invariant is the answer at the end",
+          '#include <cstddef>\n#include <iostream>\n#include <vector>\n\nint main() {\n    const std::vector<int> readings{3, 17, 8};\n    int best = readings.front();\n    // Invariant: best is the largest value among the positions already visited.\n    for (std::size_t position = 1; position < readings.size(); ++position) {\n        if (readings[position] > best) {\n            best = readings[position];\n        }\n    }\n    std::cout << best << \'\\n\';\n    return 0;\n}',
+          "17",
+          "Starting from the first reading makes the invariant true before the loop, because the best value among the visited positions is that first element. Each pass compares one new reading and keeps the larger, so the invariant survives every pass, and once the loop ends the visited positions cover the whole container.",
+          [
+            "Line 1: cstddef provides the size type used for the position.",
+            "Line 2: iostream provides the output stream.",
+            "Line 3: vector supplies the container and its construction.",
+            "Line 4: the blank line separates the includes from the entry point.",
+            "Line 5: main is the function the runtime calls.",
+            "Line 6: the readings are const because the scan never writes to them.",
+            "Line 7: the first reading seeds the best value so the invariant holds before the loop.",
+            "Line 8: the comment states what best means at every step.",
+            "Line 9: the loop starts at the second position because the first one is already the seed.",
+            "Line 10: each pass compares the current reading with the best value seen so far.",
+            "Line 11: a larger reading replaces the seed, which keeps the invariant true.",
+            "Line 12: the closing brace ends the comparison branch.",
+            "Line 13: the loop closes after every position was visited.",
+            "Line 14: the printed value is the maximum, because the invariant covers the whole container once the loop ends.",
+            "Line 15: main returns zero after producing the result.",
+            "Line 16: the program ends, with the reasoning visible in one comment and one comparison.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Walk the values with an index and stop at the first value above the limit. Keep the invariant that every position before the found index holds a value at or below the limit, then print the index and the value that broke it.",
+        starterCode: "// Walk the values with an index and preserve one stated invariant\n",
+        solution: '#include <cstddef>\n#include <iostream>\n#include <vector>\n\nint main() {\n    const std::vector<int> values{3, 8, 15, 21};\n    const int limit = 10;\n    std::size_t found = values.size();\n    for (std::size_t index = 0; index < values.size(); ++index) {\n        if (values[index] > limit) {\n            found = index;\n            break;\n        }\n    }\n    std::cout << found << \' \' << values[found] << \'\\n\';\n    return 0;\n}',
+        solutionExplanation: "The loop compares each value with the limit while preserving the invariant that all earlier positions stayed at or below it, and the break records the first position that broke the pattern, so printing that index and its value shows exactly where the scan stopped.",
+        testCases: [{ label: "First value above the limit", expected: "2 15" }],
+        hints: [
+          "Keep an index in the loop header so the found position can be recorded.",
+          "Compare each value with the limit rather than collecting matches.",
+          "Break as soon as the first value above the limit appears.",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["for\\s*\\(|while\\s*\\(", "break", "std::cout"],
+          successMessage: "The exercise stops at the first value above the limit and prints the position and the value.",
+        },
+      },
+      recap: [
+        "An invariant is true before the loop, after every pass, and after the loop ends, and it is what explains why the result is correct.",
+        "Search, accumulation, and maximum loops each have a one-sentence invariant that makes the code readable without tracing every pass.",
+        "An assertion turns that statement into a check during development, and it stays in the program unless NDEBUG is defined.",
+      ],
+      readingCheck: {
+        prompt: "What makes a statement a usable loop invariant?",
+        choices: [
+          "It is true before the loop, preserved by every pass, and still true after the loop ends",
+          "It is printed on every iteration so the log shows progress",
+          "It is written after the loop once the result is known",
+          "It only needs to be true on the final pass",
+        ],
+        correctIndex: 0,
+        explanation: "The three-part rule is the whole idea: true at the start, preserved by one pass, and true at the end, which is what lets the exit condition plus the invariant prove the result.",
+      },
+      decisionGuide: [
+        { use: "a one-sentence invariant for a loop that is hard to read", insteadOf: "tracing several passes to convince yourself", reason: "The statement plus the exit condition is the argument, and it survives refactoring because it is written about the loop rather than about one pass." },
+        { use: "an assert inside the loop while developing", insteadOf: "trusting the reasoning until something breaks later", reason: "The assertion aborts at the exact pass where the invariant stopped holding, which is far easier to debug than a wrong total at the end." },
+        { use: "splitting a loop when no invariant can be stated", insteadOf: "adding more comments to describe two jobs at once", reason: "A loop with two unrelated invariants is two loops, and the split usually removes the comment as well." },
+      ],
+      verification: ["structurally-checked"],
+      quality: { codeReading: true, edgeCase: true },
     }),
   },
   13: {
