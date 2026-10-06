@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { courseById, courses } from "../courses/catalog";
 import { chapterHasAuthoredDepth, hasEdgeCaseMaterial, hasMisleadingRuntimeClaim, summarizeCourseQuality } from "./curriculumQuality";
 import { checkRequiredPatterns } from "../utils/exerciseCheck";
+import { verifiedModifiedOutputs } from "../courses/modifiedOutputs";
 import { coverageAudit } from "./coverageAudit";
 
 describe("CodeForge curriculum integrity", () => {
@@ -168,17 +169,59 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
-  it("keeps the repaired Java project solutions prompt-faithful and self-consistent", () => {
+  it("keeps every extended variation's expected output tied to its verified entry", () => {
+    // The extended variation injects one extra statement into the chapter sample. Its expected
+    // output is recorded in verifiedModifiedOutputs.ts from a real run (g++ for C++, Node for
+    // JavaScript) or a documented hand derivation (Java), never from a guessed annotation.
+    const suffixes = ["minimal version", "working program", "target behavior", "repaired version", "extended version"];
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
+        for (const lesson of chapter.lessons) {
+          for (const example of lesson.examples) {
+            expect(example.output ?? "", `${course.id} ${example.title}`).not.toContain("plus one added result");
+          }
+          const isModifiedKind = lesson.kind === "modify" || lesson.kind === "design" || lesson.kind === "compare";
+          if (!isModifiedKind) continue;
+          const anchor = lesson.examples.find((example) => suffixes.some((suffix) => example.title.endsWith(`: ${suffix}`)));
+          if (!anchor) continue;
+          const sampleTitle = anchor.title.slice(0, anchor.title.lastIndexOf(": "));
+          const verified = verifiedModifiedOutputs[course.id]?.[sampleTitle];
+          expect(verified, `${course.id} ${lesson.id} has no verified extended output for ${sampleTitle}`).toBeTruthy();
+          expect(lesson.exercise.testCases[0]?.expected, `${course.id} ${lesson.id} expected output`).toBe(verified);
+
+          const extended = lesson.examples.find((example) => example.title === `${sampleTitle}: extended version`);
+          if (extended) expect(extended.output, `${course.id} ${extended.title}`).toBe(verified);
+        }
+      }
+    }
+  });
+
+  it("covers every chapter sample with a verified extended-variation output", () => {
+    for (const course of courses.filter((candidate) => candidate.id !== "python")) {
+      for (const chapter of course.chapters) {
+        const anchor = chapter.lessons
+          .flatMap((lesson) => lesson.examples)
+          .find((example) => ["minimal version", "working program", "target behavior", "repaired version"].some((suffix) => example.title.endsWith(`: ${suffix}`)));
+        if (!anchor) continue;
+        const sampleTitle = anchor.title.slice(0, anchor.title.lastIndexOf(": "));
+        expect(verifiedModifiedOutputs[course.id]?.[sampleTitle], `${course.id} chapter ${chapter.number} (${sampleTitle})`).toBeTruthy();
+      }
+    }
+  });
+
+  it("keeps the repaired Java and C++ project solutions prompt-faithful and self-consistent", () => {
     // Java and C++ cannot run in this browser, so the strongest honest guarantee is that the
     // shipped answer to each project satisfies the project's own structural check and is not the
-    // generated placeholder that older Java chapters shipped.
-    const java = courseById("java")!;
-    for (const chapter of java.chapters) {
+    // generated placeholder that older chapters shipped. The C++ answers were additionally
+    // compiled and executed during authoring (see cppProjectSolutions.ts).
+    for (const courseId of ["java", "cpp"] as const) {
+    const course = courseById(courseId)!;
+    for (const chapter of course.chapters) {
       const project = chapter.project as { solution?: string; checker?: NonNullable<(typeof chapter.lessons)[number]["exercise"]>["checker"] };
-      expect(project.solution, `java chapter ${chapter.number} has no authored project solution`).toBeTruthy();
-      expect(project.solution!, `java chapter ${chapter.number} still ships the generated placeholder`).not.toContain('"modified"');
+      expect(project.solution, `${courseId} chapter ${chapter.number} has no authored project solution`).toBeTruthy();
+      expect(project.solution!, `${courseId} chapter ${chapter.number} still ships the generated placeholder`).not.toContain('"modified"');
       const result = checkRequiredPatterns(project.solution!, project.checker!);
-      expect(result.missing, `java chapter ${chapter.number} project solution misses ${result.missing.join(", ")}`).toEqual([]);
+      expect(result.missing, `${courseId} chapter ${chapter.number} project solution misses ${result.missing.join(", ")}`).toEqual([]);
       expect(result.forbidden).toEqual([]);
       expect(result.invalidPatterns).toEqual([]);
       expect(result.emptyPatterns).toEqual([]);
@@ -190,6 +233,7 @@ describe("CodeForge curriculum integrity", () => {
         expect(lessonResult.missing, `${lesson.id} solution misses ${lessonResult.missing.join(", ")}`).toEqual([]);
         expect(lessonResult.forbidden, `${lesson.id} solution uses a forbidden construct`).toEqual([]);
       }
+    }
     }
   });
 

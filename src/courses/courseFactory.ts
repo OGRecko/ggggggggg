@@ -1,4 +1,5 @@
 import type { Chapter, ChapterTest, Course, Example, Exercise, LanguageId, Lesson, LessonKind, LessonQuality, ProjectExercise, VerificationKind } from "../data/types";
+import { verifiedModifiedOutputs } from "./modifiedOutputs";
 
 export type DeepDive = {
   chapter: number;
@@ -96,6 +97,19 @@ type Sample = {
   hints: string[];
   runtime: boolean;
 };
+
+/**
+ * The expected output of this sample's extended variation (modifiedCode below). The values live in
+ * modifiedOutputs.ts because they were produced by executing the variation where this project can
+ * (g++ for C++, the local worker/Node for JavaScript) or derived by hand where it cannot (Java),
+ * rather than annotated with a guessed suffix.
+ */
+function modifiedOutputFor(language: Exclude<LanguageId, "python">, sample: Sample) {
+  const verified = verifiedModifiedOutputs[language]?.[sample.title];
+  if (verified) return verified;
+  if (language === "htmlcss") return `${sample.output}, plus the added practice paragraph`;
+  return `${sample.output}\nmodified`;
+}
 
 const mistakes: Example["mistakes"] = [
   { mistake: "Changing a required keyword or punctuation mark", error: "A structure review fails; a real compiler or runtime may reject the program", fix: "Compare braces, parentheses, semicolons, and keyword spelling with the working example." },
@@ -361,7 +375,7 @@ function buildExercise(language: Exclude<LanguageId, "python">, topic: string, s
     starterCode: plan.project.starterCode ?? blankStarter(language),
     solution: plan.project.solution ?? sample.code,
     solutionExplanation: plan.project.solutionExplanation ?? `This small build applies ${topic.toLowerCase()} in a realistic scenario while keeping the boundary explicit and reviewable.`,
-    testCases: plan.project.testCases ?? [{ label: `${topic} build`, expected: sample.output }],
+    testCases: plan.project.testCases ?? [{ label: `${topic} build`, expected: plan.project.solution ? sample.output : modifiedOutputFor(language, sample) }],
     hints: plan.project.hints ?? sample.hints,
     checker: checkerFor(language, { ...sample, required: plan.project.requiredPatterns ?? sample.required }, true),
   };
@@ -391,7 +405,7 @@ function exerciseForKind(language: Exclude<LanguageId, "python">, kind: LessonKi
     starterCode: sample.code,
     solution: modifiedCode(language, sample.code),
     solutionExplanation: "The modification extends an existing working program instead of replacing it. This mirrors real programming work: understand the current boundary, make one focused change, then re-check the important construct.",
-    testCases: [{ label: `Modified ${topic}`, expected: sample.output }],
+    testCases: [{ label: `Modified ${topic}`, expected: modifiedOutputFor(language, sample) }],
     hints: ["Keep the original code first.", "Add one small visible output or semantic element.", "Do not remove the chapter feature while extending the example."],
     checker: checkerFor(language, sample, true),
   };
@@ -499,7 +513,7 @@ function examplesForKind(language: Exclude<LanguageId, "python">, kind: LessonKi
   ];
   if (kind === "compare" || kind === "design") return [
     example(sample, "minimal version", sample.code, sample.output, `This version keeps ${plan.concepts[0]?.toLowerCase() ?? "the chapter concept"} explicit.`),
-    example(sample, "extended version", modifiedCode(language, sample.code), `${sample.output} plus one added result`, `This variation is useful only when the new requirement is deliberate and still keeps ${plan.concepts[0]?.toLowerCase() ?? "the key feature"} visible.`),
+    example(sample, "extended version", modifiedCode(language, sample.code), modifiedOutputFor(language, sample), `This variation is useful only when the new requirement is deliberate and still keeps ${plan.concepts[0]?.toLowerCase() ?? "the key feature"} visible. Its expected output is the one the extended program actually produces.`),
   ];
   if (kind === "build" || kind === "blank-page" || kind === "integration" || kind === "challenge") return [
     example(sample, "target behavior", sample.code, sample.output, "This is the behavior you will reproduce from a blank editor or adapt to the project requirement."),

@@ -17,6 +17,34 @@ export function authoredLesson(input: Omit<AuthoredLessonDraft, "authoredDepth">
 
 export type LessonOverrideLibrary = Partial<Record<number, Partial<Record<NonNullable<ChapterPlan["lessonKinds"]>[number], AuthoredLessonDraft>>>>;
 
+export type ProjectSolution = {
+  solution: string;
+  solutionExplanation: string;
+  expected: string;
+};
+
+/**
+ * Replaces a chapter project's generated placeholder solution with an authored one and points the
+ * project's test case at the authored expected result. The project-shaped lesson kinds
+ * (blank-page, build, integration, challenge) read the same project solution, so one entry keeps
+ * the lesson exercises and the chapter project consistent.
+ */
+export function applyProjectSolutions(plans: ChapterPlan[], solutions: Partial<Record<number, ProjectSolution>>): ChapterPlan[] {
+  return plans.map((plan, index) => {
+    const authored = solutions[index + 1];
+    if (!authored) return plan;
+    return {
+      ...plan,
+      project: {
+        ...plan.project,
+        solution: authored.solution,
+        solutionExplanation: authored.solutionExplanation,
+        testCases: [{ label: `${plan.title} project`, expected: authored.expected }],
+      },
+    };
+  });
+}
+
 export function applyAuthoredLessons(plans: ChapterPlan[], overrides: LessonOverrideLibrary): ChapterPlan[] {
   return plans.map((plan, index) => {
     const chapterNumber = index + 1;

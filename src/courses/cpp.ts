@@ -1,7 +1,8 @@
 import { buildCourse } from "./courseFactory";
-import { applyAuthoredLessons, beginnerMilestones, chapterPlan, intermediateMilestones, projectPlan, q, reviewRubric } from "./chapterPlanHelpers";
+import { applyAuthoredLessons, applyProjectSolutions, beginnerMilestones, chapterPlan, intermediateMilestones, projectPlan, q, reviewRubric } from "./chapterPlanHelpers";
 import { cppAuthoredLessons } from "./cppAuthoredLessons";
 import { cppGapLessons } from "./cppGapLessons";
+import { cppProjectSolutions } from "./cppProjectSolutions";
 
 const cppProject = (title: string, brief: string, scenario: string, prompt: string, requiredPatterns: string[], requirements: string[], acceptanceCriteria: string[], edgeCases: string[], hints: string[]) => projectPlan({
   title,
@@ -54,7 +55,7 @@ const cumulativeTests = {
   25: [q("What makes the C++ capstone truly cumulative?", ["It combines ownership, STL choices, validation, architecture, and API design", "It only repeats iostream output", "It removes memory management", "It ignores earlier chapters"], 0, "A capstone integrates the course themes."), q("Why is a repository boundary useful even in a small native design?", ["It separates storage concerns from business rules and allows alternate implementations later", "It removes all ownership questions", "It forbids tests", "It replaces value objects"], 0, "Architecture scales from small designs upward."), q("Why does the capstone still mention toolchain limits?", ["Because honest engineering education distinguishes conceptual workflow from verified native execution", "Because C++ cannot be compiled anywhere", "Because architecture only matters in browsers", "Because RAII replaces linking"], 0, "The capstone keeps educational value without fake execution claims.")],
 } as const;
 
-const cppPlans = applyAuthoredLessons(applyAuthoredLessons([...rawCppPlans], cppAuthoredLessons), cppGapLessons);
+const cppPlans = applyAuthoredLessons(applyAuthoredLessons(applyProjectSolutions([...rawCppPlans], cppProjectSolutions), cppAuthoredLessons), cppGapLessons);
 
 export const cppCourse = buildCourse({
   id: "cpp", name: "C++", version: "C++23", accent: "#4178c0", icon: "C++",
