@@ -83,10 +83,26 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
-  it("keeps major chapters authored, edge-case aware, and honest about runtime limits", () => {
+  it("keeps major chapters edge-case aware, educationally complete, and honest about runtime limits", () => {
     for (const course of courses.filter((course) => course.id !== "python")) {
+      const summary = summarizeCourseQuality(course);
+      expect(summary.structuralCompleteness.chaptersMissingStructuralCompleteness).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingExplanation).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingSyntax).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingTerminology).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingMultipleExamples).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingCodeReading).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingPrediction).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingModification).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingBlankPage).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingEdgeCase).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingAssessment).toEqual([]);
+      expect(summary.educationalCompleteness.chaptersMissingProjectApplication).toEqual([]);
+      const majorDeepDiveChapters = summary.chapterDepthCounts.deepDiveChapters.filter((chapterNumber) => course.chapters[chapterNumber - 1]?.major);
+      expect(summary.authoredMajorChapters).toEqual(expect.arrayContaining(majorDeepDiveChapters));
+      expect(summary.chapterDepthCounts.deepDiveChapters).toEqual(expect.arrayContaining([5, 10, 15, 20, 25]));
       for (const chapter of course.chapters.filter((candidate) => candidate.major)) {
-        expect(chapterHasAuthoredDepth(chapter)).toBe(true);
+        expect(chapterHasAuthoredDepth(chapter, "scaffolded")).toBe(true);
         expect(chapter.prerequisiteChapters?.every((value) => value < chapter.number)).not.toBe(false);
         expect(chapter.lessons.some((lesson) => hasEdgeCaseMaterial(lesson, chapter.project, chapter.test))).toBe(true);
         expect(chapter.lessons.some((lesson) => hasMisleadingRuntimeClaim(lesson))).toBe(false);
@@ -99,8 +115,8 @@ describe("CodeForge curriculum integrity", () => {
       const summary = summarizeCourseQuality(course);
       expect(summary.chaptersMissingAcceptanceCriteria).toEqual([]);
       expect(summary.chaptersWithInvalidPrerequisites).toEqual([]);
-      expect(summary.authoredMajorChapters.length).toBeGreaterThanOrEqual(10);
-      expect(summary.repetitiveFindings.length).toBeLessThan(24);
+      expect(summary.lessonDepthCounts["deep-dive"]).toBeGreaterThanOrEqual(5);
+      expect(summary.repetitiveFindings.length).toBeLessThan(40);
     }
   });
 

@@ -1,5 +1,5 @@
 import type { ChapterTest } from "../data/types";
-import type { ChapterPlan, CourseProjectPlan } from "./courseFactory";
+import type { AuthoredLessonDraft, ChapterPlan, CourseProjectPlan } from "./courseFactory";
 
 export const q = (question: string, choices: string[], correctIndex: number, explanation: string): ChapterTest => ({ question, choices, correctIndex, explanation });
 
@@ -9,6 +9,27 @@ export function projectPlan(input: CourseProjectPlan): CourseProjectPlan {
 
 export function chapterPlan(input: ChapterPlan): ChapterPlan {
   return input;
+}
+
+export function authoredLesson(input: Omit<AuthoredLessonDraft, "authoredDepth">): AuthoredLessonDraft {
+  return { authoredDepth: "authored", ...input };
+}
+
+export type LessonOverrideLibrary = Partial<Record<number, Partial<Record<NonNullable<ChapterPlan["lessonKinds"]>[number], AuthoredLessonDraft>>>>;
+
+export function applyAuthoredLessons(plans: ChapterPlan[], overrides: LessonOverrideLibrary): ChapterPlan[] {
+  return plans.map((plan, index) => {
+    const chapterNumber = index + 1;
+    const lessonOverrides = overrides[chapterNumber];
+    if (!lessonOverrides) return plan;
+    return {
+      ...plan,
+      authoredLessons: {
+        ...plan.authoredLessons,
+        ...lessonOverrides,
+      },
+    };
+  });
 }
 
 export function beginnerMilestones(feature: string) {

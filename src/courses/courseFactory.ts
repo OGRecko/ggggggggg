@@ -43,6 +43,23 @@ export type CourseProjectPlan = {
   checkerMode?: NonNullable<Exercise["checker"]>["mode"];
 };
 
+export type AuthoredLessonDraft = {
+  title?: string;
+  minutes?: number;
+  summary?: string;
+  learningGoals?: string[];
+  explanation?: string;
+  keywordNotes?: string[];
+  examples?: Example[];
+  exercise?: Exercise;
+  recap?: string[];
+  decisionGuide?: Lesson["decisionGuide"];
+  readingCheck?: Lesson["readingCheck"];
+  verification?: VerificationKind[];
+  quality?: Partial<Omit<LessonQuality, "authoredDepth" | "coveredConcepts" | "prerequisiteChapters" | "notes">>;
+  authoredDepth?: Exclude<LessonQuality["authoredDepth"], "scaffolded">;
+};
+
 export type ChapterPlan = {
   title: string;
   focus: string;
@@ -52,6 +69,7 @@ export type ChapterPlan = {
   prerequisiteChapters?: number[];
   major?: boolean;
   qualitySummary?: string[];
+  authoredLessons?: Partial<Record<LessonKind, AuthoredLessonDraft>>;
   project: CourseProjectPlan;
   test: ChapterTest[];
 };
@@ -289,7 +307,12 @@ function verificationFor(language: Exclude<LanguageId, "python">, sample: Sample
   return sample.runtime ? ["executed"] : ["pattern-checked"];
 }
 
-function qualityFor(kind: LessonKind, plan: ChapterPlan, depth: LessonQuality["authoredDepth"] = "authored"): LessonQuality {
+function qualityFor(
+  kind: LessonKind,
+  plan: ChapterPlan,
+  depth: LessonQuality["authoredDepth"] = "scaffolded",
+  overrides: Partial<Omit<LessonQuality, "authoredDepth" | "coveredConcepts" | "prerequisiteChapters" | "notes">> = {},
+): LessonQuality {
   return {
     explanation: true,
     syntax: true,
@@ -303,6 +326,7 @@ function qualityFor(kind: LessonKind, plan: ChapterPlan, depth: LessonQuality["a
     edgeCase: kind === "deep-dive" || kind === "integration" || Boolean(plan.project.edgeCases.length),
     assessment: kind === "assessment" || plan.test.length > 0,
     project: true,
+    ...overrides,
     authoredDepth: depth,
     coveredConcepts: plan.concepts,
     prerequisiteChapters: plan.prerequisiteChapters,
@@ -501,25 +525,27 @@ function makeLessonSet(language: Exclude<LanguageId, "python">, chapter: number,
     `The strongest honest verification available here is ${verificationFor(language, sample, checkerFor(language, sample)).join(", ")}.`,
   ];
   return lessonKindsFor(plan, hasDeepDive).map((kind, index) => {
-    const exercise = exerciseForKind(language, kind, plan.title, sample, plan);
+    const override = plan.authoredLessons?.[kind];
+    const exercise = override?.exercise ?? exerciseForKind(language, kind, plan.title, sample, plan);
+    const authoredDepth = override?.authoredDepth ?? "scaffolded";
     return {
       id: `${language}-${chapter}-${index + 1}`,
       chapter,
       order: index + 1,
       kind,
-      minutes: ["blank-page", "build", "integration"].includes(kind) ? 32 : kind === "debug" ? 30 : 27,
-      title: `${labelForKind(kind)}: ${plan.title}`,
-      summary: summaryForKind(kind, plan.title, plan, language),
-      learningGoals: learningGoalsForKind(kind, plan),
-      explanation: explanationForKind(kind, plan.title, sample, plan, language),
-      keywordNotes: (plan.terminology ?? plan.concepts).slice(0, 4),
-      examples: examplesForKind(language, kind, sample, plan),
+      minutes: override?.minutes ?? (["blank-page", "build", "integration"].includes(kind) ? 32 : kind === "debug" ? 30 : 27),
+      title: override?.title ?? `${labelForKind(kind)}: ${plan.title}`,
+      summary: override?.summary ?? summaryForKind(kind, plan.title, plan, language),
+      learningGoals: override?.learningGoals ?? learningGoalsForKind(kind, plan),
+      explanation: override?.explanation ?? explanationForKind(kind, plan.title, sample, plan, language),
+      keywordNotes: override?.keywordNotes ?? (plan.terminology ?? plan.concepts).slice(0, 4),
+      examples: override?.examples ?? examplesForKind(language, kind, sample, plan),
       exercise,
-      recap: baseRecap,
-      decisionGuide: commonGuide(language, plan),
-      readingCheck: readingCheckForKind(kind, plan.title, sample, plan),
-      verification: verificationFor(language, sample, exercise.checker),
-      quality: qualityFor(kind, plan),
+      recap: override?.recap ?? baseRecap,
+      decisionGuide: override?.decisionGuide ?? commonGuide(language, plan),
+      readingCheck: override?.readingCheck ?? readingCheckForKind(kind, plan.title, sample, plan),
+      verification: override?.verification ?? verificationFor(language, sample, exercise.checker),
+      quality: qualityFor(kind, plan, authoredDepth, override?.quality),
     };
   });
 }

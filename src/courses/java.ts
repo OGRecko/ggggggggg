@@ -1,7 +1,8 @@
 import { buildCourse } from "./courseFactory";
-import { advancedMilestones, beginnerMilestones, chapterPlan, intermediateMilestones, projectPlan, q, reviewRubric } from "./chapterPlanHelpers";
+import { advancedMilestones, applyAuthoredLessons, beginnerMilestones, chapterPlan, intermediateMilestones, projectPlan, q, reviewRubric } from "./chapterPlanHelpers";
+import { javaAuthoredLessons } from "./javaAuthoredLessons";
 
-const javaPlans = [
+const rawJavaPlans = [
   chapterPlan({
     title: "Getting Started",
     focus: "Understand the JDK, JRE, and JVM, how Java source files are launched, and why main is the entry point in a browser-safe static workflow.",
@@ -606,7 +607,7 @@ const javaPlans = [
     title: "Web Service Foundations",
     focus: "Connect route handling, request validation, JSON responses, and layered service design without pretending a framework server is running here.",
     concepts: ["route handling", "request validation", "JSON response shape", "service layering"],
-    lessonKinds: ["learn", "read", "predict", "design", "build"],
+    lessonKinds: ["learn", "read", "predict", "design", "debug", "build"],
     prerequisiteChapters: [5, 7, 9, 17, 18, 20, 21],
     project: projectPlan({
       title: "Project: route status model",
@@ -632,7 +633,7 @@ const javaPlans = [
     title: "Advanced Java",
     focus: "Use sealed classes, pattern matching, records, advanced switch, and modern language design trade-offs carefully.",
     concepts: ["sealed hierarchies", "pattern matching", "records", "advanced switch"],
-    lessonKinds: ["learn", "compare", "predict", "design", "build"],
+    lessonKinds: ["learn", "compare", "predict", "design", "debug", "build"],
     prerequisiteChapters: [9, 10, 13, 15, 21, 22],
     major: true,
     project: projectPlan({
@@ -738,6 +739,8 @@ const cumulativeTests = {
     q("What keeps this capstone technically honest?", ["It distinguishes structural review from compilation and keeps unavailable workflows conceptual", "It fabricates Maven output", "It claims JDBC and HTTP ran in the browser", "It marks every topic complete automatically"], 0, "The project can still be educationally useful while staying honest about runtime limits."),
   ],
 } as const;
+
+const javaPlans = applyAuthoredLessons([...rawJavaPlans], javaAuthoredLessons);
 
 export const javaCourse = buildCourse({
   id: "java",

@@ -1,0 +1,434 @@
+import type { Example } from "../data/types";
+import { authoredLesson, type LessonOverrideLibrary } from "./chapterPlanHelpers";
+
+const cppMistakes: Example["mistakes"] = [
+  { mistake: "Returning or storing a reference to an object whose lifetime has already ended", error: "Undefined behavior that may appear to work briefly", fix: "Identify which object owns the storage and whether that storage is still alive when the reference or pointer is used." },
+  { mistake: "Representing ownership with a raw pointer without a clear cleanup rule", error: "Leaks, double delete, or confusing aliasing", fix: "Choose the narrowest ownership tool that communicates who destroys the resource." },
+  { mistake: "Locking too much or forgetting which state the mutex protects", error: "Deadlock risk or ineffective synchronization", fix: "Name the shared state, then lock only the critical section that reads or writes it." },
+];
+
+const example = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title,
+  code,
+  output,
+  explanation,
+  lines,
+  mistakes: cppMistakes,
+});
+
+export const cppAuthoredLessons: LessonOverrideLibrary = {
+  6: {
+    learn: authoredLesson({
+      summary: "Understand pointers and references as lifetime-sensitive views over existing objects, not as magic syntax for 'advanced C++'.",
+      learningGoals: [
+        "Explain the difference between an address, a pointer, and a reference",
+        "Predict when a pointer or reference becomes dangling",
+        "Choose the smallest capability needed for read-only versus mutable access",
+      ],
+      explanation: "Pointers and references are both ways to reach an existing object, but they communicate different capabilities. A reference must refer to a valid object immediately and acts as an alias. A pointer can be reseated or null, which makes absence representable but also forces extra lifetime discipline. The central C++ question is not 'can I write * or &'; it is 'who owns the object, and will that object still exist when I use this access path later?' Dangling access is dangerous precisely because undefined behavior may look normal before it fails.",
+      keywordNotes: [
+        "&value in an expression takes the address of an existing object.",
+        "T& is a reference: an alias that must already refer to a live object.",
+        "T* is a pointer: a value that stores an address and may also be null or reseated.",
+        "A dangling pointer or reference still has syntax, but the object it was meant to refer to is no longer alive.",
+      ],
+      examples: [
+        example(
+          "One object, two access paths",
+          '#include <iostream>\nint main() {\n    int value = 3;\n    int* pointer = &value;\n    int& reference = value;\n    *pointer += 2;\n    std::cout << value << " " << reference << \'\\n\';\n    return 0;\n}',
+          '5 5',
+          "The pointer and reference both refer to the same live int object, so mutating through one access path changes what the other path observes.",
+          [
+            "Line 1: iostream is included so the example can make the shared state visible through console output.",
+            "Line 2: main begins one stack frame that owns the lifetime of value, pointer, and reference for the duration of this function.",
+            "Line 3: value is the actual int object. It owns the storage everyone else in this example refers to.",
+            "Line 4: pointer stores value's address. The pointer is a separate object whose contents can change later even though value's identity stays the same.",
+            "Line 5: reference becomes a second name for the same int object. Unlike the pointer, it cannot be reseated to refer somewhere else later.",
+            "Line 6: *pointer dereferences the address back to the int object and mutates that shared storage. Removing the * would try to change the pointer value instead of the int it points at.",
+            "Line 7: printing value and reference shows 5 twice because both names observe the same modified object.",
+            "Line 8: main returns and ends the lifetime of every local object in this example.",
+          ],
+        ),
+        example(
+          "Returning a reference to a dead local is a bug",
+          '#include <string>\nconst std::string& bad() {\n    std::string text{"temporary"};\n    return text;\n}',
+          'A dangling reference bug',
+          "The returned reference would refer to a std::string whose lifetime ended when bad returned, so any later use is undefined behavior.",
+          [
+            "Line 1: the example uses std::string because lifetime bugs are easier to visualize when a real object owns dynamic data.",
+            "Line 2: the function signature promises to return a reference, so the caller will assume some other object continues to exist afterward.",
+            "Line 3: text is a local object owned by this function call only.",
+            "Line 4: returning text returns a reference to an object whose lifetime ends immediately after the function exits. The syntax compiles in many toolchains, but the contract is broken.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Write int value = 2; int* pointer = &value; int& reference = value; add 1 through *pointer, then print reference so the output is 3.",
+        starterCode: "#include <iostream>\n\n// Build one pointer and one reference to the same int\n",
+        solution: '#include <iostream>\nint main() {\n    int value = 2;\n    int* pointer = &value;\n    int& reference = value;\n    *pointer += 1;\n    std::cout << reference << \'\\n\';\n    return 0;\n}',
+        solutionExplanation: "pointer stores value's address, reference aliases the same object, and dereferencing pointer mutates the shared int before reference prints it.",
+        testCases: [{ label: "Shared int result", expected: "3" }],
+        hints: ["Take the address of value with &value.", "Create a reference alias with int& reference = value;.", "Dereference the pointer with *pointer before incrementing."],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["int\\s+value", "int\\*\\s+pointer\\s*=\\s*&value", "int&\\s+reference\\s*=\\s*value", "\\*pointer\\s*\\+=\\s*1"],
+          successMessage: "The exercise shows one pointer, one reference, and one dereference update.",
+        },
+      },
+      recap: [
+        "Pointers and references both access existing objects, but they communicate different capabilities and failure modes.",
+        "The crucial design question is object lifetime: will the referred-to object still exist when this access path is used?",
+        "Undefined behavior from dangling access is dangerous because it may look fine before it fails.",
+      ],
+      readingCheck: {
+        prompt: "Why is return text; in bad() a lifetime bug?",
+        choices: [
+          "Because text is a local object destroyed when the function returns",
+          "Because references cannot refer to strings",
+          "Because std::string must always live on the heap",
+          "Because const makes the object temporary",
+        ],
+        correctIndex: 0,
+        explanation: "The caller would receive a reference to an object that no longer exists after the function exits.",
+      },
+      decisionGuide: [
+        { use: "a const reference for borrowed read-only access", insteadOf: "copying a large object or storing a raw pointer without need", reason: "The signature states that the function will not mutate the object and does not need null or reseating semantics." },
+        { use: "a pointer only when absence or reseating is part of the design", insteadOf: "using pointers for every parameter", reason: "The extra capability of a pointer should correspond to a real design need, not habit." },
+      ],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  7: {
+    learn: authoredLesson({
+      summary: "Use RAII to tie cleanup to lifetime so resource management becomes a property of the type instead of a hope at every call site.",
+      learningGoals: [
+        "Explain why destructors make cleanup reliable",
+        "Distinguish owning resource types from ordinary value-only classes",
+        "Recognize when the rule of zero is better than hand-writing special members",
+      ],
+      explanation: "RAII means Resource Acquisition Is Initialization: a type acquires responsibility in its constructor and releases it in its destructor. The big win is not just fewer lines of cleanup code. The real win is that cleanup becomes a guaranteed consequence of lifetime, including early returns and exceptions. When a type can rely on existing RAII members such as std::string, std::vector, or std::unique_ptr, the rule of zero is usually better than manually writing copy, move, and destructor logic yourself.",
+      keywordNotes: [
+        "A destructor runs automatically when an object leaves scope, even during stack unwinding.",
+        "RAII ties resource release to object lifetime instead of to scattered manual cleanup calls.",
+        "The rule of zero means composing well-behaved members so the compiler-generated special members stay correct.",
+      ],
+      examples: [
+        example(
+          "Destructor order makes cleanup visible",
+          '#include <iostream>\nstruct Guard {\n    ~Guard() { std::cout << "cleanup\\n"; }\n};\nint main() {\n    Guard guard;\n    std::cout << "work\\n";\n    return 0;\n}',
+          'work\ncleanup',
+          "The destructor runs because guard's lifetime ends at scope exit, not because main remembered to call a cleanup function by hand.",
+          [
+            "Line 1: iostream makes the lifetime order visible in the console.",
+            "Line 2: Guard models one scoped responsibility rather than a data-only record.",
+            "Line 3: the destructor is the cleanup hook. If main returned early or threw, this function would still run during scope exit.",
+            "Line 4: the type definition ends after naming the cleanup behavior.",
+            "Line 5: main starts the scope that owns guard.",
+            "Line 6: constructing guard means the cleanup responsibility is now attached to this scope.",
+            "Line 7: the work message prints while guard is still alive.",
+            "Line 8: returning from main ends guard's lifetime and triggers the destructor, which prints cleanup.",
+          ],
+        ),
+        example(
+          "Prefer rule-of-zero members over raw ownership",
+          '#include <memory>\n#include <string>\nstruct Lesson {\n    std::string title;\n    std::unique_ptr<int> minutes;\n};',
+          'A rule-of-zero owning type',
+          "The class lets std::string and std::unique_ptr own their own cleanup rules, which is often safer than storing a raw owning pointer and hand-writing deletion logic.",
+          [
+            "Line 1: unique_ptr is included because the type wants one owning pointer with automatic cleanup.",
+            "Line 2: string is included because ordinary value members also manage resources safely through their own RAII behavior.",
+            "Line 3: Lesson is a small type whose members already know how to clean themselves up.",
+            "Line 4: title is a normal RAII string member; no manual destructor code is needed for it.",
+            "Line 5: minutes uses unique_ptr to make ownership explicit. Replacing this with int* would force the class to answer copy, move, and deletion questions itself.",
+            "Line 6: the type definition ends without a manual destructor because the members already encode the cleanup policy.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Define struct Guard with a destructor that prints cleanup. In main, create Guard guard; print work; then let scope exit print cleanup.",
+        starterCode: "#include <iostream>\n\n// Build one RAII-style guard type\n",
+        solution: '#include <iostream>\nstruct Guard {\n    ~Guard() { std::cout << "cleanup\\n"; }\n};\nint main() {\n    Guard guard;\n    std::cout << "work\\n";\n    return 0;\n}',
+        solutionExplanation: "Guard's destructor performs the cleanup message automatically when the object leaves scope, which is the central RAII idea.",
+        testCases: [{ label: "Destructor order", expected: "work\ncleanup" }],
+        hints: ["Use ~Guard() for the destructor.", "Create a local Guard object inside main.", "Print work before returning so the destructor order stays visible."],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["struct\\s+Guard", "~Guard\\s*\\(", "Guard\\s+guard", "cleanup"],
+          successMessage: "The exercise shows a local guard object and a destructor-based cleanup step.",
+        },
+      },
+      recap: [
+        "RAII turns cleanup into a lifetime rule of the type instead of a manual habit at every call site.",
+        "Destructors run at scope exit, including early-return and exception paths.",
+        "When existing RAII members already express ownership correctly, the rule of zero is often safer than manual special-member code.",
+      ],
+      readingCheck: {
+        prompt: "Why is std::unique_ptr a better member than a raw owning int* in the Lesson example?",
+        choices: [
+          "Because the ownership and cleanup rule are encoded in the type itself",
+          "Because unique_ptr allows unlimited shared ownership",
+          "Because raw pointers cannot point to ints",
+          "Because destructors do not run for class members",
+        ],
+        correctIndex: 0,
+        explanation: "unique_ptr states exclusive ownership and automatically destroys the owned object, so the surrounding type does not need ad hoc delete logic.",
+      },
+      decisionGuide: [
+        { use: "RAII members that already know how to clean themselves up", insteadOf: "manual cleanup flags and remembered delete calls", reason: "The lifetime rule becomes part of the type and keeps error paths from leaking resources." },
+        { use: "the rule of zero when composition is enough", insteadOf: "writing custom copy, move, and destructor code without a real need", reason: "Manual special-member logic is only worth the complexity when the type truly owns a resource that existing RAII types cannot represent directly." },
+      ],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  13: {
+    learn: authoredLesson({
+      summary: "Choose explicit ownership with smart pointers and move semantics instead of leaving heap lifetime policy implied or fragile.",
+      learningGoals: [
+        "Explain when unique_ptr is the right default ownership tool",
+        "Distinguish shared ownership from observation",
+        "Predict why returning or storing ownership by move is different from copying a value type",
+      ],
+      explanation: "Modern C++ memory management is really ownership management. Stack objects already have clear lifetime rules. Heap objects become manageable when the type communicates who owns deletion responsibility. unique_ptr expresses single ownership and move-only transfer. shared_ptr expresses reference-counted shared ownership, which should be rarer because it spreads lifetime across several participants. weak_ptr exists so code can observe a shared object without keeping it alive forever and creating a cycle.",
+      keywordNotes: [
+        "std::make_unique constructs an owned object without exposing raw new at the call site.",
+        "A move transfers ownership from one object to another instead of duplicating the owned resource.",
+        "weak_ptr observes a shared object without extending its lifetime, which helps break cycles.",
+      ],
+      examples: [
+        example(
+          "Exclusive ownership is clear and local",
+          '#include <iostream>\n#include <memory>\nint main() {\n    auto score = std::make_unique<int>(3);\n    *score += 2;\n    std::cout << *score << \'\\n\';\n    return 0;\n}',
+          '5',
+          "The unique_ptr owns one heap int object and automatically destroys it when score leaves scope.",
+          [
+            "Line 1: iostream is used only to make the owned value visible.",
+            "Line 2: memory is required because the example uses std::unique_ptr and std::make_unique.",
+            "Line 3: main owns the pointer object named score.",
+            "Line 4: make_unique constructs the heap int and places its ownership directly into score. This is safer than using raw new and remembering a later delete manually.",
+            "Line 5: dereferencing score reaches the owned int object and updates its value from 3 to 5.",
+            "Line 6: printing *score confirms the mutation while the object is still alive.",
+            "Line 7: returning from main destroys score, which in turn deletes the owned int automatically.",
+          ],
+        ),
+        example(
+          "Observation should not always be ownership",
+          '#include <memory>\nstruct Node {\n    std::shared_ptr<Node> next;\n    std::weak_ptr<Node> previous;\n};',
+          'A cycle-aware linked structure sketch',
+          "Using weak_ptr for the backward link avoids a reference cycle where both nodes would keep each other alive forever.",
+          [
+            "Line 1: memory is needed because the example compares shared and weak ownership roles.",
+            "Line 2: Node models a structure where objects may refer to each other in both directions.",
+            "Line 3: next shares ownership of the following node because the forward chain may keep that node alive.",
+            "Line 4: previous observes the backward link without extending lifetime. If this were another shared_ptr, two nodes could keep each other alive even after the rest of the program stopped using them.",
+            "Line 5: the type definition ends after naming the ownership policy explicitly in the member types.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Use auto value = std::make_unique<int>(4); add 1 through *value; then print 5.",
+        starterCode: "#include <iostream>\n#include <memory>\n\n// Build one unique owner for a heap int\n",
+        solution: '#include <iostream>\n#include <memory>\nint main() {\n    auto value = std::make_unique<int>(4);\n    *value += 1;\n    std::cout << *value << \'\\n\';\n    return 0;\n}',
+        solutionExplanation: "make_unique creates the owned heap value, unique_ptr owns its cleanup, and dereferencing lets the program update the pointed-to int while it is alive.",
+        testCases: [{ label: "Owned heap int", expected: "5" }],
+        hints: ["Include <memory> for unique_ptr and make_unique.", "Use auto value = std::make_unique<int>(4);.", "Dereference the pointer object with *value before printing."],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["std::make_unique<int>", "\\*value\\s*\\+=\\s*1", "std::cout\\s*<<\\s*\\*value"],
+          successMessage: "The exercise shows unique ownership and mutation through the owned pointer.",
+        },
+      },
+      recap: [
+        "Heap memory becomes manageable when the type communicates who owns destruction responsibility.",
+        "unique_ptr is the default for one owner; shared_ptr is for real shared lifetime, and weak_ptr observes without owning.",
+        "Move semantics transfer ownership rather than copying the owned resource.",
+      ],
+      readingCheck: {
+        prompt: "Why is weak_ptr used for previous in the Node sketch?",
+        choices: [
+          "So the backward link can observe a shared node without keeping it alive forever",
+          "Because weak_ptr owns memory more strongly than shared_ptr",
+          "Because shared_ptr cannot point to another Node",
+          "Because weak_ptr is required for every member pointer",
+        ],
+        correctIndex: 0,
+        explanation: "weak_ptr breaks ownership cycles by observing a shared object without participating in its reference count.",
+      },
+      decisionGuide: [
+        { use: "unique_ptr for one owner", insteadOf: "a raw owning pointer or shared_ptr by default", reason: "The ownership rule stays clear, move-only, and easy to audit." },
+        { use: "weak_ptr only when observing shared state", insteadOf: "another shared_ptr for every relationship", reason: "Observation should not automatically extend lifetime and create leaks through cycles." },
+      ],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  16: {
+    learn: authoredLesson({
+      summary: "Reason about shared mutable state, critical sections, and coordination tools before writing threaded code that only appears to work.",
+      learningGoals: [
+        "Explain what race conditions are and why they are not visible in every run",
+        "Use lock_guard to tie a mutex lock to scope",
+        "Describe when condition_variable or unique_lock is needed beyond a simple mutex",
+      ],
+      explanation: "Concurrency bugs come from interleaving, not just syntax. A shared counter increment is a read-modify-write sequence; if two threads interleave that sequence without coordination, one update can disappear. mutex protects shared mutable state by allowing only one thread into the critical section at a time. lock_guard is the first tool to learn because it ties the unlock to scope exit. More advanced tools such as unique_lock and condition_variable matter when code must wait for a state change or transfer lock ownership more flexibly.",
+      keywordNotes: [
+        "A race condition occurs when correctness depends on timing between unsynchronized operations.",
+        "A critical section is the smallest shared-state region that must not interleave with another thread.",
+        "std::lock_guard<std::mutex> acquires the mutex now and releases it automatically at scope exit.",
+      ],
+      examples: [
+        example(
+          "Guard one read-modify-write update",
+          '#include <iostream>\n#include <mutex>\nstruct Counter {\n    int value{0};\n    std::mutex mutex;\n    void increment() {\n        std::lock_guard<std::mutex> lock(mutex);\n        ++value;\n    }\n};\nint main() {\n    Counter counter;\n    counter.increment();\n    std::cout << counter.value << \'\\n\';\n    return 0;\n}',
+          '1',
+          "The mutex and lock_guard make the increment a critical section whose ownership is clear in the source code.",
+          [
+            "Line 1: iostream is included only to show the current shared state after one safe update.",
+            "Line 2: mutex is required because the type protects one shared value against concurrent interleaving.",
+            "Line 3: Counter groups the shared state and the synchronization tool that protects it.",
+            "Line 4: value is the shared mutable state. This is what competing threads would race over.",
+            "Line 5: mutex is the coordination object guarding value. Keeping them adjacent makes the protection policy visible.",
+            "Line 6: increment is the mutation boundary that every caller must use.",
+            "Line 7: lock_guard acquires the mutex immediately and guarantees release when the function scope ends.",
+            "Line 8: ++value is the actual critical section. Without the lock, two threads could both read the same old value and overwrite each other's update.",
+            "Line 9: the function ends, and the guard automatically unlocks the mutex.",
+            "Line 10: the type definition ends after naming both state and policy.",
+            "Line 11: main creates one counter instance.",
+            "Line 12: one safe increment is performed.",
+            "Line 13: the protected state is printed after the update.",
+            "Line 14: main returns and destroys the counter and mutex.",
+          ],
+        ),
+        example(
+          "Waiting needs a different tool than one short lock",
+          '#include <condition_variable>\n#include <mutex>\nstruct QueueState {\n    std::mutex mutex;\n    std::condition_variable ready;\n    bool has_work{false};\n};',
+          'A coordination state sketch',
+          "A simple mutex guards immediate shared access, while condition_variable exists so threads can wait for a state transition instead of spinning or checking repeatedly.",
+          [
+            "Line 1: condition_variable is included because waiting for work is a different concurrency problem from protecting one immediate increment.",
+            "Line 2: mutex is still needed because waiting and notification are tied to shared state that must be synchronized.",
+            "Line 3: QueueState names a shared state bundle for producer-consumer style coordination.",
+            "Line 4: the mutex still guards access to the state fields.",
+            "Line 5: ready is the signaling tool that lets waiting threads sleep until another thread changes the shared state.",
+            "Line 6: has_work is the predicate a waiting thread would re-check after wake-up.",
+            "Line 7: the type definition ends after naming the coordination primitives and the shared state they protect.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Create struct Counter with int value{0} and std::mutex mutex. In increment(), use std::lock_guard<std::mutex> lock(mutex); then ++value. Print the value after one call.",
+        starterCode: "#include <iostream>\n#include <mutex>\n\n// Protect one shared counter update\n",
+        solution: '#include <iostream>\n#include <mutex>\nstruct Counter {\n    int value{0};\n    std::mutex mutex;\n    void increment() {\n        std::lock_guard<std::mutex> lock(mutex);\n        ++value;\n    }\n};\nint main() {\n    Counter counter;\n    counter.increment();\n    std::cout << counter.value << \'\\n\';\n    return 0;\n}',
+        solutionExplanation: "The shared state and mutex live in the same type, and lock_guard makes the protected update scope-bound and obvious to reviewers.",
+        testCases: [{ label: "Protected increment", expected: "1" }],
+        hints: ["Keep mutex next to the state it protects.", "Acquire the lock_guard inside increment before ++value.", "Print the counter after calling increment once."],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["std::mutex", "std::lock_guard<std::mutex>", "\\+\\+value"],
+          successMessage: "The exercise models a shared counter protected by a mutex and lock_guard.",
+        },
+      },
+      recap: [
+        "Concurrency correctness depends on interleaving, so bugs may be real even when a small test run looks fine.",
+        "lock_guard is the first scope-bound tool for protecting one short critical section.",
+        "condition_variable solves waiting-for-state-change problems that a plain mutex alone does not address clearly.",
+      ],
+      readingCheck: {
+        prompt: "Why would ++value be a race without the mutex if two threads called increment at the same time?",
+        choices: [
+          "Because both threads could read the same old value before either write completes",
+          "Because ++ is illegal inside a class",
+          "Because mutex changes the integer type",
+          "Because lock_guard increments automatically",
+        ],
+        correctIndex: 0,
+        explanation: "Increment is a read-modify-write sequence, so unsynchronized threads can overwrite each other's updates.",
+      },
+      decisionGuide: [
+        { use: "one small critical section", insteadOf: "holding a mutex while doing unrelated work or I/O", reason: "Smaller locked regions reduce contention and make it easier to reason about what shared state is actually protected." },
+        { use: "condition_variable when waiting for a predicate", insteadOf: "busy looping on shared state", reason: "Waiting should coordinate around a state change rather than waste work repeatedly checking the same condition." },
+      ],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  21: {
+    learn: authoredLesson({
+      summary: "Understand how build targets, source files, headers, and the linker fit together so multi-file C++ projects stay explainable.",
+      learningGoals: [
+        "Explain the difference between compilation and linking",
+        "Describe what belongs in CMake or another build system versus in the source file",
+        "Recognize how headers declare interfaces while source files provide definitions",
+      ],
+      explanation: "Native C++ applications are assembled in layers. The compiler translates source files into object files. The linker combines those object files and libraries into one executable or library. Headers are interface declarations that multiple source files can include, while definitions live in source files or templates where the language requires them. A build system such as CMake describes targets, source lists, include paths, and dependency relationships so developers do not re-type toolchain commands by hand for every edit.",
+      keywordNotes: [
+        "A translation unit is the preprocessed source file the compiler sees after includes are expanded.",
+        "A linker error means the declaration was known but the final definition could not be found when building the program image.",
+        "A CMake target names one build artifact and its sources or dependencies outside the C++ source file itself.",
+      ],
+      examples: [
+        example(
+          "Header declaration versus source definition",
+          '// lesson_repository.hpp\n#pragma once\n#include <string>\nstd::string normalize_title(const std::string& text);\n\n// lesson_repository.cpp\n#include "lesson_repository.hpp"\nstd::string normalize_title(const std::string& text) {\n    return text;\n}',
+          'A declaration in a header and a definition in a source file',
+          "The header tells other files what function exists, while the source file provides the implementation the linker must later assemble into the program.",
+          [
+            "Line 1: the comment names the header file where the interface is declared.",
+            "Line 2: #pragma once prevents accidental multiple inclusion of the same declarations in one translation unit.",
+            "Line 3: the header includes string because the declaration depends on std::string appearing in the interface type.",
+            "Line 4: this declaration tells other files the function name, parameter type, and return type without exposing the implementation yet.",
+            "Line 5: the blank separator marks the move from interface file to implementation file in this teaching sketch.",
+            "Line 6: the comment names the source file that will carry the definition.",
+            "Line 7: the implementation includes the matching header so the compiler can verify the definition matches the declared signature.",
+            "Line 8: this is the actual function definition the compiler emits into an object file for the linker to combine later.",
+            "Line 9: the simple return body keeps the focus on build structure rather than string algorithms.",
+            "Line 10: the definition ends here; if this file were missing from the build target, callers could compile against the declaration and then fail at link time.",
+          ],
+        ),
+        example(
+          "The build system names the target boundary",
+          'add_executable(codeforge_app\n  main.cpp\n  lesson_repository.cpp\n)',
+          'A CMake target sketch',
+          "The build file, not the C++ source file, is the right place to describe which translation units and libraries belong to one artifact.",
+          [
+            "Line 1: add_executable declares one build target named codeforge_app. The target boundary belongs to the build system, not to a string hard-coded inside the C++ source.",
+            "Line 2: main.cpp is one source file that will be compiled as part of the target.",
+            "Line 3: lesson_repository.cpp is another source file whose object code must also be linked into the final artifact.",
+            "Line 4: the target declaration ends after listing the sources that belong together.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Print codeforge_app in main and include a comment naming one linker responsibility. This lesson uses structural review only.",
+        starterCode: "#include <iostream>\n\n// Name one build-stage responsibility honestly\nint main() {\n    // Print the target name\n    return 0;\n}\n",
+        solution: '#include <iostream>\n\n// The linker combines object files and libraries into one final program image.\nint main() {\n    std::cout << "codeforge_app" << \'\\n\';\n    return 0;\n}\n',
+        solutionExplanation: "The C++ program prints the conceptual target name, while the comment keeps the build-stage explanation honest and outside any fake compiler output claim.",
+        testCases: [{ label: "Target sketch", expected: "codeforge_app" }],
+        hints: ["Keep the build-stage explanation in a comment, not in a fake compiler message.", "Use std::cout to print the target name.", "Remember that linking combines compiled pieces after compilation."],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["codeforge_app", "std::cout", "link"],
+          successMessage: "The exercise names the target and one linker responsibility honestly.",
+        },
+      },
+      recap: [
+        "Compilation translates each translation unit separately; linking assembles the compiled pieces into the final artifact.",
+        "Headers declare interfaces for other translation units to include, while source files provide ordinary definitions.",
+        "CMake or another build system owns target and dependency structure so the source code can stay focused on behavior.",
+      ],
+      readingCheck: {
+        prompt: "If a function is declared in a header and called from main, but the defining .cpp file is omitted from the target, what kind of native error would you expect later?",
+        choices: [
+          "A linker error about the missing definition",
+          "An HTML validation error",
+          "A warning that references cannot exist",
+          "No issue because declarations execute the code",
+        ],
+        correctIndex: 0,
+        explanation: "The compiler can accept the declaration, but the linker later fails because the program image still lacks the function's definition.",
+      },
+      decisionGuide: [
+        { use: "headers for declarations and shared interfaces", insteadOf: "copying the same declarations into many source files", reason: "One shared declaration keeps signatures synchronized and makes translation-unit boundaries explicit." },
+        { use: "the build system for target assembly", insteadOf: "pretending the C++ source file itself manages linking", reason: "Targets, dependencies, and artifact names belong to the engineering workflow around the source code, not inside the language runtime." },
+      ],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+};
