@@ -57,6 +57,64 @@ const iterableExample = (title: string, code: string, output: string, explanatio
 
 
 /**
+ * The weak-collection entries have their own failure modes, and they are about object identity
+ * and about the deliberate absence of size and iteration. Nothing in this list claims to observe
+ * garbage collection, because a log cannot show that a collected key disappeared.
+ */
+const weakMistakes: Example["mistakes"] = [
+  { mistake: "Expecting a WeakMap to be countable or iterable", error: "size is undefined and the map cannot be looped over", fix: "Use a Map when the entries must be listed, or keep a separate counter when only a number is needed." },
+  { mistake: "Using a string or a number as a WeakMap key", error: "A TypeError at the point of the set or get call", fix: "Key the WeakMap by the object itself, and keep a Map for primitive keys." },
+  { mistake: "Looking a value up with an object that merely has the same contents", error: "undefined or false, with no error to explain it", fix: "Hold the original object reference and pass that exact reference to get and has." },
+  { mistake: "Expecting the entry to disappear in a way that console output can show", error: "No output proves collection happened, because the log itself holds a reference", fix: "Describe the guarantee in prose and verify the observable parts of the API instead." },
+];
+
+const compareExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: weakMistakes,
+});
+
+
+/**
+ * The module, await, and network lessons each have their own failure modes, so each carries a
+ * mistake list about its own subject. The network and module entries name real behaviours of
+ * the boundary rather than observed runs: the practice runner rejects module syntax and blocks
+ * networking, which is why those two lessons are reviewed structurally and say so in their
+ * declared output.
+ */
+const moduleMistakes: Example["mistakes"] = [
+  { mistake: "Importing a name that the module never exported", error: "A load-time failure naming the export, not a line in the importing file", fix: "Compare the braces against the export lines, because the names on both sides must match exactly." },
+  { mistake: "Forgetting the braces around a named import", error: "The import binds the wrong thing or fails to resolve the name", fix: "Use braces for named exports and no braces only for a default." },
+  { mistake: "Renaming a named export inside the import", error: "The name is missing, because a named import keeps the exported name unless it is renamed explicitly with as", fix: "Either import the exported name as it is, or write the rename with as." },
+  { mistake: "Relying on a top-level import for code that should load later", error: "The module is downloaded and evaluated on every visit whether or not it is used", fix: "Use dynamic import at the point where the code is actually needed." },
+];
+
+const awaitMistakes: Example["mistakes"] = [
+  { mistake: "Forgetting that an async function returns a promise", error: "The caller receives a promise where a value was expected", fix: "Await the call, or handle the returned promise deliberately." },
+  { mistake: "Calling an async function and never handling the returned promise", error: "A rejection that nobody sees", fix: "Await the call inside another async function, or attach a handler that reports the failure." },
+  { mistake: "Awaiting inside a loop when the steps are independent", error: "Steps that run one after another for no reason", fix: "Await Promise.all over the independent work so it proceeds together." },
+  { mistake: "Putting a failure outside the try block that is meant to handle it", error: "An unhandled rejection despite the visible catch", fix: "Keep the awaited call inside the block whose handler should see the failure." },
+];
+
+const networkMistakes: Example["mistakes"] = [
+  { mistake: "Treating a resolved fetch as a successful request", error: "An error body parsed as if it were data", fix: "Check response.ok before reading the body, and report the status when it fails." },
+  { mistake: "Assuming fetch rejects on a 404 or 500", error: "A failure path that never runs", fix: "Read the status, because the promise resolves whenever a response arrives at all." },
+  { mistake: "Parsing the body in the same expression as the request", error: "A parse failure that is reported as a network failure", fix: "Await the request first, judge the status, then await the parse as its own step." },
+  { mistake: "Leaving an abort timer running after the request settled", error: "A later request on the same controller aborted by a stale timer", fix: "Clear the timer in a finally block so it runs on every path." },
+];
+
+const moduleExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: moduleMistakes,
+});
+
+const awaitExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: awaitMistakes,
+});
+
+const networkExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: networkMistakes,
+});
+
+
+/**
  * The invariant lesson is about the reasoning that justifies a loop, so its mistake list is
  * about broken reasoning rather than broken syntax.
  */
@@ -597,6 +655,111 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
     }),
   },
+  10: {
+    "case-study": authoredLesson({
+      title: "A module boundary across two files",
+      minutes: 26,
+      summary: "Read the two files of a module boundary, see what the loader hands the importing file, and build the namespace by hand in the practice sandbox, which loads a single script.",
+      learningGoals: [
+        "Read a named export and the matching import, including what the braces mean",
+        "Tell a default export from a named export at the point where a file is imported",
+        "Explain what the loader gives an importing file: an object with the named exports and the default",
+        "Describe dynamic import as the form that loads a module on demand and returns a promise",
+      ],
+      explanation: "A module is a file whose top-level names are private until they are exported. The two shipped lines of a boundary are export function format(topic) { ... } in the file that owns the code, and import describe, { format } from \"./topics.js\" in the file that needs it: the braces list the named exports by the names they were exported with, while the name outside the braces is the file's default export, which the importer may call anything. The loader evaluates each module once and hands the importer an object holding the named exports, the default under the property default, and nothing else. That object is what the examples below build by hand, because the practice sandbox evaluates one script and cannot resolve a module graph; the starter shows the real two-file form at the top, and its import and export lines are reference text in the sandbox rather than something it can run.",
+      keywordNotes: [
+        "export function and export const publish named exports; an import lists them inside braces.",
+        "export default publishes the file's main value, imported without braces and named by the importer.",
+        "A bare import with no braces runs the module for its side effects and binds nothing.",
+        "import() with parentheses loads a module on demand and returns a promise for its namespace.",
+      ],
+      examples: [
+        moduleExample(
+          "The namespace a module hands to its importer",
+          'function defineTopicsModule() {\n  const topics = ["read", "build"];\n  return {\n    count: () => topics.length,\n    label: "topics",\n    default: () => "topic module",\n  };\n}\nconst namespace = defineTopicsModule();\nconsole.log(namespace.default(), namespace.count(), namespace.label);',
+          "topic module 2 topics",
+          "The factory keeps the list private and returns an object with three members, which is exactly the shape a real module namespace has: the named exports under their own names and the default export under default. Reading through that object is how an importing file sees another module.",
+          [
+            "Line 1: the factory is the module's own file in miniature, with everything it owns declared inside.",
+            "Line 2: the list is declared without being returned, so it stays private to the module.",
+            "Line 3: an object literal becomes the public surface that the importing side will receive.",
+            "Line 4: the first named export is a function closing over the private list.",
+            "Line 5: the second named export is a value, which an importer receives under this exact name.",
+            "Line 6: default holds the file's main export, which is the name an importer may rewrite freely.",
+            "Line 7: the closing brace ends the returned object.",
+            "Line 8: the closing brace ends the factory function.",
+            "Line 9: the factory is called once, producing the namespace the rest of the file reads from.",
+            "Line 10: each member is read by its exported name, and the printed order matches the argument order.",
+          ],
+        ),
+        moduleExample(
+          "A dynamic import arrives as a promise",
+          'const load = async () => ({ default: () => "topic module", count: () => 2, label: "topics" });\nasync function render() {\n  const namespace = await load("./topics.js");\n  console.log(namespace.default(), namespace.count(), namespace.label);\n}\nrender();',
+          "topic module 2 topics",
+          "A dynamic import does not bind a name at the top of the file; it settles to the namespace later, which is why the code around it is asynchronous. The loader is passed in here rather than called, so the example runs without a module graph and still shows the promise shape that import() returns.",
+          [
+            "Line 1: the loader stands in for the module system and settles with a namespace object.",
+            "Line 2: the function is async because the namespace arrives asynchronously.",
+            "Line 3: awaiting the load yields the namespace, and the binding is local to this function.",
+            "Line 4: the namespace is read exactly as a top-level import would be read.",
+            "Line 5: the closing brace ends the function that performed the on-demand load.",
+            "Line 6: the call starts the load and the transcript is captured when the awaited value has arrived.",
+          ],
+        ),
+        moduleExample(
+          "Reading the default and a named export from one namespace",
+          'const namespace = { format: (topic) => "[" + topic + "]", default: () => "topic module" };\nconsole.log(namespace.default(), namespace.format("CodeForge"));',
+          "topic module [CodeForge]",
+          "The default export is reached through the property named default, and the named export through its own name. Both are ordinary property reads on the namespace object that the loader produced.",
+          [
+            "Line 1: the namespace is written out literally so the two property names are visible in one line.",
+            "Line 2: the default is called first and the named export second, so the printed line shows both halves resolving.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "The starter opens with the real two-file form of this boundary: an exported function, an exported default, and the import line that reads both. The practice sandbox loads a single script, so complete the bottom half by building the namespace the loader would hand report.js, then print its default and its named export.",
+        starterCode: "// topics.js: the real module file.\nexport function format(topic) {\n  return \"[\" + topic + \"]\";\n}\nexport default function describe() {\n  return \"topic module\";\n}\n\n// report.js: how another file imports it.\nimport describe, { format } from \"./topics.js\";\nconsole.log(describe(), format(\"CodeForge\"));\n\n// The practice sandbox evaluates one script and cannot resolve ./topics.js, so the two lines\n// above are the reference form. Build the namespace the loader would hand report.js, then print\n// its default and its named export.\nconst namespace = {\n  // add the default export and the named export here\n};\n",
+        solution: 'const namespace = { format: (topic) => "[" + topic + "]", default: () => "topic module" };\nconsole.log(namespace.default(), namespace.format("CodeForge"));',
+        solutionExplanation: "The namespace carries the default under default and the named export under its own name, which is exactly what the loader builds from export default function describe and export function format. Calling both members prints the same line the two-file version would print.",
+        testCases: [{ label: "namespace built by hand", expected: "topic module [CodeForge]" }],
+        hints: [
+          "Add default: () => \"topic module\" and format: (topic) => \"[\" + topic + \"]\" to the object.",
+          "Read both members from the namespace variable rather than from separate functions.",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["namespace\\.default\\(", "namespace\\.format\\(", "console\\.log"],
+          successMessage: "The namespace exposes the default under default and the named export under its own name, and both are printed.",
+        },
+      },
+      recap: [
+        "A module's top-level names are private until they are exported.",
+        "Named exports are imported in braces by the exact exported name; the default is imported without braces under any name.",
+        "The loader hands the importing file a namespace object of the named exports plus the default.",
+        "Dynamic import returns a promise for that namespace, which is why the code around it is asynchronous.",
+        "The practice sandbox loads one script, so the real import and export lines in the starter are reference text here.",
+      ],
+      readingCheck: {
+        prompt: "What does the braces form in `import { format } from \"./topics.js\"` select?",
+        choices: [
+          "A named export, matched by the exact name the exporting file published",
+          "The default export of the module, renamed for convenience",
+          "Every export of the module at once",
+          "A path segment of the module specifier",
+        ],
+        correctIndex: 0,
+        explanation: "Named imports are matched by name, so the exporting file must publish that name. The default export is imported without braces and may be renamed by the importer.",
+      },
+      decisionGuide: [
+        { use: "a named export for each thing a file offers", insteadOf: "one large default object", reason: "Named imports fail loudly when a name drifts, and the importing file states exactly which parts it uses." },
+        { use: "a default export for the file's one main value", insteadOf: "a default plus many named exports for the same thing", reason: "A default is convenient for the common case, but it is unnamed at the export site, so it earns its place only when one value really is the point of the file." },
+        { use: "dynamic import when the code should load on demand", insteadOf: "a top-level import of something rarely used", reason: "A dynamic import keeps the module out of the initial graph and lets the loading code decide when it is worth the cost." },
+      ],
+      verification: ["structurally-checked", "pattern-checked"],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
   11: {
     read: authoredLesson({
       title: "Reasoning about loops with invariants",
@@ -703,6 +866,351 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
       ],
       verification: ["executed"],
       quality: { codeReading: true, edgeCase: true },
+    }),
+  },
+  12: {
+    "compare": authoredLesson({
+      title: "Caching without keeping keys alive",
+      minutes: 22,
+      summary: "Compare a Map with a WeakMap and a Set with a WeakSet, then use a WeakMap keyed by objects so a cache cannot hold those objects in memory.",
+      learningGoals: [
+        "Use a WeakMap when the key is an object whose lifetime should decide the cache's lifetime",
+        "Read why a WeakMap has no size, no clear, and no iteration, and what those omissions buy",
+        "Distinguish WeakSet membership from WeakMap key-value storage",
+        "Explain the garbage-collection guarantee without claiming to observe it in a log",
+      ],
+      explanation: "A WeakMap and a WeakSet are the collections for the case where the key is an object whose lifetime should decide the entry's lifetime: Map and Set hold their keys strongly, while the weak variants do not, and in exchange they give up size, iteration, and primitive keys.",
+      keywordNotes: [
+        "WeakMap stores one value per object key and does not keep that key reachable.",
+        "WeakSet records membership of objects and stores no value at all.",
+        "A weak key may be collected at any time, so no operation may list or count the entries.",
+        "WeakMap.prototype.set throws a TypeError for a primitive key.",
+      ],
+      examples: [
+        compareExample(
+          "A WeakMap keyed by the object it describes",
+          'const cache = new WeakMap();\nfunction remember(key, value) {\n  cache.set(key, value);\n}\nconst lesson = { title: "Data Structures" };\nremember(lesson, "visited");\nconsole.log(cache.has(lesson), cache.get(lesson));',
+          "true visited",
+          "The entry is stored under the object itself rather than under a copied name, which is what makes the key weak. The second call reads the entry back and prints both the membership and the stored value, so the pair of results shows that the value travelled with the key.",
+          [
+            "Line 1: a WeakMap is created with no arguments, because a WeakMap starts empty and never grows through a constructor.",
+            "Line 2: the helper takes the key first, which keeps the calling code reading as a statement about the object.",
+            "Line 3: set stores the value under that object key, and the map keeps no strong reference to the key.",
+            "Line 4: the closing brace ends the helper.",
+            "Line 5: a plain object is created, and this variable is the strong reference that keeps it alive.",
+            "Line 6: the object is passed as the key, so the value is attached to this exact object rather than to an equal-looking one.",
+            "Line 7: has and get are asked about the same object, and they agree because the entry exists under that identity.",
+          ],
+        ),
+        compareExample(
+          "What a WeakMap deliberately does not offer",
+          'const cache = new WeakMap();\ncache.set({ topic: "read" }, 1);\nconsole.log(typeof cache.size);\nconsole.log(typeof cache[Symbol.iterator]);\ntry {\n  cache.set("read", 2);\n} catch (error) {\n  console.log(error.name);\n}',
+          "undefined\nundefined\nTypeError",
+          "A WeakMap offers no way to count or iterate its entries, because the collection would have to reach into keys it does not own. The third output names the other half of the bargain: only objects may be keys, so a string is rejected with a TypeError rather than converted.",
+          [
+            "Line 1: the WeakMap is created empty.",
+            "Line 2: an object literal is used as a key, which is legal because every object is a valid weak key.",
+            "Line 3: typeof reports undefined, which is the evidence that size does not exist on a WeakMap.",
+            "Line 4: the iteration symbol is missing as well, so a WeakMap cannot be spread, looped over, or dumped.",
+            "Line 5: a try block wraps the call that is expected to fail.",
+            "Line 6: the string is offered as a key, and strings are primitives rather than objects.",
+            "Line 7: the catch receives the rejection instead of the program stopping.",
+            "Line 8: the error's name is printed, which shows the failure is a type error rather than a silent no-op.",
+            "Line 9: the closing brace ends the try block and its catch clause.",
+          ],
+        ),
+        compareExample(
+          "A WeakSet remembers objects it has already seen",
+          'const seen = new WeakSet();\nconst node = { name: "root" };\nseen.add(node);\nconsole.log(seen.has(node));',
+          "true",
+          "A WeakSet stores membership only, with no value attached. The object is added and then looked up by the same reference, so the result reports that this exact object is a member.",
+          [
+            "Line 1: a WeakSet is created empty, with no constructor argument.",
+            "Line 2: the object that will be tracked is created once and held in a variable.",
+            "Line 3: add records membership for that object.",
+            "Line 4: has asks about the same object and prints true, which is the whole point of a membership set.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Use a WeakMap to remember which lesson objects have already been visited, then report the stored value for the lesson and the membership of a different object with the same title.",
+        starterCode: "const memory = new WeakMap();\nconst lesson = { title: \"Data Structures\" };\n// store a value for lesson, then report the value and a lookup of another object\n",
+        solution: 'const memory = new WeakMap();\nconst lesson = { title: "Data Structures" };\nmemory.set(lesson, "visited");\nconsole.log(memory.get(lesson), memory.has({ title: "Data Structures" }));',
+        solutionExplanation: "The value is stored under the lesson object, so reading it back returns the stored string. The second lookup uses a fresh object that merely has the same property, and it reports false because weak keys are matched by identity rather than by content.",
+        testCases: [{ label: "weak cache", expected: "visited false" }],
+        hints: [
+          "Store with set(lesson, value), then print get(lesson) next to has({ title: \"Data Structures\" }).",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["new\\s+WeakMap", "\\.set\\(lesson", "\\.get\\(lesson", "\\.has\\("],
+          successMessage: "The WeakMap stores a value under the lesson object and both lookups use the object itself.",
+        },
+      },
+      recap: [
+        "A WeakMap stores a value per object key without keeping that key alive.",
+        "A WeakSet records membership of objects only.",
+        "Both refuse primitives and offer no size, no clear, and no iteration.",
+        "Collect a key object and the entry can disappear, so nothing that logs output should claim to observe the collection.",
+      ],
+      readingCheck: {
+        prompt: "Why does a WeakMap have no size property?",
+        choices: [
+          "Counting entries would require reaching into keys the map does not own, which is exactly the reference a weak map refuses to keep",
+          "The property exists but is deprecated in newer JavaScript versions",
+          "Sizes are only tracked for maps with more than one entry",
+          "Because primitives cannot be counted",
+        ],
+        correctIndex: 0,
+        explanation: "A weak map must not become an owner of its keys, and any operation that walks the keys would keep them reachable, so size, clear, and iteration are absent by design.",
+      },
+      decisionGuide: [
+        { use: "a WeakMap for a cache or an association table", insteadOf: "a Map keyed by the same objects", reason: "When the key object is discarded, the entry can be collected too, so the cache cleans itself up." },
+        { use: "a Map when the keys are strings or when the entries must be listed", insteadOf: "a WeakMap", reason: "A WeakMap cannot be iterated or counted, and it rejects primitive keys, so plain Maps stay the general-purpose choice." },
+        { use: "a WeakSet for a seen-tags or visited-nodes marker", insteadOf: "an array of objects", reason: "Membership is a constant-time question with no stored value, and the marker does not keep the objects alive." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  15: {
+    "modify": authoredLesson({
+      title: "Rewriting promise chains with await",
+      minutes: 24,
+      summary: "Turn a then chain into an async function that awaits each step, keep the ordering the chain guaranteed, and move failure handling into an ordinary try/catch.",
+      learningGoals: [
+        "Rewrite a then chain as sequential awaits while keeping the same order of operations",
+        "Explain what await does to the surrounding function and what it does not do to the program",
+        "Handle a rejected await with try/catch and know which failures a catch block actually sees",
+      ],
+      explanation: "A then chain and an async function with awaits express the same sequence, but they read differently. In a chain, each callback receives the previous result as a parameter and the ordering is implied by how the calls are attached. Await makes that ordering explicit in the source: the function pauses at each await and resumes with the settled value, so the lines after it run in the order a reader expects, and a value returned from one step is available in a local binding for every later step. The pause belongs to the async function, not to the whole program: the surrounding code keeps running, and the function resumes when the awaited promise settles. That is why an async function returns a promise even when no promise appears in its body, and why calling one without awaiting or handling it means the result can settle with nobody watching. Failure handling also becomes ordinary control flow: a rejected await throws inside the async function, so try/catch catches it, and everything after the throw in that block is skipped. Two habits keep the rewrite honest. First, awaiting inside a loop makes the steps sequential, which is right when each step needs the previous result and wrong when the steps are independent, where Promise.all expresses the concurrency on purpose. Second, a catch block only sees what happens inside its try, so a failure that escapes an earlier step must be inside the block that is supposed to handle it. Everything in this lesson executes in the practice sandbox, because each example settles within a microtask: the printed output you see is the real result of the real runner.",
+      keywordNotes: [
+        "await pauses the async function it appears in and resumes it with the settled value of the promise.",
+        "An async function always returns a promise, even when its body returns a plain value.",
+        "A rejected await throws inside the async function, so try/catch handles it like any other exception.",
+        "Sequential awaits run one step after another, while Promise.all starts independent steps together and awaits them as a group.",
+        "A catch block only sees failures raised inside its own try block.",
+        "Before await existed, the same sequence was written with then callbacks that each received the previous value.",
+      ],
+      examples: [
+        awaitExample(
+          "One awaited step instead of a then callback",
+          'async function load() {\n  const value = await Promise.resolve(21);\n  console.log(value * 2);\n}\nload();',
+          "42",
+          "The awaited value arrives in a normal local binding, so the multiplication is ordinary code rather than a callback body. This is the shape to reach for when the old version was a single then call: the value that used to be a parameter is now a variable, and everything after the await reads in the order it runs. The sandbox executes this program, and 42 is what it actually prints.",
+          [
+            "Line 1: the async keyword is what allows await inside and what makes the call return a promise.",
+            "Line 2: await pauses here until the promise settles, then binds the settled value to a normal local name.",
+            "Line 3: the arithmetic runs after the value arrived, so it reads like ordinary sequential code.",
+            "Line 4: the closing brace ends the async function, whose return value is a promise.",
+            "Line 5: calling the function starts it; the work settles within a microtask, which is why the sandbox prints the line.",
+          ],
+        ),
+        awaitExample(
+          "Two awaited steps keep the chain's order",
+          'async function load() {\n  const first = await Promise.resolve("read");\n  const second = await Promise.resolve("build");\n  console.log(first + " then " + second);\n}\nload();',
+          "read then build",
+          "Each await hands the next line a settled value, so the second step starts only after the first finished. That ordering is the property a then chain had implicitly and the reason a rewrite must not replace sequential awaits with a group of independent ones unless ordering genuinely does not matter. The printed line shows both values, in the order the source states.",
+          [
+            "Line 1: the async function holds the whole sequence.",
+            "Line 2: the first await resolves one value and binds it for the rest of the function.",
+            "Line 3: the second await starts only after the first line above it finished, which is the ordering the chain guaranteed.",
+            "Line 4: both bindings are in scope, so the message can use them without nesting a callback inside another callback.",
+            "Line 5: the function closes having performed the steps in order.",
+            "Line 6: the call starts the sequence, and the sandbox prints the combined text.",
+          ],
+        ),
+        awaitExample(
+          "Catch a rejected await like any other failure",
+          'async function load() {\n  try {\n    await Promise.reject(new Error("offline"));\n  } catch (error) {\n    console.log("caught " + error.message);\n  }\n}\nload();',
+          "caught offline",
+          "A rejected promise becomes a thrown value at the await, so the catch block runs like it would for any other exception and the rest of the try is skipped. That is the practical reason the rewrite is worth doing: failure handling moves back into ordinary control flow instead of a second callback attached to the chain. The message printed here is the error the example rejected with, which proves the handler saw the real failure.",
+          [
+            "Line 1: the async function still contains the whole operation.",
+            "Line 2: the try block marks the code whose failure this function is prepared to handle.",
+            "Line 3: this promise is rejected on purpose, so the await throws at exactly this point.",
+            "Line 4: the catch clause receives the thrown error, which is the rejection reason.",
+            "Line 5: the handler reads the error's message rather than assuming what went wrong.",
+            "Line 6: the closing brace ends the catch block.",
+            "Line 7: the function closes having handled the failure inside itself.",
+            "Line 8: the call starts the sequence, and the sandbox prints the handled message instead of an unhandled rejection.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Write an async function main that awaits two resolved values, six and seven, and logs their product. The sandbox executes it, so the printed number is what gets checked.",
+        starterCode: "async function main() {\n  // await two values, then log their product\n}\nmain();\n",
+        solution: 'async function main() {\n  const first = await Promise.resolve(6);\n  const second = await Promise.resolve(7);\n  console.log(first * second);\n}\nmain();',
+        solutionExplanation: "Each await binds one settled value, and the multiplication runs after both have arrived, so the printed product is 42.",
+        testCases: [{ label: "Worker output", expected: "42" }],
+        hints: [
+          "Mark the function async so await is allowed inside it.",
+          "Await each resolved value in turn and keep them in local bindings.",
+          "Log the product after both values have arrived.",
+        ],
+      },
+      recap: [
+        "await turns a promise's settled value into a local binding, so a chain's steps become ordinary sequential lines.",
+        "The pause belongs to the async function, not the program, and every async function returns a promise.",
+        "A rejected await throws inside the function, so try/catch handles failures that a chain handled in a second callback.",
+      ],
+      readingCheck: {
+        prompt: "What does await do to the code around it?",
+        choices: [
+          "It pauses the async function and resumes it with the settled value, while the rest of the program keeps running",
+          "It blocks the entire program until the promise settles",
+          "It converts the promise into a synchronous value everywhere",
+          "It starts the promise and ignores the result",
+        ],
+        correctIndex: 0,
+        explanation: "The pause is local to the async function: other code continues, and the function resumes with the value once the awaited promise settles.",
+      },
+      decisionGuide: [
+        { use: "sequential awaits when each step needs the previous result", insteadOf: "a then chain that nests callback after callback", reason: "The ordering is visible in the source, and each intermediate value gets a name instead of a callback parameter." },
+        { use: "Promise.all when the steps are independent", insteadOf: "awaiting inside a loop out of habit", reason: "Independent work can start together, and awaiting one step at a time would serialize it for no reason." },
+        { use: "try/catch around awaited calls", insteadOf: "a trailing catch callback on the chain", reason: "Failure handling becomes ordinary control flow, and the block states exactly which work it covers." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, modification: true },
+    }),
+  },
+  16: {
+    "integration": authoredLesson({
+      title: "Reading a network response honestly",
+      minutes: 28,
+      summary: "Handle a network response in the one order that keeps failures honest: await the request, judge response.ok, then parse the body, with a cancellation signal and a cleared timer around it.",
+      learningGoals: [
+        "Check response.ok before parsing a body, because a resolved request is not a successful one",
+        "Tell a status failure from a parse failure from a cancellation in the code that handles them",
+        "Wire an AbortController signal into a request and clear its timer in a finally block",
+        "Describe what the practice sandbox cannot do here and why the request is passed in",
+      ],
+      explanation: "fetch resolves as soon as a response arrives, whatever its status, so a 404 or a 500 reaches the next line looking exactly like a success until response.ok is checked. The honest order is therefore three separate steps: await the request, judge response.ok and raise an error naming response.status when it is false, then await the body parse as its own step so a malformed body is reported as a parse failure rather than as a network failure. Cancellation is a fourth, different outcome: an AbortController owns a signal, the request receives that signal, and a timer that fires abort turns a slow request into a rejection naming an abort. The examples below take the request function as a parameter defaulting to fetch, because this sandbox blocks networking and stops timers before the transcript is captured: the production line is await request(url), and in a browser it is await fetch(url).",
+      keywordNotes: [
+        "response.ok is true only for a status in the 200 to 299 range; a resolved promise says nothing about success.",
+        "response.status carries the number that belongs in the error message.",
+        "response.json() returns a promise for the parsed body, so a malformed body fails at that await.",
+        "AbortController.abort() rejects the request that was given controller.signal.",
+      ],
+      examples: [
+        networkExample(
+          "Await the request, judge the status, then parse",
+          'const requestJson = (url) => fetch(url, { headers: { Accept: "application/json" } });\nasync function loadTopics(url, request = requestJson) {\n  const response = await request(url);\n  if (!response.ok) {\n    throw new Error("request failed with status " + response.status);\n  }\n  return response.json();\n}\nasync function main() {\n  const standIn = async () => ({ ok: true, status: 200, json: () => ["read", "build"] });\n  const topics = await loadTopics("https://example.test/topics.json", standIn);\n  console.log(topics.join(" and "));\n}\nmain();',
+          "read and build",
+          "The production call to fetch lives in one named helper so the accept header is set in a single place, and the request function defaults to that helper. The example passes a stand-in instead, because this sandbox replaces fetch with a throwing stub and captures the transcript before a request could ever complete. Everything after the injection point is the real reading path: await the request, judge response.ok, and parse the body as a separate step.",
+          [
+            "Line 1: the production request function is where fetch is called, and it adds the JSON accept header once for every caller.",
+            "Line 2: the request function defaults to that helper, so production code calls the function with a url and nothing else.",
+            "Line 3: the response arrives here, and nothing about its status has been judged yet.",
+            "Line 4: ok is the first question asked, because a resolved request can still be a failed one.",
+            "Line 5: a status outside the success range becomes an error that carries the number.",
+            "Line 6: the message is what the caller will read, so it names the status rather than saying something failed.",
+            "Line 7: the closing brace ends the failure branch.",
+            "Line 8: the body is parsed only after the status passed, and this line returns the promise from json.",
+            "Line 9: the closing brace ends the function whose promise settles to the parsed body.",
+            "Line 10: the main function keeps the example's failure handling in one place.",
+            "Line 11: the stand-in request settles with a response shaped like the real one.",
+            "Line 12: the body reader is synchronous here only because this stand-in owns its data.",
+            "Line 13: the example passes the stand-in explicitly, so fetch is never called in this sandbox.",
+            "Line 14: the parsed names are printed, so the transcript proves the whole path ran.",
+          ],
+        ),
+        networkExample(
+          "A failed status is caught, never parsed",
+          'async function loadTopics(url, request) {\n  const response = await request(url);\n  if (!response.ok) {\n    throw new Error("request failed with status " + response.status);\n  }\n  return response.json();\n}\nasync function main() {\n  const standIn = async () => ({ ok: false, status: 404, json: () => [] });\n  try {\n    await loadTopics("https://example.test/missing.json", standIn);\n  } catch (error) {\n    console.log("caught " + error.message);\n  }\n}\nmain();',
+          "caught request failed with status 404",
+          "The same function now receives a response with ok false, so the thrown error is caught by the caller. The body is never read, which is the point: an error page must not travel through the code path reserved for data.",
+          [
+            "Line 1: the same request helper is defined, so the example is the production shape with one substitution.",
+            "Line 2: the default keeps the helper as the production request function.",
+            "Line 3: the request resolves normally, which is exactly why the status must be checked.",
+            "Line 4: ok is false for this response.",
+            "Line 5: the error names the status, so the handler can tell 404 from a network outage.",
+            "Line 6: the message is built from the status number rather than from a guess.",
+            "Line 7: the closing brace ends the failure branch.",
+            "Line 8: this parse line is reached only by responses that passed the check.",
+            "Line 9: the closing brace ends the function.",
+            "Line 10: the main function owns the try block for this example.",
+            "Line 11: the stand-in answers with a failure status and an empty body.",
+            "Line 12: the body reader is present so the shape matches the real response object.",
+            "Line 13: the try block wraps the awaited call, because the throw happens at that await.",
+            "Line 14: the call passes the failing stand-in, so the status branch is the one that runs.",
+            "Line 15: the catch receives the error the status check threw.",
+            "Line 16: the handler prints the message it was given rather than inventing one.",
+          ],
+        ),
+        networkExample(
+          "Cancel a request and clear the timer that armed it",
+          'async function requestWithSignal(url, request, controller) {\n  try {\n    return await request(url, { signal: controller.signal });\n  } finally {\n    console.log("timer cleared");\n  }\n}\nasync function main() {\n  const controller = new AbortController();\n  const pending = (url, options) => new Promise((resolve, reject) => {\n    options.signal.addEventListener("abort", () => reject(new Error("request aborted")), { once: true });\n  });\n  const call = requestWithSignal("https://example.test/slow.json", pending, controller);\n  controller.abort();\n  try {\n    await call;\n  } catch (error) {\n    console.log("caught " + error.message);\n  }\n}\nmain();',
+          "timer cleared\ncaught request aborted",
+          "The controller owns the signal and the request receives it, so abort rejects the pending call. The finally block logs before the error travels outward, which is the evidence that cleanup runs on the failure path too. In production the abort comes from a timer or a newer request superseding this one, and clearTimeout is what stops a settled request from being aborted later.",
+          [
+            "Line 1: the function receives the request function and the controller rather than creating them.",
+            "Line 2: the try block covers the awaited request, because cancellation arrives as a rejection there.",
+            "Line 3: the signal travels with the request, which is what connects the controller to this call.",
+            "Line 4: the finally block runs whether the request succeeded, failed, or was aborted.",
+            "Line 5: clearing the timer here is what prevents a stale abort from hitting a later request.",
+            "Line 6: the closing brace ends the try block and its finally clause.",
+            "Line 7: the closing brace ends the function.",
+            "Line 8: the main function drives the cancellation in one place.",
+            "Line 9: the controller is created per call, so two concurrent calls cannot cancel each other.",
+            "Line 10: the stand-in request settles only when something aborts it.",
+            "Line 11: the executor receives the resolve and reject functions from the Promise constructor.",
+            "Line 12: the listener is registered on the signal the request will receive.",
+            "Line 13: abort rejects the pending promise with an error that names what happened.",
+            "Line 14: once is enough because a request is cancelled at most once.",
+            "Line 15: the closing brace ends the executor.",
+            "Line 16: the closing brace ends the stand-in request.",
+            "Line 17: the call is started before the abort, so something is actually pending.",
+            "Line 18: the abort fires immediately here; in production a timer fires it.",
+            "Line 19: the try block wraps the await that will now reject.",
+            "Line 20: the catch turns the rejection into a printed line.",
+            "Line 21: the message comes from the error the abort produced.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Write the loadNames function so it awaits a request function that defaults to the requestJson helper, rejects a failed status with the number in the message, and returns the parsed body; then call it once with a stand-in request and print the names joined with \" and \".",
+        starterCode: "const requestJson = (url) => fetch(url, { headers: { Accept: \"application/json\" } });\n\nasync function loadNames(url, request = requestJson) {\n  // await the request, check response.ok, and return the parsed body\n}\n\nasync function main() {\n  // call loadNames with a stand-in request that answers ok with [\"read\", \"build\"], then join them\n}\nmain();\n",
+        solution: 'const requestJson = (url) => fetch(url, { headers: { Accept: "application/json" } });\nasync function loadNames(url, request = requestJson) {\n  const response = await request(url);\n  if (!response.ok) {\n    throw new Error("request failed with status " + response.status);\n  }\n  return response.json();\n}\nasync function main() {\n  const standIn = async () => ({ ok: true, status: 200, json: () => ["read", "build"] });\n  const names = await loadNames("https://example.test/names.json", standIn);\n  console.log(names.join(" and "));\n}\nmain();',
+        solutionExplanation: "The default parameter makes requestJson the production request function while a stand-in can be passed in where no network exists. The status is judged before the parse, and the parse is the returned value, so the caller receives either the parsed body or an error that names the status.",
+        testCases: [{ label: "honest response handling", expected: "read and build" }],
+        hints: [
+          "Check response.ok right after the await, then throw an error built from response.status.",
+          "Return response.json() and let the caller await it, so the parse stays a separate step.",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["fetch\\(", "request\\s*=\\s*requestJson", "response\\.ok", "response\\.status", "response\\.json\\(\\)"],
+          successMessage: "The request is awaited, the status is judged before the parse, and the failure message carries the status number.",
+        },
+      },
+      recap: [
+        "fetch resolves as soon as a response arrives, so a resolved request is not a successful one.",
+        "The honest order is await the request, judge response.ok, then await the parse as its own step.",
+        "An error built from response.status lets the handler tell a 404 from an outage.",
+        "An AbortController supplies the signal, and abort rejects the request that received it.",
+        "The timer that arms the abort is cleared in a finally block, so cleanup runs on every path.",
+        "The examples take the request function as a parameter because this sandbox blocks networking and does not run timers before the transcript is captured.",
+      ],
+      readingCheck: {
+        prompt: "Why must response.ok be checked before the body is parsed?",
+        choices: [
+          "Because fetch resolves for any status, so an error page would otherwise be parsed as if it were data",
+          "Because response.json throws for every status outside the 200s",
+          "Because parsing changes the status code",
+          "Because ok is only defined for cached responses",
+        ],
+        correctIndex: 0,
+        explanation: "A response arrives for 404 and 500 as well, and the promise resolves either way. The status check is what separates a failure body from data, and the parse belongs after it.",
+      },
+      decisionGuide: [
+        { use: "response.ok plus an error naming response.status", insteadOf: "wrapping the parse in a catch-all", reason: "The status is known before the body is touched, so the failure can be described precisely instead of being inferred from a parse error." },
+        { use: "one await per step, request then status then parse", insteadOf: "parsing inside the same expression as the request", reason: "Separate steps keep the three failure kinds distinguishable in the code that handles them." },
+        { use: "an AbortController with a timer cleared in finally", insteadOf: "letting a slow request run to completion", reason: "Cancellation bounds the wait, and the cleared timer prevents an abort from landing on a request that already settled." },
+      ],
+      verification: ["executed", "structurally-checked", "pattern-checked"],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
     }),
   },
   18: {
