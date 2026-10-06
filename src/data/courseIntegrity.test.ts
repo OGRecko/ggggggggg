@@ -432,6 +432,54 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("ships lesson and project solutions that pass their own structure checkers", () => {
+    // A learner who types the provided answer must not be told that required constructs are missing.
+    // This invariant is what caught the chapters whose project shipped an unrelated sample solution.
+    const failures: string[] = [];
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
+        const project = chapter.project;
+        if (project?.checker && project.solution) {
+          const result = checkRequiredPatterns(project.solution, project.checker);
+          if (!result.passed) {
+            failures.push(`${course.id} ch${chapter.number} project: missing ${result.missing.join(", ")}`);
+          }
+        }
+        for (const lesson of chapter.lessons) {
+          const exercise = lesson.exercise;
+          if (!exercise?.checker) continue;
+          const result = checkRequiredPatterns(exercise.solution, exercise.checker);
+          if (!result.passed) {
+            failures.push(`${course.id} ${lesson.id}: missing ${result.missing.join(", ")}`);
+          }
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it("never requires a construct that comment stripping makes impossible to match", () => {
+    // Comment-only requirements are prose in the prompt; a structure checker that demands comment
+    // syntax can never pass because the checker strips comments before matching.
+    const commentTargeting = /(^|[^:\w])\s*\/\/|\/\\?\*|<!--/;
+    const offenders: string[] = [];
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
+        const checkers = [
+          { label: `${course.id} ch${chapter.number} project`, checker: chapter.project?.checker },
+          ...chapter.lessons.map((lesson) => ({ label: `${course.id} ${lesson.id}`, checker: lesson.exercise?.checker })),
+        ];
+        for (const { label, checker } of checkers) {
+          if (!checker) continue;
+          for (const pattern of [...(checker.requiredPatterns ?? []), ...(checker.requiredOneOf ?? []).flat()]) {
+            if (commentTargeting.test(pattern)) offenders.push(`${label}: ${pattern}`);
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps coverage audit conservative about static-only runtimes", () => {
     expect(coverageAudit.Java.every((item) => item.status !== "COMPLETE")).toBe(true);
     expect(coverageAudit["C++"].every((item) => item.status !== "COMPLETE")).toBe(true);
