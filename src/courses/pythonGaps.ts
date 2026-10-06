@@ -908,6 +908,59 @@ const gapLessonRoundTwo: Record<number, LessonSeed[]> = {
         { use: "keyword patterns by default", insteadOf: "positional patterns everywhere", reason: "Named attributes stay correct when the class gains a field, while positional patterns depend on the declared order." },
       ],
     },
+    {
+      title: "Suppressing expected errors and stacking cleanup",
+      minutes: 24,
+      summary: "Ignore one known-and-harmless failure with contextlib.suppress, and manage several resources with ExitStack.",
+      learningGoals: ["Suppress one specific exception", "Manage several context managers with ExitStack", "Decide when suppressing is honest"],
+      explanation: "Some failures are expected and carry no useful information: a probe file that is simply absent, a cache key that was never stored. contextlib.suppress(SomeError) turns that one exception into a no-op for the indented block, while every other exception still propagates, which is what keeps the silence honest. ExitStack manages a variable number of context managers: each enter_context call registers another resource, and all of them are closed in reverse order when the block ends. Use suppress for a specific, understood failure with a defined next step, never as a way to hide an error whose cause is still unknown.",
+      keywordNotes: [
+        "contextlib.suppress(ExpectedError) ignores that one exception type inside its block and lets every other type propagate.",
+        "ExitStack.enter_context(manager) registers context managers dynamically and unwinds them all in reverse order.",
+        "Suppressing is honest when the failure is understood and the code has a defined behavior for it.",
+      ],
+      examples: [
+        {
+          title: "Ignore one expected failure",
+          code: 'import contextlib\nwith contextlib.suppress(FileNotFoundError):\n    open("/missing/report.txt", encoding="utf-8")\nprint("continued")',
+          output: "continued",
+          explanation: "The missing file raises FileNotFoundError, which is exactly the type the block suppresses, so execution continues at the next statement. A different error, such as a permission problem, would still stop the program and stay visible.",
+          reasons: [
+            "Line 1: The import brings in the context manager that filters one exception type.",
+            "Line 2: The block declares that FileNotFoundError is expected and harmless here, so it will be swallowed rather than raised.",
+            "Line 3: Opening the absent path raises the expected exception, which exits the block silently instead of crashing the program.",
+            "Line 4: Execution continues after the with block, which proves the failure was handled rather than ignored by accident.",
+          ],
+        },
+        {
+          title: "Manage several resources with ExitStack",
+          code: 'from contextlib import ExitStack\nimport io\nwith ExitStack() as stack:\n    first = stack.enter_context(io.StringIO("a"))\n    second = stack.enter_context(io.StringIO("b"))\n    print(first.getvalue() + second.getvalue())',
+          output: "ab",
+          explanation: "ExitStack owns both streams: each enter_context call registers a resource and arranges its cleanup, which matters when the number of resources is not known until the loop or branch runs. At the end of the block every registered resource is closed in reverse order.",
+          reasons: [
+            "Line 1: The import supplies ExitStack, which manages a dynamic set of context managers.",
+            "Line 2: io provides the in-memory streams used as the example resources.",
+            "Line 3: The with statement creates the stack; leaving the block unwinds every resource it registered.",
+            "Line 4: The first stream is registered and bound to first, so it will be closed by the stack rather than by a separate with statement.",
+            "Line 5: A second stream is registered the same way, showing that the count can grow at runtime.",
+            "Line 6: Both streams are read and their contents are joined, which prints ab before the cleanup runs.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Create an empty dictionary data, suppress KeyError while reading data[" + '"missing"' + "], then print safe.",
+        starterCode: "import contextlib\ndata = {}\n# Ignore the one expected lookup failure\n",
+        solution: 'import contextlib\ndata = {}\nwith contextlib.suppress(KeyError):\n    print(data["missing"])\nprint("safe")',
+        solutionExplanation: "The missing key raises KeyError, which the block suppresses, so the print inside never runs and the program continues to print safe.",
+        testCases: [{ label: "Continues after the suppressed error", expected: "safe" }],
+        hints: ["Wrap the lookup in with contextlib.suppress(KeyError).", "Read a key that does not exist inside the block.", "Print safe after the block."],
+      },
+      recap: ["suppress ignores one named exception type and lets every other type propagate.", "ExitStack registers context managers dynamically and closes them in reverse order.", "Suppressing is only honest when the failure is expected and the code has a defined next step."],
+      decisionGuide: [
+        { use: "suppress for one understood failure", insteadOf: "a bare except that hides every error", reason: "Naming the type keeps unrelated failures visible, which is what makes the silence safe to read later." },
+        { use: "ExitStack when the number of resources varies", insteadOf: "nesting with statements until the indentation hides the logic", reason: "One block registers every resource and guarantees a reverse-order cleanup regardless of how many were opened." },
+      ],
+    },
   ],
   24: [
     {

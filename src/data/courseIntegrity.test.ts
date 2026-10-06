@@ -160,6 +160,8 @@ describe("CodeForge curriculum integrity", () => {
     expect(chapterBlob(15)).toMatch(/Iterable\[int\]/);
 
     expect(chapterBlob(23)).toMatch(/__match_args__/);
+    expect(chapterBlob(23)).toMatch(/contextlib\.suppress|suppress\(/);
+    expect(chapterBlob(23)).toMatch(/ExitStack/);
 
     expect(chapterBlob(24)).toMatch(/configparser/);
     expect(chapterBlob(24)).toMatch(/dictConfig/);
