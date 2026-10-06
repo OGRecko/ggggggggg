@@ -291,3 +291,58 @@ guide that states when to use the construct and what to use instead.
 - `node /tmp/cppnew/verify/full.cjs` (g++ compile and run of every shipped program)
 - `node .arena-verify-htmlcss.mjs`
 - `npm run typecheck`, `npm test`, `npm run build`
+
+## Appendix B: Python corpus audit in the app's own interpreter
+
+The Python course is the stated first priority, so its corpus was executed rather than read.
+Every shipped example and exercise solution with a declared output — 615 strings — was run in
+Pyodide 0.29.3 (CPython 3.13.2), the exact interpreter the app loads, one fresh namespace per
+row, with stdout compared byte for byte.
+
+### Result
+
+| Bucket | Rows | Meaning |
+| --- | --- | --- |
+| match | 564 | ran in Pyodide and printed exactly the declared output |
+| verified elsewhere | 2 | `subprocess` call-shape examples, executed with a real interpreter and real child processes |
+| environment-limited | 38 | 21 need the unvendored `sqlite3` wheel, 17 need WASM stack switching; all 38 confirmed byte-exact once the wheel or the capability was present |
+| needs input | 9 | graded by the app with stdin supplied per test case |
+| intentionally empty | 2 | the program prints an empty string, and the declared output says so |
+| mismatch | 0 | |
+| unexplained error | 0 | |
+
+### Defects found and fixed
+
+1. **Chapter 11, "Use a running best"** — the recurrence was `best = max(best, best + value)`,
+   which drops the option of restarting at the current value, so the program printed `5` while
+   the explanation and the declared output both described `4`. Now `max(value, best + value)`,
+   with the explanation naming why that comparison matters.
+2. **Chapter 4 "Handle a boundary deliberately" and Chapter 9 "Check the edge case"** — both
+   boundary snippets called `divide` and `Wallet` from the example above them and raised
+   `NameError` when run alone, while every other boundary snippet in the course repeats the
+   definition it needs. Both now stand alone.
+3. **Chapter 21, "Running external programs with subprocess"** — the lesson named
+   `subprocess.run` in its explanation and keyword notes but no shipped Python string ever
+   imported `subprocess`. It now ships two executed examples, one reading `returncode` and
+   captured `stdout` and one turning a non-zero exit status into `CalledProcessError` through
+   `check=True`, with per-line notes for every line and the provenance stated in the lesson.
+
+### Two host boundaries, measured rather than assumed
+
+- **`sqlite3` is unvendored** from the Pyodide standard library. The app's runner already calls
+  `loadPackagesFromImports`, which requests the `sqlite3` wheel from the package CDN, so the
+  Chapter 17 lessons work in a browser with network access; in this offline sandbox the wheel
+  cannot be fetched, so all 21 SQL rows were instead executed against real SQLite with a local
+  CPython and matched byte for byte.
+- **`asyncio.run` needs WASM stack switching** in the JavaScript host. All 17 coroutine rows
+  failed with "WebAssembly stack switching not supported in this JavaScript runtime" in plain
+  Node and matched byte for byte when the flag was enabled, so the lesson code is correct and
+  the capability belongs to the host runtime, not the curriculum.
+
+### The three-in-one pattern behind this batch
+
+`coveredConcepts` cannot detect a gap because the factory copies a chapter plan's concepts onto
+every lesson in the chapter, so a chapter claims its topics six times over. The textual sweep
+finds concepts with no trace at all; the teach-probe finds constructs that appear only in
+prose; and now the interpreter audit finds code that runs differently from what it claims. Each
+one found defects the previous could not see, and the Python corpus is clean under all three.
