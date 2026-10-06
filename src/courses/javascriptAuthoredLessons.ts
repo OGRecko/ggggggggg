@@ -170,6 +170,90 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
       verification: ["executed"],
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
     }),
+    compare: authoredLesson({
+      title: "Formatting numbers and dates for people",
+      minutes: 22,
+      summary: "Compare hand-built text with the Intl formatters, and compare an implicit default locale with an explicit one, so displayed values are correct for readers and stable where the output is checked.",
+      learningGoals: [
+        "Format numbers, currency, percentages, and dates with Intl formatters instead of string arithmetic",
+        "Pass the locale and the options explicitly so output does not depend on the machine",
+        "Keep the raw value for logic and use the formatted string only for display",
+      ],
+      explanation: "A number is data, and the text a person reads is a rendering of that data. Intl.NumberFormat and Intl.DateTimeFormat turn a value into text using a locale plus options, which is how grouping separators, currency symbols, decimal commas, and long date names appear correctly without hand-written concatenation. The locale argument is what makes the result predictable: omit it and the runtime falls back to whatever default locale the machine happens to have, so a log line or a checked output can differ on another computer. Options carry intent that a bare number cannot express: style: \"currency\" needs a currency code, style: \"percent\" expects the ratio rather than the value already multiplied by one hundred, and a date needs a time zone before it is stable across machines. Constructing a formatter is the expensive part, so build one per format and reuse it instead of creating a formatter for every row. Intl.RelativeTimeFormat covers phrasing that hand-rolled string logic handles badly, such as \"in 3 days\". The boundary to keep straight is that formatting is a display concern: keep storing, comparing, and calculating with the raw number or Date, and never parse a formatted string back into data.",
+      keywordNotes: [
+        "Intl.NumberFormat(locale, options) formats numbers, and style: \"currency\" requires a currency code.",
+        "style: \"percent\" expects the ratio (0.125) rather than an already-multiplied value (12.5).",
+        "Intl.DateTimeFormat needs locale, options, and a time zone before a date string is stable across machines.",
+        "An omitted locale uses the runtime default, so explicit locales are what make logs and checked output reproducible.",
+        "Build a formatter once and reuse it; formatting is for display, so keep the raw value for calculations.",
+      ],
+      examples: [
+        example(
+          "Build one currency formatter and reuse it",
+          'const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });\nconsole.log(usd.format(1234.5));\nconsole.log(usd.format(12));',
+          '$1,234.50\n$12.00',
+          "The formatter holds the locale and the currency intent, so both values render with the right symbol, grouping separator, and two decimal places without any string arithmetic.",
+          [
+            "Line 1: the locale and the currency code are stated once, which is what makes every later call consistent and reviewable.",
+            "Line 2: the first value renders with grouping and two fraction digits because the currency style implies them.",
+            "Line 3: the same formatter pads the second value to two decimals, so reuse also removes a class of inconsistent formatting.",
+          ],
+        ),
+        example(
+          "Format a date and a relative time",
+          'const release = new Date(Date.UTC(2026, 9, 6));\nconst day = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" });\nconst relative = new Intl.RelativeTimeFormat("en-US", { numeric: "always" });\nconsole.log(day.format(release));\nconsole.log(relative.format(3, "day"));',
+          'October 6, 2026\nin 3 days',
+          "The date formatter states the locale, the style, and the time zone, so the printed date does not depend on the machine's clock settings, and the relative formatter produces the phrasing that hand-written string logic usually gets wrong.",
+          [
+            "Line 1: Date.UTC pins the instant to a fixed moment, which keeps the example reproducible instead of depending on today's date.",
+            "Line 2: the formatter declares the long date style and a time zone, so the output is stable everywhere rather than shifting by hours.",
+            "Line 3: the relative formatter is configured with numeric: \"always\" so the result reads as an explicit offset instead of a vague phrase.",
+            "Line 4: formatting happens at the moment of display, and the Date value itself was never turned into text before this line.",
+            "Line 5: the second formatter produces human phrasing for an offset, which is exactly the text that string concatenation renders clumsily.",
+          ],
+        ),
+        example(
+          "The locale changes the rendering of the same number",
+          'console.log(new Intl.NumberFormat("en-US").format(1234.5));\nconsole.log(new Intl.NumberFormat("de-DE").format(1234.5));',
+          '1,234.5\n1.234,5',
+          "One value produces two correct renderings: the digits are identical, while the separators follow each locale, which is why the locale argument is part of the formatting contract rather than decoration.",
+          [
+            "Line 1: en-US groups with a comma and marks the decimal part with a period.",
+            "Line 2: de-DE does the opposite, so reading either string back as data would be a mistake even though both describe the same number.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Format 0.125 as a percentage with one fraction digit for en-US, and format an offset of 3 days with Intl.RelativeTimeFormat for en-US, then log both. The worker really runs this, so the printed output is what CodeForge checks.",
+        starterCode: "// Use the formatters rather than multiplying or concatenating by hand\n",
+        solution: 'const percent = new Intl.NumberFormat("en-US", { style: "percent", minimumFractionDigits: 1 });\nconst relative = new Intl.RelativeTimeFormat("en-US", { numeric: "always" });\nconsole.log(percent.format(0.125));\nconsole.log(relative.format(3, "day"));',
+        solutionExplanation: "The percent formatter receives the ratio and adds the sign and the requested fraction digit, while the relative formatter turns the offset into readable text. Both pass an explicit locale, so the printed output is the same on any machine that runs the code.",
+        testCases: [{ label: "Worker output", expected: "12.5%\nin 3 days" }],
+        hints: ["Pass the ratio to a percent formatter instead of multiplying by 100.", "Set minimumFractionDigits for the one decimal place.", "Give the relative formatter an explicit locale and numeric mode."],
+      },
+      recap: [
+        "Intl formatters render data as text using a locale and options, which is more reliable than hand-built concatenation.",
+        "An explicit locale and, for dates, a time zone keep the rendered output stable across machines.",
+        "Keep the raw number or Date for calculation and comparison, and format only at the moment of display.",
+      ],
+      readingCheck: {
+        prompt: "Why should the percent formatter receive 0.125 rather than 12.5?",
+        choices: [
+          "Because style: \"percent\" treats the input as a ratio and applies the conversion itself",
+          "Because 12.5 is not a valid number in JavaScript",
+          "Because the formatter rejects values above ten",
+          "Because the locale argument replaces the need for a value",
+        ],
+        correctIndex: 0,
+        explanation: "The percent style expects the ratio, so 0.125 renders as 12.5%; passing 12.5 would render as 1250%, which is the classic version of this mistake.",
+      },
+      decisionGuide: [
+        { use: "an explicit locale and options on a reused formatter", insteadOf: "relying on the machine's default locale", reason: "Explicit configuration makes displayed and checked output reproducible instead of depending on the environment that happens to run the code." },
+        { use: "a formatted string only for display", insteadOf: "parsing formatted text back into numbers or dates", reason: "Formatted text is locale-specific and lossy, so calculations should stay on the raw value while rendering stays a presentation step." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, prediction: true, edgeCase: true },
+    }),
   },
   7: {
     learn: authoredLesson({
