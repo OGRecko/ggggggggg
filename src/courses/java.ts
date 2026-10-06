@@ -76,7 +76,7 @@ const rawJavaPlans = [
     focus: "Cover if, else, switch, switch expressions, loops, break, continue, and deliberate branch selection with honest static checking.",
     concepts: ["if and else branches", "switch and switch expressions", "for and while loops", "break and continue"],
     terminology: ["if", "switch", "for", "continue"],
-    lessonKinds: ["learn", "predict", "debug", "compare", "blank-page", "build"],
+    lessonKinds: ["learn", "predict", "debug", "compare", "blank-page", "build", "read"],
     prerequisiteChapters: [1, 2],
     major: true,
     project: projectPlan({
@@ -175,7 +175,7 @@ const rawJavaPlans = [
     focus: "Teach List, Set, Map, Queue, Deque, iteration, sorting, comparators, and the cost of collection choices.",
     concepts: ["List vs Set vs Map", "Queue and Deque", "iterators and loops", "sorting with Comparator"],
     terminology: ["List", "Set", "Map", "Comparator"],
-    lessonKinds: ["learn", "read", "compare", "debug", "blank-page", "build", "design"],
+    lessonKinds: ["learn", "read", "compare", "debug", "blank-page", "build", "design", "modify"],
     prerequisiteChapters: [2, 3, 4, 5],
     major: true,
     project: projectPlan({
@@ -399,7 +399,7 @@ requiredPatterns: ["Queue<", "ArrayDeque", "Set<", "contains\\("], hints: ["Impo
     focus: "Teach lambdas, method references, streams, Optional, map/filter/reduce shapes, and when functional style improves clarity.",
     concepts: ["lambdas and method references", "stream pipelines", "Optional for absence", "pure transformations"],
     terminology: ["lambda", "method reference", "stream", "Optional"],
-    lessonKinds: ["learn", "predict", "compare", "debug", "build", "integration", "read"],
+    lessonKinds: ["learn", "predict", "compare", "debug", "build", "integration", "read", "design"],
     prerequisiteChapters: [6, 10, 11, 12],
     major: true,
     project: projectPlan({

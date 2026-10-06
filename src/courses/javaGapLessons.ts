@@ -22,7 +22,172 @@ const example = (title: string, code: string, output: string, explanation: strin
   title, code, output, explanation, lines, mistakes: javaGapMistakes,
 });
 
+/**
+ * The loop, iterator, and stream lessons each expose a different kind of mistake, so they
+ * carry their own mistake lists instead of reusing the collection and interface list above.
+ * The mistake, the error it produces, and the repair are all facts about the language, not
+ * observations from a run: there is no JDK in this sandbox, so none of these lessons claim
+ * executed output and every expected value is derived by reading the code.
+ */
+const loopMistakes: Example["mistakes"] = [
+  { mistake: "Writing a while loop whose body never changes the condition", error: "An infinite loop that never prints a result", fix: "Put an update step inside the body that can make the condition false, and confirm it runs on every path." },
+  { mistake: "Using while when the body must run before its first test", error: "A pass that is silently skipped because the condition starts false", fix: "Use do-while so the body runs once before the condition is consulted." },
+  { mistake: "Reaching for an enhanced for loop and then adding a counter to track the index", error: "An index maintained by hand that can drift from the real position", fix: "Use the counted for loop, which keeps start, test, and update together in the header." },
+  { mistake: "Assuming a while loop always runs at least once", error: "A missing first result when the condition is false from the start", fix: "Decide from the requirement whether zero passes is acceptable, and choose while or do-while accordingly." },
+];
+
+const iteratorMistakes: Example["mistakes"] = [
+  { mistake: "Removing through the list inside a for-each loop", error: "ConcurrentModificationException on the next step of the iteration", fix: "Remove through the iterator's own remove method, or express the rule with removeIf." },
+  { mistake: "Calling Iterator.remove twice without another next call", error: "IllegalStateException because remove has no element to delete", fix: "Call next before every remove so the iterator has a current element." },
+  { mistake: "Treating ConcurrentModificationException as a threading problem", error: "A hunt for threads in single-threaded code that modified a collection mid-walk", fix: "Read the exception as a structural change made outside the iterator, and repair the loop that made it." },
+  { mistake: "Using an iterator loop only to state one removal condition", error: "Correct code that is longer than the rule it expresses", fix: "Use removeIf when the decision depends on the current element alone." },
+];
+
+const streamMistakes: Example["mistakes"] = [
+  { mistake: "Chaining filter and map and stopping there", error: "No output and no computation, because nothing requested a result", fix: "End the pipeline with a terminal operation such as collect, count, sum, or forEach." },
+  { mistake: "Using peek or forEach to keep state inside a pipeline", error: "A pipeline whose result depends on side effects in the wrong order", fix: "Use a loop when the body must keep state, and keep pipelines to transformations that return values." },
+  { mistake: "Expecting parallelism from a stream chain", error: "Single-threaded behavior where several threads were assumed", fix: "Treat a plain stream as sequential on the calling thread, and ask for parallelism explicitly if it is genuinely needed." },
+  { mistake: "Reusing one stream after a terminal operation", error: "IllegalStateException because a consumed stream cannot be restarted", fix: "Build a new pipeline from the source for each result you need." },
+];
+
+const whileExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: loopMistakes,
+});
+
+const iteratorExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: iteratorMistakes,
+});
+
+const streamExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: streamMistakes,
+});
+
 export const javaGapLessons: LessonOverrideLibrary = {
+  3: {
+    read: authoredLesson({
+      title: "Looping with while and do-while",
+      minutes: 22,
+      summary: "Read a conditional loop as a test that runs before its body, know what do-while adds by running the body at least once, and choose between the counted form, the conditional form, and the enhanced for.",
+      learningGoals: [
+        "Trace a while loop through its condition, body, and update step",
+        "Explain the one guarantee do-while adds and when that guarantee matters",
+        "Choose the indexed for, the enhanced for, or a while loop from what the loop actually needs",
+      ],
+      explanation: "A while loop is repetition with the test at the top: the condition is evaluated first, and if it is false the body never runs at all, which makes zero iterations a normal outcome rather than a special case. That shape fits any job where the number of passes is not known in advance, such as consuming values until a sentinel appears, halving a number until it reaches a bound, or retrying while a budget remains. Because the test is at the top, something inside the body has to move the program toward the exit: the update step is part of the loop contract, and reading a while loop means locating that step and confirming it happens on every path through the body. do-while moves the test to the bottom, so the body always runs at least once before the condition is checked, and that guarantee is exactly what a menu, a validation prompt, or an attempt counter needs; it is the only difference between the two forms. The counted for loop packs its start, test, and update into one header, which keeps it the clearest choice when the number of passes is known, and the enhanced for removes the index entirely when the loop only needs each element in turn. The trade runs both ways: an enhanced for cannot skip an element, cannot walk backwards, and does not expose the index, so the moment a loop needs any of those the counted for is the honest tool rather than an enhanced loop with a counter bolted on the side.",
+      keywordNotes: [
+        "while evaluates its condition before the body, so the body can run zero times.",
+        "do-while evaluates the condition after the body, so the body runs at least once.",
+        "Every while loop needs an update step inside the body that can make the condition false, or the loop never ends.",
+        "The counted for puts start, test, and update in the header when the number of passes is known.",
+        "The enhanced for removes the index when only the elements matter, and cannot skip, reverse, or index.",
+      ],
+      examples: [
+        whileExample(
+          "Shrink a value until its own condition ends the loop",
+          'public class Main {\n    public static void main(String[] args) {\n        int value = 1250;\n        int digits = 0;\n        while (value > 0) {\n            value = value / 10;\n            digits++;\n        }\n        System.out.println(digits);\n    }\n}',
+          "4",
+          "The loop has no counter to compare against a limit; the value itself is the state that changes, and the condition reads that state. Dividing by ten removes one digit each pass, so the loop ends when the value reaches zero, and the number of passes is the number of digits the value had.",
+          [
+            "Line 1: the class holds the entry point that a launcher would call.",
+            "Line 2: the main method is the method the runtime invokes.",
+            "Line 3: the value being inspected is the loop state, not a counter.",
+            "Line 4: the counter starts at zero because nothing has been counted yet.",
+            "Line 5: the condition is tested before every pass, so a zero value would skip the body entirely.",
+            "Line 6: integer division drops the last digit, which is the update step that moves the value toward the exit.",
+            "Line 7: the counter records one pass against the original value.",
+            "Line 8: the body ends and control returns to the test with a smaller value.",
+            "Line 9: the printed count is the number of digits the value had.",
+            "Line 10: the main method closes after the loop finished.",
+            "Line 11: the class closes, and no index was needed because the value itself carried the state.",
+          ],
+        ),
+        whileExample(
+          "Compare a test at the top with a test at the bottom",
+          'public class Main {\n    public static void main(String[] args) {\n        int attempts = 0;\n        do {\n            attempts++;\n        } while (attempts < 3);\n        int refused = 0;\n        while (refused < 0) {\n            refused++;\n        }\n        System.out.println(attempts + " " + refused);\n    }\n}',
+          "3 0",
+          "The first loop counts attempts and stops when the counter reaches three, and the second loop shows the contrast that matters: its condition is false from the start, so a while loop runs its body zero times. That difference is the reason do-while exists, and the printed pair makes both behaviors visible in one program.",
+          [
+            "Line 1: the class declares the runnable entry point.",
+            "Line 2: the main method is the method the launcher calls.",
+            "Line 3: the attempt counter starts before the loop so the test has something to read.",
+            "Line 4: do opens a loop whose body comes first.",
+            "Line 5: the body runs before any condition is evaluated.",
+            "Line 6: the test runs after the body and ends the loop once the counter reaches three.",
+            "Line 7: the counter begins again at zero for the second comparison.",
+            "Line 8: this while loop tests before its body, which is the opposite order.",
+            "Line 9: the condition is false immediately, so the body never runs.",
+            "Line 10: this line is never reached, which is exactly the point of the comparison.",
+            "Line 11: the loop header closes without the body having executed.",
+            "Line 12: the printed pair reports three attempts from the do-while and zero from the never-runnable while.",
+            "Line 13: the class closes with both loop shapes observed in one program.",
+          ],
+        ),
+        whileExample(
+          "Walk the same array with an index and with the enhanced for",
+          'public class Main {\n    public static void main(String[] args) {\n        int[] scores = {4, 9, 16};\n        int total = 0;\n        for (int index = 0; index < scores.length; index++) {\n            total += scores[index];\n        }\n        int count = 0;\n        for (int score : scores) {\n            count++;\n        }\n        System.out.println(total + " " + count);\n    }\n}',
+          "29 3",
+          "Both loops visit three numbers, and the pair shows what each form is for: the counted loop needs the index to reach each element, while the enhanced loop hands over the element directly. The sum proves the values were seen, and the count proves the enhanced loop really executed once per element.",
+          [
+            "Line 1: the class holds the entry point.",
+            "Line 2: the main method is the single method the runtime invokes.",
+            "Line 3: the array literal is the data both loops will walk.",
+            "Line 4: the total starts at zero, which is the identity for addition.",
+            "Line 5: the counted for declares the index, tests it against the length, and advances it in one header.",
+            "Line 6: each pass adds the element at the current index, so the index is what makes this form work.",
+            "Line 7: the header closes with the index advanced past the element just used.",
+            "Line 8: the count starts at zero for the second loop.",
+            "Line 9: the enhanced for names the element type and the loop variable without an index.",
+            "Line 10: the body needs no index at all, so it only counts the visits.",
+            "Line 11: the loop closes after every element was handed over once.",
+            "Line 12: the printed sum and count come from two different loop shapes over one array.",
+            "Line 13: the main method closes.",
+            "Line 14: the class closes, and the example shows when the index is necessary and when it is noise.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Print a countdown from three to one with a while loop, then print the word go after the loop, using print for the numbers so the countdown shares one line.",
+        starterCode: "// Count down with a while loop, then print the final word\n",
+        solution: 'public class Main {\n    public static void main(String[] args) {\n        int remaining = 3;\n        while (remaining > 0) {\n            System.out.print(remaining + " ");\n            remaining--;\n        }\n        System.out.println("go");\n    }\n}',
+        solutionExplanation: "The condition keeps the loop running while the counter is above zero, the body prints the current value and then decrements it, and the value that finally ends the loop is the one that would have printed zero; the final println runs after the loop, which is why the word appears once at the end.",
+        testCases: [{ label: "Countdown", expected: "3 2 1 go" }],
+        hints: [
+          "Start the counter at three.",
+          "Print the number before you decrement it.",
+          "Let the condition end the loop when the counter reaches zero.",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["while\\s*\\(", "remaining--|remaining\\s*-=\\s*1|remaining\\s*=\\s*remaining\\s*-\\s*1", "System\\.out\\.println"],
+          successMessage: "The exercise ends a while loop with its own condition and prints the final word after the loop.",
+        },
+      },
+      recap: [
+        "while tests first, so zero passes is a normal outcome; do-while tests last, so the body always runs once.",
+        "The update step inside a while body is what eventually makes the condition false.",
+        "Use the counted for when the index matters, the enhanced for when only elements matter, and while when the number of passes is unknown.",
+      ],
+      readingCheck: {
+        prompt: "What is the practical difference between while and do-while?",
+        choices: [
+          "do-while checks its condition more often than while does",
+          "do-while runs the body at least once because the test happens after it, while while can skip the body entirely",
+          "while cannot be exited with break",
+          "do-while is the only form that allows a counter that changes",
+        ],
+        correctIndex: 1,
+        explanation: "The position of the test is the whole difference: at the top it can prevent the body from running at all, and at the bottom the body has already run once before the condition is consulted.",
+      },
+      decisionGuide: [
+        { use: "a while loop when the number of passes is unknown", insteadOf: "a counted for loop with an invented limit", reason: "The condition states the real stopping rule instead of a guessed bound that then has to be kept in sync with the data." },
+        { use: "do-while when the body must run at least once", insteadOf: "a while loop plus a duplicated first pass", reason: "Testing at the bottom states the guarantee directly and avoids copying the body ahead of the loop." },
+        { use: "the enhanced for when only the elements matter", insteadOf: "an indexed loop whose index is never read", reason: "Removing the unused index removes the chance of an off-by-one mistake." },
+        { use: "the counted for when the index or order control matters", insteadOf: "the enhanced for plus a manual counter", reason: "Start, test, and update stay together in the header, and skipping or reversing remains possible." },
+      ],
+      verification: ["structurally-checked"],
+      quality: { codeReading: true, prediction: true },
+    }),
+  },
   6: {
     design: authoredLesson({
       title: "Immutable collection factories",
@@ -116,6 +281,108 @@ export const javaGapLessons: LessonOverrideLibrary = {
       ],
       verification: ["structurally-checked"],
       quality: { codeReading: true, edgeCase: true },
+    }),
+    modify: authoredLesson({
+      title: "Removing elements safely while iterating",
+      minutes: 22,
+      summary: "Repair a removal loop that mutates a list mid-iteration, understand why the for-each form fails, and choose between an explicit Iterator and removeIf.",
+      learningGoals: [
+        "Explain why removing through the list while a for-each walks it fails",
+        "Remove while iterating with an explicit Iterator and its remove method",
+        "Choose removeIf when the whole rule is one predicate",
+      ],
+      explanation: "A collection iterator is not just a cursor: it tracks how many structural changes it has made so it can hand out every element exactly once. Removing through the list itself changes that structure behind the iterator's back, so the next call to next or hasNext finds the counts disagreeing and throws ConcurrentModificationException. That exception is a correctness feature rather than a nuisance, because without it the loop could silently skip the element that shifted into the removed position. The repair is to let the iterator perform the removal: Iterator.remove deletes the element that next has just returned and updates the iterator's own bookkeeping at the same time, so a while loop over hasNext and next is the natural shape, and remove must always follow a next call. When the rule is a single condition that does not depend on state gathered during the walk, removeIf states that intent in one line and applies the same safe removal internally. The boundary to keep honest is that the explicit iterator remains the right choice when the decision needs more than the current element, or when the loop must record what it removed, because removeIf accepts a predicate and nothing else.",
+      keywordNotes: [
+        "The iterator owns the position, so structural changes made through the list can be detected and rejected.",
+        "ConcurrentModificationException means the structure changed outside the iterator, not that another thread interfered.",
+        "Iterator.remove deletes the element returned by the most recent next call and keeps the iterator consistent.",
+        "removeIf applies one predicate to every element with the same iterator safety inside.",
+        "Calling remove twice in a row, or before any next call, is an illegal state on the iterator.",
+      ],
+      examples: [
+        iteratorExample(
+          "Remove through the iterator that owns the position",
+          'import java.util.ArrayList;\nimport java.util.Iterator;\nimport java.util.List;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<String> tags = new ArrayList<>(List.of("draft", "old", "published"));\n        Iterator<String> iterator = tags.iterator();\n        while (iterator.hasNext()) {\n            if (iterator.next().startsWith("o")) {\n                iterator.remove();\n            }\n        }\n        System.out.println(tags);\n    }\n}',
+          "[draft, published]",
+          "The while loop asks the iterator for each element and lets the iterator delete the one that matches, so the structure only ever changes through the object tracking the walk. The list that remains shows exactly one entry gone and the original order preserved.",
+          [
+            "Line 1: ArrayList is the concrete list being walked and mutated.",
+            "Line 2: the Iterator import names the type that owns the position.",
+            "Line 3: List supplies the declared element type and the factory used to seed the data.",
+            "Line 4: the blank line separates imports from the type declaration by convention.",
+            "Line 5: the class declares the runnable entry point.",
+            "Line 6: the main method is the single method the launcher calls.",
+            "Line 7: the list is created as a mutable copy, because a fixed factory result cannot be changed.",
+            "Line 8: the iterator is requested once, and from here it owns the walk.",
+            "Line 9: hasNext is the loop condition, so the walk continues while elements remain.",
+            "Line 10: next returns the element and advances the position, and the test decides whether it is unwanted.",
+            "Line 11: remove deletes the element next just returned, which keeps the iterator's own count consistent.",
+            "Line 12: the if block closes.",
+            "Line 13: the while body ends and the next pass re-tests hasNext.",
+            "Line 14: printing the list shows one entry removed and the original order intact.",
+            "Line 15: the main method closes.",
+            "Line 16: the class closes, and every structural change went through the iterator.",
+          ],
+        ),
+        iteratorExample(
+          "Express one removal rule with removeIf",
+          'import java.util.ArrayList;\nimport java.util.List;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> scores = new ArrayList<>(List.of(72, 91, 58, 88));\n        scores.removeIf(score -> score < 60);\n        System.out.println(scores.size() + " " + scores);\n    }\n}',
+          "3 [72, 91, 88]",
+          "When the removal is one condition and nothing else, removeIf names that condition without an explicit loop, and it still performs the deletion through the collection's own iterator internally. The printed size and contents show that only the failing score was dropped and the remaining order is unchanged.",
+          [
+            "Line 1: ArrayList is imported for the mutable copy.",
+            "Line 2: List supplies the declared type and the seeding factory.",
+            "Line 3: the blank line keeps imports separate from the class.",
+            "Line 4: the class holds the entry point.",
+            "Line 5: main is the method the runtime invokes.",
+            "Line 6: the scores are copied into a mutable list so removal is allowed.",
+            "Line 7: removeIf takes one predicate and deletes every element that satisfies it.",
+            "Line 8: the size and remaining contents are printed together so both effects are visible.",
+            "Line 9: the main method closes after the removal.",
+            "Line 10: the class closes, with the rule stated once and applied by the collection.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "The starter shows a loop that removes through the list while a for-each walks it. Repair the removal so every empty entry disappears, then print the surviving size and contents.",
+        starterCode: "// This loop throws ConcurrentModificationException: repair the removal\n// for (String value : queue) { if (value.isEmpty()) { queue.remove(value); } }\n",
+        solution: 'import java.util.ArrayList;\nimport java.util.List;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<String> queue = new ArrayList<>(List.of("ok", "", "retry", ""));\n        queue.removeIf(value -> value.isEmpty());\n        System.out.println(queue.size() + " " + queue);\n    }\n}',
+        solutionExplanation: "removeIf states the single condition that decides removal and lets the collection delete matching elements through its own iterator, which is the safe form of exactly what the commented loop attempted.",
+        testCases: [{ label: "Surviving queue", expected: "2 [ok, retry]" }],
+        hints: [
+          "Do not remove through the list while a for-each is walking it.",
+          "One predicate can express the whole rule.",
+          "Print the size and the list after the removal.",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["removeIf|iterator\\(", "isEmpty", "System\\.out\\.println"],
+          successMessage: "The exercise removes matches through the collection instead of mutating behind the iterator.",
+        },
+      },
+      recap: [
+        "Removing through the list while a for-each iterates changes the structure behind the iterator and throws ConcurrentModificationException.",
+        "Iterator.remove deletes the element most recently returned by next and keeps the iterator consistent.",
+        "removeIf is the right shape when the removal is a single condition, and an explicit iterator is the right shape when the decision needs more.",
+      ],
+      readingCheck: {
+        prompt: "Why does removing through the list during a for-each loop throw?",
+        choices: [
+          "The iterator tracks structural changes and refuses to continue when the collection was modified outside it",
+          "The list is immutable and rejects every removal",
+          "for-each loops always run in another thread",
+          "removeIf and remove cannot be used on the same collection",
+        ],
+        correctIndex: 0,
+        explanation: "The iterator's own modification count disagrees with the collection's, which is detected at the next step and reported instead of silently skipping an element.",
+      },
+      decisionGuide: [
+        { use: "an explicit Iterator when the decision needs state or a record of what was removed", insteadOf: "a for-each loop with a removal inside it", reason: "The iterator owns both the position and the removal, so the walk stays consistent and the loop can collect information while it works." },
+        { use: "removeIf when the rule is a single predicate", insteadOf: "a hand-written iterator loop for one condition", reason: "The collection applies the same safe removal internally with less code for the reader to verify." },
+        { use: "a copy of the list when the original must not change", insteadOf: "removing from a collection the caller still needs", reason: "Mutating shared state to answer a question is a side effect the caller did not ask for." },
+      ],
+      verification: ["structurally-checked"],
+      quality: { modification: true, codeReading: true },
     }),
   },
   7: {
@@ -411,6 +678,106 @@ export const javaGapLessons: LessonOverrideLibrary = {
         { use: "a named class when the implementation has a real identity", insteadOf: "an anonymous class reused in several places", reason: "A name lets the type be tested, reused, and referenced in error messages, which an unnamed class cannot offer." },
       ],
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+    design: authoredLesson({
+      title: "Choosing loops or stream pipelines",
+      minutes: 24,
+      summary: "Read a stream pipeline as a source, a chain of lazy intermediate operations, and one terminal operation, then choose between a pipeline and a loop from what the code has to say.",
+      learningGoals: [
+        "Trace a pipeline from its source through its intermediate stages to its terminal operation",
+        "Explain why a pipeline without a terminal operation computes nothing",
+        "Choose a loop when the body needs state, early exit, or several outputs",
+      ],
+      explanation: "A stream pipeline describes work rather than performing it: the source supplies elements, each intermediate operation wraps the previous stage in another step, and a single terminal operation drives the elements through the chain. That separation is why filter and map can be chained in a readable order without building an intermediate collection for every step, and why the chain stays lazy until something asks for a result. The laziness has a sharp consequence for reading streams: a chain that ends at an intermediate operation computes nothing at all, so a forgotten collect, count, forEach, or sum is a silent no-op rather than a compile error. Choosing between a pipeline and a loop is a question about what the code has to say. A pipeline reads well when the shape is filter, transform, and reduce to one value or one collection, because each stage is visible and the flow of data is the flow of control. A loop reads better when the body keeps state that is not the result, stops early on a condition, produces several outputs, or throws in a way that names the failing element, because those are control decisions a pipeline can only express awkwardly through side effects. The two are not rivals, and the honest rule is to pick the form whose structure matches the work; the streams in this course always run on the calling thread, so nothing here promises parallelism.",
+      keywordNotes: [
+        "A pipeline is a source, intermediate operations, and exactly one terminal operation.",
+        "Intermediate operations are lazy and return another stream, so they do nothing until a terminal operation runs.",
+        "The terminal operation decides the result type: collect builds a collection, count returns a long, and sum returns a number.",
+        "Streams preserve encounter order for ordered sources such as List, so a filtered list keeps its original order.",
+        "mapToInt avoids boxing when a pipeline works with numbers.",
+        "Reach for a loop when state, early exit, or several outputs are part of the job.",
+      ],
+      examples: [
+        streamExample(
+          "Filter, transform, and collect in one readable chain",
+          'import java.util.List;\nimport java.util.stream.Collectors;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<String> words = List.of("go", "swim", "jump", "ok");\n        List<String> kept = words.stream()\n                .filter(word -> word.length() > 2)\n                .map(String::toUpperCase)\n                .collect(Collectors.toList());\n        System.out.println(kept.size() + " " + kept);\n    }\n}',
+          "2 [SWIM, JUMP]",
+          "Each stage does one thing: filter keeps the words long enough to matter, map rewrites each survivor, and collect gathers the result, which is the terminal operation that finally makes the pipeline run. Encounter order is preserved, so the surviving words appear in the order the source listed them.",
+          [
+            "Line 1: List supplies the source type and the factory that builds it.",
+            "Line 2: Collectors provides the terminal operation that gathers results into a collection.",
+            "Line 3: the blank line separates imports from the class.",
+            "Line 4: the class declares the runnable entry point.",
+            "Line 5: main is the method the launcher calls.",
+            "Line 6: the source list is ordered, so the pipeline will preserve encounter order.",
+            "Line 7: stream opens the pipeline, and everything after this point describes stages rather than steps already taken.",
+            "Line 8: filter keeps the elements whose length passes the predicate.",
+            "Line 9: map rewrites each surviving element, and the method reference states the transformation compactly.",
+            "Line 10: collect is the terminal operation, which is what actually drives the elements through the chain.",
+            "Line 11: the printed size and contents show both how many words survived and their order.",
+            "Line 12: the main method closes after the terminal operation produced its result.",
+            "Line 13: the class closes, and the whole job was expressed as stages rather than a mutable accumulator.",
+          ],
+        ),
+        streamExample(
+          "A pipeline without a terminal operation does nothing",
+          'import java.util.List;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> values = List.of(4, 9, 16);\n        values.stream().map(value -> value * 2).peek(System.out::println);\n        int total = values.stream().mapToInt(Integer::intValue).sum();\n        System.out.println(total);\n    }\n}',
+          "29",
+          "The first statement builds a chain of intermediate operations and stops there, so it describes doubling and printing steps that never execute: removing the terminal operation removed the work. The second statement ends with sum, which is why it produces the total that gets printed, and the contrast is the point of the example.",
+          [
+            "Line 1: List is the only import this example needs.",
+            "Line 2: the blank line separates imports from the class.",
+            "Line 3: the class declares the runnable entry point.",
+            "Line 4: main is the method the runtime invokes.",
+            "Line 5: the values are fixed so the expected total can be checked by reading.",
+            "Line 6: this chain has only intermediate operations, so it is a description with nothing to drive it.",
+            "Line 7: sum is a terminal operation, so this pipeline actually runs and adds the elements.",
+            "Line 8: only the total is printed, which proves the first chain produced no output.",
+            "Line 9: the main method closes.",
+            "Line 10: the class closes, and the missing terminal operation shows up as missing output.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Build a pipeline over the scores, keep only those at or above sixty, collect them into a list, and print the list.",
+        starterCode: "// Filter the scores, then collect the survivors into a list\n",
+        solution: 'import java.util.List;\nimport java.util.stream.Collectors;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> scores = List.of(41, 88, 67);\n        List<Integer> passing = scores.stream()\n                .filter(score -> score >= 60)\n                .collect(Collectors.toList());\n        System.out.println(passing);\n    }\n}',
+        solutionExplanation: "stream opens the pipeline, filter states the condition, and collect is the terminal operation that produces the resulting list, so the printed value contains only the scores that passed.",
+        testCases: [{ label: "Passing scores", expected: "[88, 67]" }],
+        hints: [
+          "Open the pipeline with stream().",
+          "State the condition with filter.",
+          "Finish with a terminal operation, or nothing runs.",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["\\.stream\\(\\)", "filter\\(", "collect\\("],
+          successMessage: "The exercise ends its pipeline with a terminal operation and collects the survivors.",
+        },
+      },
+      recap: [
+        "A pipeline is a source, lazy intermediate stages, and one terminal operation that makes it run.",
+        "A chain that stops at an intermediate operation computes nothing, which is why the terminal step is not optional.",
+        "Choose a pipeline for filter-transform-collect work, and a loop when the body needs state, early exit, or several outputs.",
+      ],
+      readingCheck: {
+        prompt: "What makes the elements of a stream pipeline actually flow through it?",
+        choices: [
+          "The stream() call on the source",
+          "Each intermediate operation as soon as it is chained",
+          "A terminal operation such as collect, count, sum, or forEach",
+          "The import of Collectors",
+        ],
+        correctIndex: 2,
+        explanation: "Intermediate operations only describe stages; the terminal operation is what requests a result and therefore drives the elements through the chain.",
+      },
+      decisionGuide: [
+        { use: "a stream pipeline when each stage is one transformation of the data", insteadOf: "a loop with a mutable accumulator and nested conditions", reason: "The stages read in order and the data flow becomes the control flow, so the shape of the work is visible." },
+        { use: "a loop when the body keeps state or must stop early", insteadOf: "a pipeline with side effects in peek or forEach", reason: "State and early exit are control decisions that a loop states directly instead of hiding inside a lambda." },
+        { use: "mapToInt when the pipeline only works with numbers", insteadOf: "a boxed Stream and repeated unboxing", reason: "The primitive stream matches the work and provides terminal operations such as sum without conversions." },
+      ],
+      verification: ["structurally-checked"],
+      quality: { codeReading: true, edgeCase: true },
     }),
   },
   15: {
