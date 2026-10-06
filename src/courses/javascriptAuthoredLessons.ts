@@ -96,6 +96,81 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
     }),
   },
+  6: {
+    read: authoredLesson({
+      title: "Pattern matching with regular expressions",
+      minutes: 22,
+      summary: "Read a regular expression as a description of a text shape, use it for validation, extraction, and replacement, and know when a plain string method is the honest tool instead.",
+      learningGoals: [
+        "Read anchors, character classes, quantifiers, and flags in a regular expression",
+        "Choose between test, match, and replace for one concrete text job",
+        "Avoid the common pitfalls: unescaped user input, stateful global patterns, and regexes doing a parser's job",
+      ],
+      explanation: "A regular expression describes the shape of text rather than a literal sequence. /^[A-Z]{2}-\\d[A-Z]\\d$/ can be read left to right: the anchors ^ and $ pin the match to the whole string, [A-Z] allows one uppercase letter, {2} demands exactly two of them, \\d wants one digit, and the trailing [A-Z]\\d closes the format. The methods answer different questions: test asks whether the pattern occurs and returns a boolean, match returns the matched text plus its capture groups, and replace rewrites occurrences and takes the g flag to work past the first one. Because replace also accepts a function, a pattern can transform text without building the replacement by hand. Two boundaries matter in real code. A pattern assembled from user input must have its metacharacters escaped, otherwise the input silently becomes part of the pattern language instead of text to match. And when a task involves nesting or quoted strings, a regular expression is usually the wrong tool: HTML, JSON, and markup have real parsers, and a pattern that almost works is harder to debug than a parser call. Keep patterns small, anchor them when the whole string must match, and test each one against a matching and a non-matching string before trusting it.",
+      keywordNotes: [
+        "/pattern/flags is a regular-expression literal, and new RegExp(\"pattern\", \"flags\") builds the same pattern from a string.",
+        "^ and $ anchor a match to the start and end of the string, so a valid-looking substring cannot pass a whole-string rule.",
+        "\\d, \\w, and \\s are shorthand classes for digits, word characters, and whitespace, and a quantifier such as + or {2} states how many are allowed.",
+        "The g flag makes replace and match work across every occurrence, while a global pattern reused with test keeps a lastIndex that can surprise the next call.",
+        "Text that becomes part of a pattern must be escaped, otherwise user input like a dot or a bracket changes the rule instead of being matched by it.",
+      ],
+      examples: [
+        example(
+          "Validate a whole string with anchors",
+          'const code = "JS-2A4";\nconst pattern = /^[A-Z]{2}-\\d[A-Z]\\d$/;\nconsole.log(pattern.test(code));\nconsole.log(pattern.test("JS-2A4X"));',
+          "true\nfalse",
+          "The anchors make the rule apply to the entire string, so the extra trailing character fails even though a valid prefix exists.",
+          [
+            "Line 1: the value under test is data, and keeping it in a variable lets the next line stay short enough to read the pattern itself.",
+            "Line 2: the literal is read left to right: two uppercase letters, a hyphen, one digit, one uppercase letter, one digit, all anchored to the ends of the string.",
+            "Line 3: test answers one question with a boolean, which is exactly what a validation rule should produce.",
+            "Line 4: the trailing X fails because $ demands the end of the string immediately after the last digit; without the anchors this line would print true.",
+          ],
+        ),
+        example(
+          "Normalize messy text by replacing every occurrence",
+          'const title = "  Intro to   Regular Expressions  ";\nconst slug = title.trim().toLowerCase().replace(/\\s+/g, "-");\nconsole.log(slug);',
+          "intro-to-regular-expressions",
+          "trim removes the outer spaces before the pattern runs, and the global pattern collapses each run of whitespace into one hyphen so the double gap does not produce a double hyphen.",
+          [
+            "Line 1: the raw text deliberately keeps its uneven spacing so the transformation has something real to fix.",
+            "Line 2: trim runs first so outer spaces cannot become outer hyphens, toLowerCase normalizes case, and the global pattern \\s+ collapses every run of whitespace into one hyphen, not only the first run.",
+            "Line 3: logging the finished slug makes the transformation observable in the worker console instead of leaving it as an invisible intermediate value.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Write const hasDigits = text => /\\d/.test(text); then log hasDigits(\"code-7\") and hasDigits(\"code\") in one call. This lesson really executes in the worker, so the printed output is what CodeForge checks.",
+        starterCode: "const hasDigits = text => /* pattern test */;\n",
+        solution: 'const hasDigits = text => /\\d/.test(text);\nconsole.log(hasDigits("code-7"), hasDigits("code"));',
+        solutionExplanation: "The arrow function wraps one pattern test in a named rule, and a single log call prints both answers in order: true for the text that contains a digit and false for the text that does not. The pattern needs no anchors here because the question is whether a digit appears anywhere in the string rather than whether the whole string is a valid format.",
+        testCases: [{ label: "Worker output", expected: "true false" }],
+        hints: ["Use a shorthand class for one digit.", "test already returns a boolean you can log directly.", "Log both calls in one expression so the order is visible."],
+      },
+      recap: [
+        "A regular expression describes a text shape, and anchors decide whether that shape must account for the whole string.",
+        "test answers yes or no, match returns what was found, and replace rewrites occurrences once the g flag is present.",
+        "Patterns built from user text need escaping, and tasks with real nesting usually belong to a parser instead of a regular expression.",
+      ],
+      readingCheck: {
+        prompt: "Why does /^\\d$/ report false for the text \"a1\"?",
+        choices: [
+          "Because the anchors require the whole string to be a single digit, and the letter a is not one",
+          "Because \\d only matches even numbers",
+          "Because test needs the g flag to find a digit inside text",
+          "Because regular expressions compare only the first character",
+        ],
+        correctIndex: 0,
+        explanation: "The anchors force the pattern to describe the entire string, so any extra character such as the leading a fails the match even though a digit is present.",
+      },
+      decisionGuide: [
+        { use: "an anchored pattern for whole-string validation", insteadOf: "combining startsWith, includes, and length checks by hand", reason: "One readable pattern states the full rule and its boundaries, while a chain of partial checks usually leaves a gap that only shows up in production." },
+        { use: "a parser for HTML, JSON, or other nested formats", insteadOf: "a clever regular expression that almost handles nesting", reason: "Parsers handle quoting, escaping, and nesting correctly; a near-correct pattern tends to fail on the inputs that matter most and is harder to debug." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
   7: {
     learn: authoredLesson({
       summary: "Use DOM APIs with honest browser boundaries, guarding missing elements and preferring textContent when the job is plain text.",
