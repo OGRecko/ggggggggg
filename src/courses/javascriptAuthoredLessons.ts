@@ -74,6 +74,23 @@ const compareExample = (title: string, code: string, output: string, explanation
 
 
 /**
+ * The professional-engineering lesson reviews modules rather than syntax, so its failure list is
+ * about contracts: hidden dependencies, a surface wider than the callers need, state that can be
+ * reached from outside, and work performed as a side effect of importing.
+ */
+const reviewMistakes: Example["mistakes"] = [
+  { mistake: "Reading configuration from a global inside the module", error: "The module behaves differently depending on who loaded it first", fix: "Take configuration as a parameter so the contract is visible in the signature." },
+  { mistake: "Exporting helpers because they might be useful one day", error: "Every exported name becomes a promise the module must keep, and the reviewer has more to hold in mind", fix: "Export the behaviours callers use and keep the rest inside the closure." },
+  { mistake: "Returning the internal state object itself", error: "A caller can mutate fields the module believed it controlled", fix: "Expose behaviours that read or change the state, rather than the state container." },
+  { mistake: "Doing work when the module is imported", error: "Behaviour depends on load order, and the module cannot be reviewed from its exports", fix: "Move the work into a function the caller invokes deliberately." },
+];
+
+const reviewExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: reviewMistakes,
+});
+
+
+/**
  * The module, await, and network lessons each have their own failure modes, so each carries a
  * mistake list about its own subject. The network and module entries name real behaviours of
  * the boundary rather than observed runs: the practice runner rejects module syntax and blocks
@@ -1464,6 +1481,130 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
     }),
   },
   24: {
+    "design": authoredLesson({
+      title: "Designing reviewable modules",
+      minutes: 26,
+      summary: "Shape a feature into reviewable modules: dependencies arrive as parameters, the public surface stays small enough to hold in mind, and state stays private so the contract is what a reviewer reads.",
+      learningGoals: [
+        "State a module's contract from its factory signature alone",
+        "Keep the public surface small enough that a reviewer can hold it in mind",
+        "Take configuration and reporting as parameters instead of reaching for globals",
+        "Explain why private state makes a module easier to review than an exported object literal",
+      ],
+      explanation: "A module is reviewable when a reader can decide whether it is correct without following threads into the rest of the program. That property comes from design choices rather than from formatting. The first is an explicit contract: the factory signature names the configuration and the reporting function it needs, so a reviewer reads the dependencies at the top instead of searching for globals. The second is a small public surface: the returned object exposes the two or three behaviours callers actually use, and every helper stays private inside the closure, so the reviewer never has to wonder which internal function is safe to call. The third is private state: a counter or a list declared inside the factory can only change through the exposed behaviours, which makes every transition traceable from the exported calls. Reviewable modules also keep their work out of load time: a module that logs, fetches, or mutates globals as a side effect of being imported cannot be reviewed from its signature, because its behaviour depends on when it was loaded. The examples below use factory functions so the surface and the state are visible in one screen; the same discipline applies to a file whose real export list is one function and two constants.",
+      keywordNotes: [
+        "A factory function returns the module's public surface, so the contract is written in one place.",
+        "Dependency injection means configuration and reporting arrive as parameters rather than being read from globals.",
+        "Private state lives in the closure, so the only ways to change it are the behaviours the module exposes.",
+        "A reviewable module does its work when a behaviour is called, not as a side effect of being imported.",
+        "The export list is the review checklist: if a name is exported without a caller, the surface is larger than it needs to be.",
+      ],
+      examples: [
+        reviewExample(
+          "A small surface with injected dependencies",
+          'function createFeature(config, report) {\n  const seen = [];\n  function record(entry) {\n    seen.push(entry);\n    report("recorded " + entry);\n  }\n  return { record, count: () => seen.length };\n}\nconst feature = createFeature({ limit: 2 }, (line) => console.log(line));\nfeature.record("first");\nfeature.record("second");\nconsole.log(feature.count());',
+          "recorded first\nrecorded second\n2",
+          "Two dependencies arrive as parameters and two behaviours come back. Because the list stays inside the closure, a reviewer can account for every way the state changes by reading the returned object.",
+          [
+            "Line 1: the factory takes the configuration and the reporting function as parameters, so the module has no hidden dependencies.",
+            "Line 2: the list of entries is internal state, created per call and never returned directly.",
+            "Line 3: the internal helper is private to the factory, which is what keeps the public surface small.",
+            "Line 4: recording appends to the private state.",
+            "Line 5: the report goes through the injected function instead of reaching for a global console.",
+            "Line 6: the closing brace ends the internal helper.",
+            "Line 7: the returned object is the module's public surface, and it holds exactly two members.",
+            "Line 8: the closing brace ends the returned object.",
+            "Line 9: the closing brace ends the factory.",
+            "Line 10: the caller supplies both dependencies, which is what makes this call site self-explanatory.",
+            "Line 11: each call records through the public surface rather than the private state.",
+            "Line 12: the second call goes through the same surface, so a reviewer sees only one way in.",
+          ],
+        ),
+        reviewExample(
+          "Private helpers do not widen the contract",
+          'function createFeature(config, report) {\n  const version = "1.0.0";\n  function record(entry) {\n    report("recorded " + entry);\n  }\n  function describe() {\n    return version + " with limit " + config.limit;\n  }\n  return { record, describe };\n}\nconst feature = createFeature({ limit: 2 }, (line) => console.log(line));\nfeature.record("first");\nconsole.log(feature.describe());',
+          "recorded first\n1.0.0 with limit 2",
+          "The version constant and both helpers stay private, so the exported surface is still the two named behaviours. A reviewer reads the signature, the returned object, and nothing else to understand what callers can do.",
+          [
+            "Line 1: the same two dependencies arrive as parameters, so review starts from the signature.",
+            "Line 2: a version constant belongs to the module, so it is declared inside the factory and never exported.",
+            "Line 3: the helper stays private, and the public surface below is what a reviewer has to hold in mind.",
+            "Line 4: the helper reports through the injected function.",
+            "Line 5: the closing brace ends the internal helper.",
+            "Line 6: a second helper composes the version and the configuration into one readable sentence.",
+            "Line 7: the value is built from named inputs rather than from a global or a magic string.",
+            "Line 8: the closing brace ends the describe helper.",
+            "Line 9: the public surface exposes both behaviours by name, and nothing else.",
+            "Line 10: the closing brace ends the factory.",
+            "Line 11: the caller supplies the configuration and the reporter at one point in the program.",
+            "Line 12: one behaviour is exercised through the surface.",
+            "Line 13: the composed sentence proves both inputs reached the module, which is what a reviewer checks first.",
+          ],
+        ),
+        reviewExample(
+          "State changes only through the exposed behaviours",
+          'function createFeature(config) {\n  let state = config.start;\n  return {\n    step: () => (state += 1),\n    value: () => state,\n  };\n}\nconst feature = createFeature({ start: 0 });\nfeature.step();\nfeature.step();\nconsole.log(feature.value());',
+          "2",
+          "The counter cannot be set from outside, and the two behaviours separate the write from the read. That separation is what lets a reviewer check the transition rule instead of tracking every assignment in the file.",
+          [
+            "Line 1: the factory takes one dependency and needs nothing else, which is a small enough contract to review at a glance.",
+            "Line 2: the counter lives inside the closure, so no caller can set it to an arbitrary value.",
+            "Line 3: the returned object is the entire public surface.",
+            "Line 4: step advances the state and returns the new value, so the caller never needs a second read.",
+            "Line 5: value reports the state without changing it, which keeps the read and the write separate.",
+            "Line 6: the closing brace ends the returned object.",
+            "Line 7: the closing brace ends the factory.",
+            "Line 8: the caller chooses the starting value through the configuration object.",
+            "Line 9: the first step advances the counter.",
+            "Line 10: the second step advances it again, so the final number is checkable by reading the calls.",
+            "Line 11: the reported value is the proof that the private state changed exactly twice.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Write a feature factory whose only dependency is the function that reports entries, keeping the count private, exposing record and count, and printing the count after one recorded entry.",
+        starterCode: "// The real module file would publish one function, for example:\n//   export function createFeature(report) { ... }\n// The sandbox loads a single script, so define the factory here and call it once.\nfunction createFeature(report) {\n  // keep the count private, expose record and count\n}\n\nconst feature = createFeature((line) => console.log(line));\nfeature.record(\"first\");\nconsole.log(feature.count());\n",
+        solution: 'function createFeature(report) {\n  let count = 0;\n  return {\n    record: (entry) => {\n      count += 1;\n      report(entry + " (" + count + ")");\n    },\n    count: () => count,\n  };\n}\nconst feature = createFeature((line) => console.log(line));\nfeature.record("first");\nconsole.log(feature.count());',
+        solutionExplanation: "The count is created inside the factory, record is the only behaviour that changes it, and count reports it without changing anything. The reporting function arrives as a parameter, so the module has no global dependency and its contract is the signature plus the returned object.",
+        testCases: [{ label: "reviewable feature factory", expected: "first (1)\n1" }],
+        hints: [
+          "Declare the count inside the factory so no caller can reach it.",
+          "Return an object with record and count only.",
+        ],
+        checker: {
+          mode: "patterns",
+          requiredPatterns: ["createFeature\\(", "record:", "count:", "console\\.log"],
+          successMessage: "The factory takes its reporter as a parameter, keeps the count private, and exposes exactly record and count.",
+        },
+      },
+      recap: [
+        "A module is reviewable when its correctness can be judged from its contract rather than from the whole program.",
+        "Configuration and reporting arrive as parameters, so the dependencies are visible in the signature.",
+        "The public surface stays small, and helpers stay private inside the closure.",
+        "Private state can only change through exposed behaviours, which makes every transition traceable.",
+        "Work happens when a behaviour is called, not as a side effect of importing the module.",
+        "The export list doubles as the review checklist: every exported name should have a caller.",
+      ],
+      readingCheck: {
+        prompt: "Which trait most directly makes a module reviewable?",
+        choices: [
+          "Its dependencies and public surface are visible from its signature and its export list",
+          "It exports every helper so reviewers can inspect them individually",
+          "It performs its setup as a side effect of being imported",
+          "Its functions are as short as possible regardless of what they expose",
+        ],
+        correctIndex: 0,
+        explanation: "Reviewability is about a reader being able to decide whether the module is correct from its contract. Hidden dependencies, a large surface, and load-time side effects all push that decision back into the rest of the program.",
+      },
+      decisionGuide: [
+        { use: "a factory that takes configuration and dependencies as parameters", insteadOf: "reading globals or environment values inside the module", reason: "The contract is then visible in the signature, and a test can supply its own collaborators." },
+        { use: "a public surface of the two or three behaviours callers use", insteadOf: "exporting every helper for convenience", reason: "A reviewer reads the contract, not the whole file, and each exported name is a promise to keep working." },
+        { use: "private state inside the closure", insteadOf: "an exported object literal whose fields anyone can assign", reason: "Every change then flows through an exposed behaviour, so the state transitions are traceable." },
+      ],
+      verification: ["executed", "structurally-checked"],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+
     learn: authoredLesson({
       summary: "Design JavaScript feature modules with explicit configuration, safe logging boundaries, and APIs that are small enough to review.",
       learningGoals: [
