@@ -110,6 +110,17 @@ describe("JavaScriptRunner", () => {
     await expect(retriedRun).resolves.toEqual({ id: 2, output: "after reset" });
   });
 
+  it("rejects oversized code before creating a worker", async () => {
+    const runner = new JavaScriptRunner();
+    const largeProgram = "x".repeat(20_001);
+
+    await expect(runner.run(largeProgram)).resolves.toEqual({
+      output: "",
+      error: `This JavaScript submission is too large for the in-browser runner (${largeProgram.length} characters). Keep examples focused or split the work into smaller functions.`,
+    });
+    expect(MockWorker.instances).toHaveLength(0);
+  });
+
   it("terminates the current worker when reset is called explicitly", () => {
     const runner = new JavaScriptRunner();
     void runner.run('console.log("keep worker alive")');

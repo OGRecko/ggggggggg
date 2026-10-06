@@ -110,13 +110,32 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("keeps default scaffold samples aligned with late-course chapter topics", () => {
+    const java = courseById("java")!;
+    const javaConcurrencyRead = java.chapters[15].lessons.find((lesson) => lesson.kind === "read");
+    const javaNetworkingLearn = java.chapters[16].lessons.find((lesson) => lesson.kind === "learn");
+    const javaProfessionalBuild = java.chapters[23].lessons.find((lesson) => lesson.kind === "build");
+    expect(javaConcurrencyRead?.exercise.solution).toMatch(/AtomicInteger|CompletableFuture|Thread/);
+    expect(javaConcurrencyRead?.exercise.solution).not.toMatch(/URI\.create/);
+    expect(javaNetworkingLearn?.exercise.solution).toMatch(/URI\.create/);
+    expect(javaProfessionalBuild?.exercise.solution).toMatch(/Logger|getLogger|logger/);
+
+    const cpp = courseById("cpp")!;
+    const cppPointersRead = cpp.chapters[5].lessons.find((lesson) => lesson.kind === "read");
+    const cppDataStructuresRead = cpp.chapters[11].lessons.find((lesson) => lesson.kind === "read");
+    const cppProfessionalBuild = cpp.chapters[23].lessons.find((lesson) => lesson.kind === "build");
+    expect(cppPointersRead?.exercise.solution).toMatch(/int\*|int&|pointer/);
+    expect(cppDataStructuresRead?.exercise.solution).toMatch(/queue|unordered_map/);
+    expect(cppProfessionalBuild?.exercise.solution).toMatch(/service-ready|std::cerr/);
+  });
+
   it("detects suspicious repetition without flagging the whole curriculum as boilerplate", () => {
     for (const course of courses.filter((course) => course.id !== "python")) {
       const summary = summarizeCourseQuality(course);
       expect(summary.chaptersMissingAcceptanceCriteria).toEqual([]);
       expect(summary.chaptersWithInvalidPrerequisites).toEqual([]);
       expect(summary.lessonDepthCounts["deep-dive"]).toBeGreaterThanOrEqual(5);
-      expect(summary.repetitiveFindings.length).toBeLessThan(40);
+      expect(summary.repetitiveFindings).toEqual([]);
     }
   });
 

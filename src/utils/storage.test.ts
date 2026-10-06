@@ -55,6 +55,48 @@ describe("browser progress storage", () => {
     expect(loaded.lessonStates["java-1-1"].passed).toBe(true);
   });
 
+  it("sanitizes parseable but malformed progress shapes", () => {
+    localStorage.setItem("codeforge-progress-v2", JSON.stringify({
+      schemaVersion: 99,
+      code: "not-a-map",
+      completedLessons: ["java-1-1", "java-1-1", 7],
+      completedExercises: "wrong-type",
+      projectComplete: [null, "java-5-5"],
+      testScores: { good: 2, bad: Number.NaN, nope: "3" },
+      lessonStates: { "java-1-1": { viewed: true, passed: "yes" }, broken: "state" },
+      settings: { theme: "neon", font: "mono", textScale: "huge", spacing: "relaxed" },
+    }));
+
+    const loaded = loadProgress();
+    expect(loaded.schemaVersion).toBe(2);
+    expect(loaded.code).toEqual({});
+    expect(loaded.completedLessons).toEqual(["java-1-1"]);
+    expect(loaded.completedExercises).toEqual([]);
+    expect(loaded.projectComplete).toEqual(["java-5-5"]);
+    expect(loaded.testScores).toEqual({ good: 2 });
+    expect(loaded.lessonStates["java-1-1"]).toEqual({ viewed: true, practiced: true, passed: undefined, mastered: undefined, projectCompleted: undefined });
+    expect(loaded.lessonStates.broken).toEqual({});
+    expect(loaded.lessonStates["java-5-5"].projectCompleted).toBe(true);
+    expect(loaded.settings).toEqual({ theme: "light", font: "mono", textScale: "normal", spacing: "relaxed" });
+  });
+
+  it("keeps known fields from future-schema saves when they are still valid", () => {
+    localStorage.setItem("codeforge-progress-v2", JSON.stringify({
+      schemaVersion: 42,
+      code: { "python-1-1": 'print("ok")' },
+      completedExercises: ["python-1-1"],
+      settings: { theme: "dark", font: "system", textScale: "larger", spacing: "normal" },
+      extraField: { ignored: true },
+    }));
+
+    const loaded = loadProgress();
+    expect(loaded.code["python-1-1"]).toBe('print("ok")');
+    expect(loaded.completedExercises).toEqual(["python-1-1"]);
+    expect(loaded.lessonStates["python-1-1"].passed).toBe(true);
+    expect(loaded.settings.theme).toBe("dark");
+    expect(loaded.settings.textScale).toBe("larger");
+  });
+
   it("clears saved progress safely", () => {
     expect(saveProgress({ ...loadProgress(), completedExercises: ["java-1-1"] })).toBe(true);
     expect(clearProgress()).toBe(true);

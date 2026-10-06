@@ -55,12 +55,6 @@ export function CodeEditor({ value, onChange, errorLine, disabled = false, langu
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString());
           }),
-          EditorView.domEventHandlers({
-            paste: (event) => {
-              event.preventDefault();
-              return true;
-            },
-          }),
           EditorView.theme({
             "&": { height: "100%", fontSize: "14px", backgroundColor: "transparent" },
             ".cm-scroller": { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", padding: "12px 0" },
@@ -75,9 +69,9 @@ export function CodeEditor({ value, onChange, errorLine, disabled = false, langu
     });
     viewRef.current = view;
     return () => view.destroy();
-    // The editor deliberately initializes once; later values come from its own update listener.
+    // The editor deliberately re-initializes only when language mode or editability changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language]);
+  }, [language, disabled]);
 
   useEffect(() => {
     const view = viewRef.current;
