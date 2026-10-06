@@ -43,7 +43,7 @@ const rawJavaPlans = [
     focus: "Teach primitive types, reference types, strings, arrays, casting, operators, and the difference between storing a value and storing a reference.",
     concepts: ["primitive vs reference types", "String and array values", "casting", "operators and assignment"],
     terminology: ["int", "double", "String", "array", "cast"],
-    lessonKinds: ["learn", "read", "compare", "debug", "blank-page", "build"],
+    lessonKinds: ["learn", "read", "compare", "debug", "blank-page", "build", "design"],
     prerequisiteChapters: [1],
     major: true,
     project: projectPlan({
@@ -175,7 +175,7 @@ const rawJavaPlans = [
     focus: "Teach List, Set, Map, Queue, Deque, iteration, sorting, comparators, and the cost of collection choices.",
     concepts: ["List vs Set vs Map", "Queue and Deque", "iterators and loops", "sorting with Comparator"],
     terminology: ["List", "Set", "Map", "Comparator"],
-    lessonKinds: ["learn", "read", "compare", "debug", "blank-page", "build"],
+    lessonKinds: ["learn", "read", "compare", "debug", "blank-page", "build", "design"],
     prerequisiteChapters: [2, 3, 4, 5],
     major: true,
     project: projectPlan({
@@ -208,7 +208,7 @@ const rawJavaPlans = [
     focus: "Cover String immutability, equals, split, trim, text normalization, and careful string-building choices.",
     concepts: ["String immutability", "equals vs ==", "split and trim", "text formatting"],
     terminology: ["String", "equals", "trim", "split"],
-    lessonKinds: ["learn", "predict", "debug", "blank-page", "build", "read"],
+    lessonKinds: ["learn", "predict", "debug", "blank-page", "build", "read", "compare"],
     prerequisiteChapters: [2, 4],
     major: true,
     project: projectPlan({
@@ -462,7 +462,7 @@ requiredPatterns: ["Integer\\.parseInt", "assert"], hints: ["Keep the parser in 
     title: "Clean Java",
     focus: "Reinforce naming, small methods, clear responsibilities, records, sealed types, switch expressions, and maintainable Java style.",
     concepts: ["switch expressions", "records", "sealed classes", "naming and responsibility"],
-    lessonKinds: ["learn", "compare", "design", "debug", "build"],
+    lessonKinds: ["learn", "compare", "design", "debug", "build", "read"],
     prerequisiteChapters: [4, 5, 9, 10, 13, 14],
     project: projectPlan({
       title: "Project: result type cleanup",
@@ -521,7 +521,7 @@ requiredPatterns: ["AtomicInteger", "incrementAndGet"], hints: ["Import AtomicIn
     title: "Networking and APIs",
     focus: "Teach URI, HTTP, requests, responses, REST, JSON, status codes, timeouts, retries, and failure handling conceptually and structurally.",
     concepts: ["URI and URL parts", "request and response", "REST and JSON", "timeouts and failure handling"],
-    lessonKinds: ["learn", "read", "predict", "design", "build"],
+    lessonKinds: ["learn", "read", "predict", "design", "build", "compare"],
     prerequisiteChapters: [6, 7, 10, 13, 14, 16],
     major: true,
     project: projectPlan({
