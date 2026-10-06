@@ -47,6 +47,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
             "Line 6: *pointer dereferences the address back to the int object and mutates that shared storage. Removing the * would try to change the pointer value instead of the int it points at.",
             "Line 7: printing value and reference shows 5 twice because both names observe the same modified object.",
             "Line 8: main returns and ends the lifetime of every local object in this example.",
+            "Line 9: The closing brace ends main, so the three local objects in this stack frame no longer exist.",
           ],
         ),
         example(
@@ -59,6 +60,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
             "Line 2: the function signature promises to return a reference, so the caller will assume some other object continues to exist afterward.",
             "Line 3: text is a local object owned by this function call only.",
             "Line 4: returning text returns a reference to an object whose lifetime ends immediately after the function exits. The syntax compiles in many toolchains, but the contract is broken.",
+            "Line 5: The closing brace ends bad(), but the reference it already returned refers to an object whose lifetime is over.",
           ],
         ),
       ],
@@ -127,6 +129,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
             "Line 6: constructing guard means the cleanup responsibility is now attached to this scope.",
             "Line 7: the work message prints while guard is still alive.",
             "Line 8: returning from main ends guard's lifetime and triggers the destructor, which prints cleanup.",
+            "Line 9: The closing brace ends main, and the scope that owned guard is gone.",
           ],
         ),
         example(
@@ -208,6 +211,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
             "Line 5: dereferencing score reaches the owned int object and updates its value from 3 to 5.",
             "Line 6: printing *score confirms the mutation while the object is still alive.",
             "Line 7: returning from main destroys score, which in turn deletes the owned int automatically.",
+            "Line 8: The closing brace ends main, so the unique_ptr and the int it owned are both gone.",
           ],
         ),
         example(
@@ -293,8 +297,10 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
             "Line 10: the type definition ends after naming both state and policy.",
             "Line 11: main creates one counter instance.",
             "Line 12: one safe increment is performed.",
-            "Line 13: the protected state is printed after the update.",
-            "Line 14: main returns and destroys the counter and mutex.",
+            "Line 13: counter.increment() is called exactly once, so the critical section runs one time.",
+            "Line 14: the protected state is printed after the update.",
+            "Line 15: return 0 signals success and begins the exit from main.",
+            "Line 16: The closing brace finishes main, so the counter and its mutex are destroyed together.",
           ],
         ),
         example(

@@ -80,6 +80,37 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("keeps the authored C++ gap lessons present and honest", () => {
+    const cpp = courseById("cpp")!;
+    const chapterBlob = (number: number) => JSON.stringify(cpp.chapters[number - 1]);
+
+    expect(chapterBlob(7)).toMatch(/const\(\)\s*const|const member function|const-correctness/i);
+    expect(chapterBlob(8)).toMatch(/operator\+/);
+    expect(chapterBlob(8)).toMatch(/operator<</);
+    expect(chapterBlob(10)).toMatch(/std::views::filter/);
+    expect(chapterBlob(10)).toMatch(/std::ranges::distance/);
+    expect(chapterBlob(13)).toMatch(/std::move/);
+    expect(chapterBlob(13)).toMatch(/rule of five/i);
+    expect(chapterBlob(14)).toMatch(/std::invalid_argument/);
+    expect(chapterBlob(14)).toMatch(/noexcept/);
+    expect(chapterBlob(15)).toMatch(/\[limit\]|capture/);
+    expect(chapterBlob(15)).toMatch(/std::function/);
+    expect(chapterBlob(17)).toMatch(/steady_clock/);
+    expect(chapterBlob(17)).toMatch(/duration_cast/);
+
+    for (const number of [7, 8, 10, 13, 14, 15, 17]) {
+      const chapter = cpp.chapters[number - 1];
+      const authored = chapter.lessons.filter((lesson) => lesson.quality?.authoredDepth === "authored");
+      expect(authored.length).toBeGreaterThan(0);
+      for (const lesson of authored) {
+        for (const example of lesson.examples) {
+          expect(example.lines).toHaveLength(example.code.split("\n").length);
+          expect(lesson.exercise.checker?.requiredPatterns?.length ?? 0).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
   it("keeps Python coverage broad across core and advanced language features", () => {
     const python = courseById("python")!;
     const chapter8 = JSON.stringify(python.chapters[7]);
