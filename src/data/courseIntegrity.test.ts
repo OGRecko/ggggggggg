@@ -71,6 +71,24 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("keeps Python coverage broad across core and advanced language features", () => {
+    const python = courseById("python")!;
+    const chapter13 = JSON.stringify(python.chapters[12]);
+    const chapter23 = JSON.stringify(python.chapters[22]);
+    const chapter24 = JSON.stringify(python.chapters[23]);
+
+    expect(chapter13).toMatch(/zip\(/);
+    expect(chapter13).toMatch(/map\(/);
+    expect(chapter13).toMatch(/filter\(/);
+    expect(chapter13).toMatch(/dictionary comprehension|set comprehensions?/i);
+
+    expect(chapter23).toMatch(/match message|match\/case|structural pattern matching/i);
+    expect(chapter23).toMatch(/__iter__/);
+    expect(chapter23).toMatch(/__next__/);
+
+    expect(chapter24).toMatch(/pyproject|environment|logging|deployment/i);
+  });
+
   it("keeps implementation practice in every non-Python major chapter and debugging coverage across most major chapters", () => {
     for (const course of courses.filter((course) => course.id !== "python")) {
       const quality = summarizeCourseQuality(course);
