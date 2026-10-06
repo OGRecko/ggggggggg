@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { courseById, courses } from "../courses/catalog";
 import { chapterHasAuthoredDepth, hasEdgeCaseMaterial, hasMisleadingRuntimeClaim, summarizeCourseQuality } from "./curriculumQuality";
+import { checkRequiredPatterns } from "../utils/exerciseCheck";
 import { coverageAudit } from "./coverageAudit";
 
 describe("CodeForge curriculum integrity", () => {
@@ -76,6 +77,118 @@ describe("CodeForge curriculum integrity", () => {
       for (const chapter of course.chapters) {
         const titles = chapter.lessons.map((lesson) => lesson.title);
         expect(new Set(titles).size).toBe(titles.length);
+      }
+    }
+  });
+
+  it("explains every line of every example across all five courses", () => {
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
+        for (const lesson of chapter.lessons) {
+          for (const example of lesson.examples) {
+            const codeLines = example.code.split("\n");
+            expect(example.lines).toHaveLength(codeLines.length);
+            for (const line of example.lines) {
+              expect(line.trim().length).toBeGreaterThan(10);
+              expect(line).toMatch(/^Line \d+:/);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("keeps the authored Java gap lessons present and honest", () => {
+    const java = courseById("java")!;
+    const chapterBlob = (number: number) => JSON.stringify(java.chapters[number - 1]);
+
+    const javaLesson = (title: string) => {
+      for (const chapter of java.chapters) {
+        const lesson = chapter.lessons.find((candidate) => candidate.title === title);
+        if (lesson) return lesson;
+      }
+      throw new Error(`missing Java lesson: ${title}`);
+    };
+
+    const textBlocks = javaLesson("Text blocks for multi-line text");
+    expect(JSON.stringify(textBlocks)).toMatch(/text block/i);
+    expect(textBlocks.examples.some((example) => example.code.includes('"""'))).toBe(true);
+
+    expect(chapterBlob(5)).toMatch(/static initializer|static \{/i);
+    expect(chapterBlob(5)).toMatch(/instance initializer/i);
+
+    expect(chapterBlob(9)).toMatch(/default method/i);
+    expect(chapterBlob(9)).toMatch(/default\s+String/);
+
+    expect(chapterBlob(13)).toMatch(/anonymous/i);
+
+    expect(chapterBlob(21)).toMatch(/module-info|module\s+codeforge/);
+    expect(chapterBlob(21)).toMatch(/requires/);
+    expect(chapterBlob(21)).toMatch(/exports/);
+
+    for (const number of [5, 7, 9, 13, 21]) {
+      const chapter = java.chapters[number - 1];
+      const authored = chapter.lessons.filter((lesson) => lesson.quality?.authoredDepth === "authored");
+      expect(authored.length).toBeGreaterThan(0);
+      for (const lesson of authored) {
+        for (const example of lesson.examples) {
+          expect(example.lines).toHaveLength(example.code.split("\n").length);
+        }
+        expect(lesson.exercise.checker?.requiredPatterns?.length ?? 0).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("never grades a required construct that the structure checker strips away", () => {
+    // checkRequiredPatterns removes comments before matching, so a required pattern whose only
+    // alternatives are comment markers can never pass. Comment requirements stay in the
+    // learner-facing prompt, requirements, hints, and rubric instead.
+    const commentOnlyPattern = (pattern: string) => {
+      const tokens = pattern.replace(/\(\?:|\(|=|\)|\(|\|/g, " ").split(/\s+/).filter(Boolean);
+      return tokens.length > 0 && tokens.every((token) => token.includes("//") || token.includes("/\\*"));
+    };
+
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
+        const checkers = [
+          ...chapter.lessons.map((lesson) => lesson.exercise?.checker),
+          (chapter as { project?: { checker?: NonNullable<(typeof chapter.lessons)[number]["exercise"]>["checker"] } }).project?.checker,
+        ].filter(Boolean);
+        for (const checker of checkers) {
+          for (const pattern of checker!.requiredPatterns ?? []) {
+            expect(commentOnlyPattern(pattern), `${course.id} chapter ${chapter.number} requires ${pattern}`).toBe(false);
+          }
+          for (const group of checker!.requiredOneOf ?? []) {
+            for (const pattern of group) {
+              expect(commentOnlyPattern(pattern), `${course.id} chapter ${chapter.number} requires ${pattern}`).toBe(false);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("keeps the repaired Java project solutions prompt-faithful and self-consistent", () => {
+    // Java and C++ cannot run in this browser, so the strongest honest guarantee is that the
+    // shipped answer to each project satisfies the project's own structural check and is not the
+    // generated placeholder that older Java chapters shipped.
+    const java = courseById("java")!;
+    for (const chapter of java.chapters) {
+      const project = chapter.project as { solution?: string; checker?: NonNullable<(typeof chapter.lessons)[number]["exercise"]>["checker"] };
+      expect(project.solution, `java chapter ${chapter.number} has no authored project solution`).toBeTruthy();
+      expect(project.solution!, `java chapter ${chapter.number} still ships the generated placeholder`).not.toContain('"modified"');
+      const result = checkRequiredPatterns(project.solution!, project.checker!);
+      expect(result.missing, `java chapter ${chapter.number} project solution misses ${result.missing.join(", ")}`).toEqual([]);
+      expect(result.forbidden).toEqual([]);
+      expect(result.invalidPatterns).toEqual([]);
+      expect(result.emptyPatterns).toEqual([]);
+
+      for (const lesson of chapter.lessons) {
+        const checker = lesson.exercise?.checker;
+        if (!checker || checker.mode !== "patterns") continue;
+        const lessonResult = checkRequiredPatterns(lesson.exercise.solution, checker);
+        expect(lessonResult.missing, `${lesson.id} solution misses ${lessonResult.missing.join(", ")}`).toEqual([]);
+        expect(lessonResult.forbidden, `${lesson.id} solution uses a forbidden construct`).toEqual([]);
       }
     }
   });

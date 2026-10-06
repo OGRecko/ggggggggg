@@ -410,7 +410,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
         hints: ["Keep the build-stage explanation in a comment, not in a fake compiler message.", "Use std::cout to print the target name.", "Remember that linking combines compiled pieces after compilation."],
         checker: {
           mode: "patterns",
-          requiredPatterns: ["codeforge_app", "std::cout", "link"],
+          requiredPatterns: ["codeforge_app", "std::cout"],
           successMessage: "The exercise names the target and one linker responsibility honestly.",
         },
       },

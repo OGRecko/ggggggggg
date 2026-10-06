@@ -48,7 +48,8 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
             "Line 7: counter now stores one specific closure instance. A second call to makeCounter() would create a different private count binding.",
             "Line 8: the first invocation updates count from 0 to 1 and logs 1.",
             "Line 9: the second invocation reaches the same preserved binding, updates 1 to 2, and logs 2 instead of starting over.",
-          ],
+          
+          "Line 10: the closing line ends the example after the preserved binding has been observed twice.",],
         ),
         example(
           "One shared binding causes stale callback behavior",
@@ -218,7 +219,8 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
             "Line 3: the 400 path makes the validation failure explicit and returns a response-shaped object the adapter could translate later.",
             "Line 4: the success path returns a 201-style created result with the cleaned value.",
             "Line 5: logging the status demonstrates the rule through ordinary JavaScript execution even without a live HTTP framework.",
-          ],
+          
+          "Line 6: the closing line observes the response shape produced by the validation boundary.",],
         ),
       ],
       exercise: {
@@ -278,7 +280,8 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
             "Line 3: assigning to textContent preserves the characters as text. If this line used innerHTML in a real document, the browser would start parsing tags instead.",
             "Line 4: returning the stored text lets the example prove what value the rendering path preserved.",
             "Line 5: the logged result still shows literal angle brackets, demonstrating that the text path did not execute anything.",
-          ],
+          
+          "Line 6: the closing line observes the escaped text returned by the rendering path.",],
         ),
         example(
           "Separate origin policy from text escaping",
@@ -352,7 +355,8 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
             "Line 6: the public API object is returned to the caller.",
             "Line 7: the caller chooses the environment-specific prefix value at the boundary instead of hard-coding it deep in the helper.",
             "Line 8: the final console.log observes the feature behavior for this small example, but a larger system could call format from elsewhere without changing the helper itself.",
-          ],
+          
+          "Line 9: the closing line observes the configured behavior through the injected prefix.",],
         ),
         example(
           "Send observability through an adapter",
@@ -368,7 +372,9 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
             "Line 6: the success path logs a different event name and structured payload.",
             "Line 7: true reports the domain outcome after the success path completed.",
             "Line 8: the example passes a no-op logger to prove the domain rule can still be executed and observed independently of a real logging backend.",
-          ],
+          
+          "Line 9: the adapter boundary receives the observability event without the domain code knowing which logger is used.",
+          "Line 10: the closing line observes the domain outcome after the adapter ran.",],
         ),
       ],
       exercise: {
