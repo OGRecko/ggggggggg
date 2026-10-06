@@ -137,6 +137,35 @@ describe("CodeForge curriculum integrity", () => {
     expect(chapterBlob(21)).toMatch(/shell=True/);
   });
 
+  it("keeps the standard-library workflow lessons present across the built catalog", () => {
+    const python = courseById("python")!;
+    const chapterBlob = (number: number) => JSON.stringify(python.chapters[number - 1]);
+
+    expect(chapterBlob(6)).toMatch(/textwrap/);
+    expect(chapterBlob(6)).toMatch(/Template/);
+
+    expect(chapterBlob(7)).toMatch(/TemporaryDirectory/);
+    expect(chapterBlob(7)).toMatch(/glob\.glob/);
+    expect(chapterBlob(7)).toMatch(/shutil\.copyfile/);
+
+    expect(chapterBlob(10)).toMatch(/singledispatch/);
+
+    expect(chapterBlob(13)).toMatch(/itemgetter/);
+    expect(chapterBlob(13)).toMatch(/attrgetter/);
+
+    expect(chapterBlob(14)).toMatch(/debug specifier/i);
+    expect(chapterBlob(14)).toMatch(/format specifier/i);
+
+    expect(chapterBlob(15)).toMatch(/collections\.abc/);
+    expect(chapterBlob(15)).toMatch(/Iterable\[int\]/);
+
+    expect(chapterBlob(23)).toMatch(/__match_args__/);
+
+    expect(chapterBlob(24)).toMatch(/configparser/);
+    expect(chapterBlob(24)).toMatch(/dictConfig/);
+    expect(chapterBlob(24)).toMatch(/DeprecationWarning/);
+  });
+
   it("keeps every Python gadget lesson free of unsupported runtime promises", () => {
     const python = courseById("python")!;
     const blob = JSON.stringify(python);

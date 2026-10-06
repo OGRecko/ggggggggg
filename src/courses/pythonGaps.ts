@@ -8,7 +8,7 @@ import type { LessonSeed } from "./pythonAdvanced";
  * Pyodide worker (subprocess, pdb, coverage.py) the lesson says so explicitly
  * instead of pretending the sandbox executes it.
  */
-export const pythonGapLessons: Record<number, LessonSeed[]> = {
+const gapLessonRoundOne: Record<number, LessonSeed[]> = {
   2: [
     {
       title: "Assignment forms, swaps, and the walrus operator",
@@ -495,3 +495,548 @@ export const pythonGapLessons: Record<number, LessonSeed[]> = {
     },
   ],
 };
+
+/**
+ * Second pass: standard-library workflows that were still missing from the
+ * authored track. Every example below was executed inside the same Pyodide
+ * 0.29.3 runtime the app loads (CPython 3.13.2) with the app's stdout capture
+ * behavior, and each documented output matched byte for byte.
+ */
+const gapLessonRoundTwo: Record<number, LessonSeed[]> = {
+  6: [
+    {
+      title: "Wrapping, templates, and readable text",
+      minutes: 25,
+      summary: "Wrap long text to a chosen width, and fill a reusable template instead of concatenating strings by hand.",
+      learningGoals: ["Wrap a paragraph with textwrap", "Fill a template with named values", "Choose a template over manual concatenation"],
+      explanation: "Text that a person reads has a width limit, and text that a program reuses has placeholders. textwrap reflows a long string into lines that fit a requested width, which keeps console output and reports readable without hand-placed breaks. string.Template stores placeholders such as $name and fills them from named values, so one reusable message stays separate from the data it receives. substitute raises KeyError when a value is missing, while safe_substitute leaves the unknown placeholder in place, which suits data that is still incomplete. Both tools belong to the display boundary: build the data first, then format it once.",
+      keywordNotes: [
+        "textwrap.fill(text, width=n) reflows one string so each line fits the width and breaks at word boundaries.",
+        "string.Template(\"...$name...\").substitute(name=...) replaces every named placeholder and raises KeyError when one is missing.",
+        "safe_substitute leaves an unknown placeholder untouched, which is useful when only part of the data exists yet.",
+      ],
+      examples: [
+        {
+          title: "Wrap a long note",
+          code: 'import textwrap\nnote = "Remember to read the failing line before editing any code."\nprint(textwrap.fill(note, width=30))',
+          output: "Remember to read the failing\nline before editing any code.",
+          explanation: "The stored sentence stays complete and unbroken. fill reflows it for display, cutting at word boundaries so no word is split and each resulting line fits the requested width.",
+          reasons: [
+            "Line 1: The import makes the wrapping helpers available; nothing is wrapped yet.",
+            "Line 2: The full sentence is stored unchanged, which keeps the readable source text separate from its presentation.",
+            "Line 3: textwrap.fill reflows that sentence into lines of at most 30 characters, breaking between words, and returns one string whose newlines print displays as separate lines.",
+          ],
+        },
+        {
+          title: "Fill a reusable template",
+          code: 'from string import Template\ntemplate = Template("Hello, $name. You have $count new lessons.")\nprint(template.substitute(name="Ada", count=2))',
+          output: "Hello, Ada. You have 2 new lessons.",
+          explanation: "The template keeps the sentence with its placeholders intact, and substitute replaces each one with the matching named value. Every placeholder must be supplied: omitting count would raise KeyError instead of printing a half-filled message.",
+          reasons: [
+            "Line 1: The import brings in Template, which understands $name style placeholders.",
+            "Line 2: The template stores the message once with two placeholders, so the wording lives in a single place instead of being rebuilt at every call site.",
+            "Line 3: substitute walks the placeholders, inserts Ada and 2, and returns the completed text. Because substitute is strict, a missing name is reported as an error rather than silently skipped.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Use string.Template with the text \"Hi $name, welcome to $course\" and fill name=\"Ada\" and course=\"CodeForge\". Print the completed message.",
+        starterCode: "from string import Template\n# Fill in both placeholders\n",
+        solution: 'from string import Template\ntemplate = Template("Hi $name, welcome to $course")\nprint(template.substitute(name="Ada", course="CodeForge"))',
+        solutionExplanation: "Each placeholder is matched by name, so the order of the keyword arguments does not matter. substitute returns one completed string that print displays.",
+        testCases: [{ label: "Filled template", expected: "Hi Ada, welcome to CodeForge" }],
+        hints: ["Create the Template with both placeholders in one string.", "Pass name and course as keyword arguments.", "Print the value returned by substitute."],
+      },
+      recap: ["Wrap text at the display boundary instead of inserting manual line breaks.", "A template keeps one reusable wording with named placeholders.", "substitute is strict about missing values, while safe_substitute tolerates them."],
+      decisionGuide: [
+        { use: "textwrap.fill for readable output", insteadOf: "hand-placed newlines inside the source string", reason: "The sentence stays one readable value, and the width can change for a different console or report without editing the text." },
+        { use: "string.Template for messages assembled from data", insteadOf: "joining fragments with + in every caller", reason: "The wording lives in one place and named placeholders make it obvious which values a message needs." },
+      ],
+    },
+  ],
+  7: [
+    {
+      title: "Temporary paths, file discovery, and copying",
+      minutes: 29,
+      summary: "Create a workspace that cleans itself up, find files by pattern, and copy file contents with the standard library.",
+      learningGoals: ["Create and clean up a temporary directory", "Discover files by pattern with glob", "Copy a file with shutil"],
+      explanation: "Programs that touch the filesystem need a place to work that cleans up after itself and reliable ways to find and copy files. tempfile.TemporaryDirectory creates a workspace whose contents are removed when the with block exits, so a failed run does not leave litter behind. glob matches path patterns such as *.txt and returns the matching paths, which is how a program discovers input files without being told each name. shutil copies, moves, and removes files and whole trees; copyfile copies contents to a destination path. This browser sandbox uses an in-memory filesystem, so these same calls work here while nothing survives a page reload.",
+      keywordNotes: [
+        "tempfile.TemporaryDirectory() creates a workspace and removes its contents when the with block finishes.",
+        "glob.glob(pattern) returns every path matching a shell-style pattern such as *.txt or notes/?.md.",
+        "shutil.copyfile(source, target) copies file contents; shutil.copytree and shutil.rmtree work on whole directory trees.",
+      ],
+      examples: [
+        {
+          title: "Write and find a file in a temporary workspace",
+          code: 'import glob, os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    note = os.path.join(folder, "note.txt")\n    with open(note, "w", encoding="utf-8") as handle:\n        handle.write("remember\\n")\n    print(os.path.basename(note))\n    print(len(glob.glob(os.path.join(folder, "*.txt"))))',
+          output: "note.txt\n1",
+          explanation: "Three modules do three separate jobs: tempfile owns the workspace, os builds portable paths, and glob finds files by pattern. The directory disappears when the with block ends, so the example leaves nothing behind.",
+          reasons: [
+            "Line 1: glob finds files by pattern, os joins paths portably, and tempfile creates a self-cleaning workspace.",
+            "Line 2: The with statement asks tempfile for a directory and binds its path to folder; when the block exits, that directory and its contents are removed.",
+            "Line 3: os.path.join builds the file path inside the workspace, which keeps the code working on different operating systems instead of hard-coding a separator.",
+            "Line 4: Opening with the w mode creates the file for writing, encoding=\"utf-8\" states how the text is encoded, and the with block guarantees the handle closes.",
+            "Line 5: The write call stores one line of text, including its newline character.",
+            "Line 6: os.path.basename strips the directory part, so the printed result is just note.txt rather than a long temporary path.",
+            "Line 7: The pattern *.txt matches every text file in the workspace, and len reports that exactly one file was found.",
+          ],
+        },
+        {
+          title: "Copy a file and list the result",
+          code: 'import glob, os, shutil, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    source = os.path.join(folder, "draft.txt")\n    with open(source, "w", encoding="utf-8") as handle:\n        handle.write("draft\\n")\n    target = os.path.join(folder, "final.txt")\n    shutil.copyfile(source, target)\n    print(sorted(os.path.basename(path) for path in glob.glob(os.path.join(folder, "*.txt"))))',
+          output: "['draft.txt', 'final.txt']",
+          explanation: "copyfile needs both a source and a destination path, and it copies contents rather than moving them. Directory listings have no guaranteed order, so sorted makes the printed evidence stable.",
+          reasons: [
+            "Line 1: Four modules cover the work: path building, pattern matching, copying, and the temporary workspace.",
+            "Line 2: The temporary directory is created and will be removed automatically at the end of the block.",
+            "Line 3: The source path draft.txt is built inside that workspace.",
+            "Line 4: The file is opened for text writing with an explicit encoding and a guaranteed close.",
+            "Line 5: One line of content is written, so the copy has something to duplicate.",
+            "Line 6: The destination path final.txt is built, showing that copying always names both ends.",
+            "Line 7: copyfile duplicates the contents, glob finds both text files, and sorted with basename produces a stable, readable order.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Create a temporary directory, write the text \"notes\" into a file named lesson.md inside it, and print how many .md files the pattern finds.",
+        starterCode: "import glob, os, tempfile\n# Write one file, then count the matches\n",
+        solution: 'import glob, os, tempfile\nwith tempfile.TemporaryDirectory() as folder:\n    path = os.path.join(folder, "lesson.md")\n    with open(path, "w", encoding="utf-8") as handle:\n        handle.write("notes\\n")\n    print(len(glob.glob(os.path.join(folder, "*.md"))))',
+        solutionExplanation: "The with block owns the workspace and the file handle, so both are released no matter how the block ends. The pattern matches files by extension rather than by exact name.",
+        testCases: [{ label: "Markdown files found", expected: "1" }],
+        hints: ["Create the workspace with tempfile.TemporaryDirectory().", "Build the file path with os.path.join.", "Count the matches returned by glob.glob with a *.md pattern."],
+      },
+      recap: ["Temporary directories clean themselves up when their with block ends.", "glob discovers files by pattern, so new inputs need no code change.", "shutil copies and removes files and trees; copyfile copies contents to a named destination."],
+      decisionGuide: [
+        { use: "tempfile.TemporaryDirectory for scratch work", insteadOf: "inventing a folder name in the project directory", reason: "The standard library picks a unique location and removes it afterwards, so runs cannot collide or leave debris." },
+        { use: "a glob pattern to find input files", insteadOf: "a hard-coded list of file names", reason: "A new file that matches the pattern is picked up without editing the program." },
+      ],
+    },
+  ],
+  10: [
+    {
+      title: "Registering behavior by type with singledispatch",
+      minutes: 27,
+      summary: "Extend one function with type-specific behavior without editing the original definition or growing an if/elif chain.",
+      learningGoals: ["Register a specialized handler", "Keep a general fallback for other types", "Choose dispatch over repeated isinstance checks"],
+      explanation: "Sometimes one operation has a general meaning but needs different behavior for a few specific types. functools.singledispatch lets you define that general function once, then register specialized implementations for chosen argument types. The implementation is picked from the type of the first argument, and the general function remains the fallback for every type you have not registered. Registrations live where the specialized behavior is needed, so extending the function does not mean editing its original body or adding another branch to a long if/elif chain.",
+      keywordNotes: [
+        "@singledispatch turns the decorated function into the general fallback and gives it a .register attribute.",
+        "@describe.register attaches the function below as the handler for the type named in its annotation.",
+        "Handlers keep the same documented contract even though the returned behavior differs by type.",
+      ],
+      examples: [
+        {
+          title: "Specialize one type and keep the fallback",
+          code: 'from functools import singledispatch\n@singledispatch\ndef describe(value):\n    return "unknown"\n@describe.register\ndef _(value: int):\n    return "whole number"\nprint(describe(3))\nprint(describe("three"))',
+          output: "whole number\nunknown",
+          explanation: "The generic describe handles every type by default. The registered handler answers only for int, so the integer call takes the specialized branch while the string call falls back to the general one.",
+          reasons: [
+            "Line 1: The import brings in the singledispatch decorator from functools.",
+            "Line 2: @singledispatch marks the function below as the general fallback and adds the register attribute used later.",
+            "Line 3: The general function is defined once, with one signature that every caller uses.",
+            "Line 4: Its body is the answer for any type that has no specialized handler.",
+            "Line 5: @describe.register inspects the annotation on the next function and records it as the handler for int.",
+            "Line 6: The handler is named _ because the registration, not the name, is what makes it reachable.",
+            "Line 7: describe(3) dispatches on the type of 3, finds the int registration, and prints whole number.",
+            "Line 8: describe(\"three\") has no str registration, so the general body prints unknown.",
+          ],
+        },
+        {
+          title: "Register a handler for your own type",
+          code: 'from functools import singledispatch\nclass Money:\n    def __init__(self, cents):\n        self.cents = cents\n@singledispatch\ndef format_value(value):\n    return str(value)\n@format_value.register\ndef _(value: Money):\n    return "$" + str(value.cents / 100)\nprint(format_value(5))\nprint(format_value(Money(250)))',
+          output: "5\n$2.5",
+          explanation: "The generic function formats anything with str. The Money handler adds the domain-specific presentation, and both calls keep the same name and contract, so callers do not need to know which type they hold.",
+          reasons: [
+            "Line 1: The import supplies the decorator used to build the dispatch table.",
+            "Line 2: The small class is the type that needs its own presentation.",
+            "Line 3: The initializer stores the amount in cents as an integer.",
+            "Line 4: The stored value is assigned, so the class needs no further behavior.",
+            "Line 5: @singledispatch makes format_value the general entry point.",
+            "Line 6: The general answer converts any value with str.",
+            "Line 7: @format_value.register records the next function as the Money handler.",
+            "Line 8: The handler receives a Money instance and divides cents by 100 to build the display form.",
+            "Line 9: format_value(5) finds no int handler and uses the general body, printing 5.",
+            "Line 10: format_value(Money(250)) finds the registered handler and prints $2.5.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Define a generic kind(value) that returns \"other\", register an int handler returning \"int\", then print kind(1) and kind(\"one\").",
+        starterCode: "from functools import singledispatch\n# Register one specialized handler\n",
+        solution: 'from functools import singledispatch\n@singledispatch\ndef kind(value):\n    return "other"\n@kind.register\ndef _(value: int):\n    return "int"\nprint(kind(1))\nprint(kind("one"))',
+        solutionExplanation: "The generic function answers for every type, and the registered handler adds the one specialization. Printing both calls shows the dispatch decision rather than assuming it.",
+        testCases: [{ label: "Dispatched results", expected: "int\nother" }],
+        hints: ["Decorate the generic function with @singledispatch.", "Register the int handler with @kind.register above a function annotated value: int.", "Print kind(1) and kind(\"one\") to compare the two paths."],
+      },
+      recap: ["singledispatch keeps one public function name with type-specific implementations behind it.", "The generic body is the fallback for every unregistered type.", "Registration separates new behavior from the original definition, which keeps long if/elif chains out of the code."],
+      decisionGuide: [
+        { use: "singledispatch for behavior that varies by argument type", insteadOf: "an if/elif chain of isinstance checks inside one function", reason: "Each type's behavior is registered next to its own type, and the dispatch table is built once instead of re-tested on every call." },
+        { use: "a plain function for one behavior", insteadOf: "dispatch machinery with a single implementation", reason: "If every type takes the same path, the extra indirection adds a concept without adding capability." },
+      ],
+    },
+  ],
+  13: [
+    {
+      title: "operator helpers for sort keys and lookups",
+      minutes: 24,
+      summary: "Use itemgetter and attrgetter to express a field access as a reusable callable instead of a throwaway lambda.",
+      learningGoals: ["Sort records by a field with itemgetter", "Sort objects by attribute with attrgetter", "Decide when a lambda is clearer"],
+      explanation: "The operator module provides small callables for common access patterns, which is exactly the shape sorted expects for its key argument. itemgetter(1) builds a function that returns the element at index 1, so sorted(records, key=itemgetter(1)) reads as a sort on one field. attrgetter(\"minutes\") does the same for object attributes. Both are faster than an equivalent lambda for plain field access and both accept several fields, so itemgetter(0, 2) builds a two-part key in one call. Keep a lambda for a calculation that is more than a field read, because then the expression itself is the documentation.",
+      keywordNotes: [
+        "itemgetter(1) returns a callable that reads the element at index 1 of its argument, which is the usual sort-key shape.",
+        "attrgetter(\"minutes\") returns a callable that reads that attribute from each item.",
+        "Both accept several fields, so itemgetter(0, 2) or attrgetter(\"title\", \"minutes\") build multi-part keys.",
+      ],
+      examples: [
+        {
+          title: "Sort records by one field",
+          code: 'from operator import itemgetter\nrecords = [("read", 3), ("build", 1)]\nprint(sorted(records, key=itemgetter(1)))',
+          output: "[('build', 1), ('read', 3)]",
+          explanation: "itemgetter(1) is a callable that pulls the second element from each tuple. sorted calls it once per record and orders the records by that number while keeping each pair intact.",
+          reasons: [
+            "Line 1: The import brings in itemgetter, the helper that turns an index into a callable.",
+            "Line 2: Two tuples are stored as records, each pairing a label with a count.",
+            "Line 3: sorted builds a new list ordered by whatever key returns. Here the key reads index 1, so the pair with the smaller count comes first and the tuples themselves are unchanged.",
+          ],
+        },
+        {
+          title: "Sort objects by attribute",
+          code: 'from operator import attrgetter\nclass Lesson:\n    def __init__(self, title, minutes):\n        self.title = title\n        self.minutes = minutes\nlessons = [Lesson("Loops", 30), Lesson("Files", 20)]\nprint([lesson.title for lesson in sorted(lessons, key=attrgetter("minutes"))])',
+          output: "['Files', 'Loops']",
+          explanation: "attrgetter(\"minutes\") reads the minutes attribute from each object, so the sort compares durations. The comprehension then reports only the titles in their new order.",
+          reasons: [
+            "Line 1: The import supplies attrgetter for attribute-based keys.",
+            "Line 2: The class describes one lesson with its title and estimated minutes.",
+            "Line 3: The initializer receives the two values that define a lesson.",
+            "Line 4: The title is stored on the instance for later reading.",
+            "Line 5: The minutes value is stored as well, and this is the attribute the sort will use.",
+            "Line 6: Two lesson objects are created for comparison.",
+            "Line 7: attrgetter(\"minutes\") extracts the number to sort by, sorted returns the objects in that order, and the comprehension keeps only the titles so the printed evidence is simple.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Create pairs = [(\"b\", 2), (\"a\", 1)] and print the list sorted by the first element using itemgetter(0).",
+        starterCode: "from operator import itemgetter\n# Sort on the first field\n",
+        solution: 'from operator import itemgetter\npairs = [("b", 2), ("a", 1)]\nprint(sorted(pairs, key=itemgetter(0)))',
+        solutionExplanation: "itemgetter(0) reads the label from each pair, so the ordering follows the labels and the pairs stay whole. Because sorted returns a new list, the original order is untouched.",
+        testCases: [{ label: "Sorted pairs", expected: "[('a', 1), ('b', 2)]" }],
+        hints: ["Import itemgetter from operator.", "Pass key=itemgetter(0) to sorted.", "Print the returned list rather than a single element."],
+      },
+      recap: ["itemgetter and attrgetter turn a field access into a reusable callable.", "sorted with a key keeps the original items intact and only decides their order.", "Multi-field keys come from the same helpers, for example itemgetter(0, 2)."],
+      decisionGuide: [
+        { use: "itemgetter or attrgetter for a plain field", insteadOf: "a lambda that only reads one field", reason: "The helper states the access directly, avoids a function definition at every call site, and is implemented in C." },
+        { use: "a lambda for a computed key", insteadOf: "forcing a field accessor to do arithmetic", reason: "When the key is a calculation, the expression itself explains the intent better than a helper call can." },
+      ],
+    },
+  ],
+  14: [
+    {
+      title: "f-string debug output and focused diagnostics",
+      minutes: 23,
+      summary: "Print a value together with the expression's own source text, and keep temporary output easy to remove.",
+      learningGoals: ["Use the f-string = specifier", "Combine = with a format specifier", "Keep temporary diagnostics targeted"],
+      explanation: "The f-string = specifier prints the expression exactly as written, then its value, so temporary output documents itself: f\"{value=}\" produces value=41 without repeating the name in text. It combines with a format specifier, as in f\"{rate=:.3f}\", and with a real expression such as f\"{count * 2=}\", which prints the source expression and the computed result together. Each line carries its own label, so a short burst of these prints answers what a value is and where it came from. Use them deliberately for one focused question, then remove them or replace the question with a test.",
+      keywordNotes: [
+        "f\"{value=}\" expands to the expression text, an equals sign, and the value's repr.",
+        "f\"{rate=:.3f}\" places the format specifier after the = marker, so the label and the formatted value appear together.",
+        "The = specifier uses repr, which shows a string with its quotes and makes trailing spaces visible.",
+      ],
+      examples: [
+        {
+          title: "Label a value with its own expression",
+          code: 'value = 41\nprint(f"{value=}")\nprint(f"{value + 1=}")',
+          output: "value=41\nvalue + 1=42",
+          explanation: "The first line shows a name and its value. The second shows a whole expression and its result, which is what makes this form useful during an investigation: the output records the question as well as the answer.",
+          reasons: [
+            "Line 1: The variable is created with a known value so the printed lines can be checked.",
+            "Line 2: The debug specifier prints the expression text value, then its value 41, so no separate label string is needed.",
+            "Line 3: The same specifier with a computed expression prints value + 1=42, showing the source expression and the result together.",
+          ],
+        },
+        {
+          title: "Combine the debug marker with a format specifier",
+          code: 'rate = 7 / 3\nprint(f"{rate=:.3f}")\nprint(f"{rate * 100=:.1f}%")',
+          output: "rate=2.333\nrate * 100=233.3%",
+          explanation: "The colon introduces a format specifier after the debug marker, so one line carries the label and a readable precision. The percent line appends a literal % outside the braces, keeping the unit visible without extra text.",
+          reasons: [
+            "Line 1: The division produces a repeating decimal, which is exactly the kind of value that needs rounding for display.",
+            "Line 2: The debug marker prints rate= and the format specifier .3f rounds the value to three decimal places.",
+            "Line 3: The expression is scaled by 100, formatted to one decimal place, and followed by a literal percent sign written outside the placeholder.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Set count to 4 and print f\"{count=}\" and f\"{count * 2=}\".",
+        starterCode: "count = 4\n# Print each value with its own expression text\n",
+        solution: 'count = 4\nprint(f"{count=}")\nprint(f"{count * 2=}")',
+        solutionExplanation: "The debug specifier prints the source text of each expression next to its value, so the console records both the label and the result on one line.",
+        testCases: [{ label: "Debug output", expected: "count=4\ncount * 2=8" }],
+        hints: ["Write the expression inside braces followed by =.", "Keep the whole f-string inside print(...).", "Use count * 2 for the second line."],
+      },
+      recap: ["The = specifier prints an expression and its value together, so temporary output labels itself.", "A format specifier can follow the marker to control precision.", "Targeted debug output answers one question; tests are the durable replacement for it."],
+      decisionGuide: [
+        { use: "f\"{value=}\" for a quick check", insteadOf: "a label string plus the variable name typed twice", reason: "The output cannot drift from the code, because the expression text is generated at runtime." },
+        { use: "a test once the question is answered", insteadOf: "leaving debug prints in the final code", reason: "A test keeps protecting the behavior, while stray prints become noise in real output." },
+      ],
+    },
+  ],
+  15: [
+    {
+      title: "Abstract collection types for annotations",
+      minutes: 26,
+      summary: "Annotate a function with the behavior it needs rather than the concrete container it happens to receive.",
+      learningGoals: ["Annotate with collections.abc types", "Check a category at runtime with isinstance", "Prefer behavior contracts over concrete classes"],
+      explanation: "An annotation should describe what a function needs. collections.abc supplies the abstract types that name those needs: Iterable for anything a loop can pull values from, Sequence for ordered indexed access, Mapping for key lookups, and Set for uniqueness. Annotating a parameter as Iterable[int] tells the caller that any iterable of integers will do, so a list, a set, and a range all qualify. The same types work with isinstance at runtime, which lets a function branch on a category instead of listing concrete classes. Reach for a concrete type in an annotation only when the function truly depends on that concrete behavior.",
+      keywordNotes: [
+        "collections.abc.Iterable describes anything that can be iterated, including lists, sets, generators, and ranges.",
+        "collections.abc.Sequence adds ordering and indexing, Mapping adds key lookup, and Set adds uniqueness semantics.",
+        "The abstract types work with isinstance at runtime, so one contract can describe both the annotation and the check.",
+      ],
+      examples: [
+        {
+          title: "Ask for an iterable, not a list",
+          code: 'from collections.abc import Iterable\ndef total(values: Iterable[int]) -> int:\n    return sum(values)\nprint(total([1, 2, 3]))\nprint(total({4, 5}))',
+          output: "6\n9",
+          explanation: "The annotation promises only that values can be iterated, and sum needs nothing more. A list and a set both satisfy that promise, so neither caller has to convert data just to satisfy the signature.",
+          reasons: [
+            "Line 1: The import brings in the abstract type that names iteration behavior.",
+            "Line 2: The parameter is annotated Iterable[int], which accepts any iterable of integers, and the return annotation states that the result is an integer.",
+            "Line 3: sum consumes the iterable without needing indexes or a length, which is why the abstract type is enough.",
+            "Line 4: A list satisfies the contract and the total is 6.",
+            "Line 5: A set also satisfies the contract, and its total is 9, which proves the function did not secretly depend on list behavior.",
+          ],
+        },
+        {
+          title: "Branch on a behavior category",
+          code: 'from collections.abc import Mapping, Sequence\ndef shape_of(value):\n    if isinstance(value, Mapping):\n        return "mapping"\n    if isinstance(value, Sequence):\n        return "sequence"\n    return "other"\nprint(shape_of({"a": 1}))\nprint(shape_of("text"))\nprint(shape_of(3))',
+          output: "mapping\nsequence\nother",
+          explanation: "isinstance with an abstract type asks what a value can do, not which class it is. A dictionary reports as a mapping, a string reports as a sequence because text supports indexed access and slicing, and an integer falls through to other.",
+          reasons: [
+            "Line 1: The two abstract types describe key lookup and ordered indexed access.",
+            "Line 2: The function accepts any value and classifies it by behavior.",
+            "Line 3: The first check asks whether the value supports mapping-style key lookup.",
+            "Line 4: A dictionary satisfies that check, so the function stops there.",
+            "Line 5: The second check asks for sequence behavior, which includes ordering and indexing.",
+            "Line 6: Text satisfies the sequence contract, which is a useful fact to remember when a string arrives where a list of items was expected.",
+            "Line 7: Anything supporting neither behavior is reported as other.",
+            "Line 8: The dictionary prints mapping, the text prints sequence, and the integer prints other.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Annotate count_all(values: Iterable[int]) -> int, return how many values it receives, and print count_all([1, 2, 3]) followed by count_all(range(5)).",
+        starterCode: "from collections.abc import Iterable\n# Count the values a caller supplied\n",
+        solution: 'from collections.abc import Iterable\ndef count_all(values: Iterable[int]) -> int:\n    return sum(1 for _ in values)\nprint(count_all([1, 2, 3]))\nprint(count_all(range(5)))',
+        solutionExplanation: "The generator adds 1 for each produced value without building a list, and range shows that a lazily produced sequence satisfies the same annotation as a concrete list.",
+        testCases: [{ label: "Counted values", expected: "3\n5" }],
+        hints: ["Import Iterable from collections.abc.", "Use sum(1 for _ in values) so the input is only iterated once.", "Print both calls to show that a list and a range both qualify."],
+      },
+      recap: ["Abstract collection types let an annotation state the behavior a function actually uses.", "The same types work with isinstance, so a contract can be checked at runtime.", "Annotate the concrete type only when the function depends on that exact behavior."],
+      decisionGuide: [
+        { use: "Iterable or Sequence in a parameter annotation", insteadOf: "list everywhere by default", reason: "The annotation stops promising something the function never needed, so callers can pass sets, ranges, or generators without converting first." },
+        { use: "Mapping or Sequence checks for flexible input", insteadOf: "checking for dict or list specifically", reason: "The abstract check accepts every compatible type and keeps the branch tied to the behavior the code depends on." },
+      ],
+    },
+  ],
+  23: [
+    {
+      title: "Class patterns and matching objects",
+      minutes: 26,
+      summary: "Match on an object's type and attributes, and declare which attributes positional patterns may capture.",
+      learningGoals: ["Match attributes with a keyword class pattern", "Declare __match_args__ for positional patterns", "Keep one branch per accepted shape"],
+      explanation: "Pattern matching also works on objects. A class pattern such as case Point(x=0, y=0) checks that the subject is a Point and that its attributes hold those values. Positional patterns such as case Message(\"lesson\", title) rely on __match_args__, a class attribute listing which attribute names fill those positions, which is why the compact form is legal only when the class declares it. Keyword patterns keep working either way. Class patterns follow the same discipline as dictionary patterns: each branch states one accepted shape, and anything unmatched falls through to case _.",
+      keywordNotes: [
+        "case Point(x=0, y=0) matches an instance of Point whose x and y attributes are both 0.",
+        "__match_args__ = (\"x\", \"y\") declares which attributes positional class patterns capture, in order.",
+        "A class pattern checks the type before reading attributes, so an unrelated object simply does not match.",
+      ],
+      examples: [
+        {
+          title: "Match a value object by attribute",
+          code: 'class Point:\n    __match_args__ = ("x", "y")\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\nmatch Point(0, 0):\n    case Point(x=0, y=0):\n        print("origin")\n    case Point():\n        print("point")',
+          output: "origin",
+          explanation: "The first pattern demands both attributes to be 0, so a point at the origin takes that branch. The second pattern matches any Point at all, which is a useful fallback that still refuses unrelated types.",
+          reasons: [
+            "Line 1: The class declares the object type that the patterns will recognize.",
+            "Line 2: __match_args__ names the attributes in order, which allows positional class patterns to capture x and y.",
+            "Line 3: The initializer receives the two coordinates.",
+            "Line 4: The coordinate is stored on the instance so patterns can read it.",
+            "Line 5: The second coordinate is stored the same way.",
+            "Line 6: The subject Point(0, 0) is the value being matched.",
+            "Line 7: The pattern checks the type and both attribute values at once; all three must hold.",
+            "Line 8: When the pattern matches, this branch runs and prints origin.",
+            "Line 9: A class pattern with no attribute checks accepts any instance of Point.",
+            "Line 10: That branch prints point for every other coordinate pair, which is the shape-one-branch-each style at work.",
+          ],
+        },
+        {
+          title: "Capture attributes from a positional pattern",
+          code: 'class Message:\n    __match_args__ = ("kind", "title")\n    def __init__(self, kind, title):\n        self.kind = kind\n        self.title = title\ndef label(message):\n    match message:\n        case Message("lesson", title):\n            return title\n        case Message(kind):\n            return "unsupported: " + kind\n    return "missing"\nprint(label(Message("lesson", "Functions")))\nprint(label(Message("ping", "")))',
+          output: "Functions\nunsupported: ping",
+          explanation: "The positional pattern compares the first attribute to the literal \"lesson\" and binds the second attribute to the name title. A message of another kind still matches the second branch, which captures its kind so the caller gets a specific message instead of a generic failure.",
+          reasons: [
+            "Line 1: The class describes a tagged message with two attributes.",
+            "Line 2: __match_args__ makes the positional pattern legal by declaring kind first and title second.",
+            "Line 3: The initializer receives the tag and the payload.",
+            "Line 4: The kind attribute is stored for the pattern to compare.",
+            "Line 5: The title attribute is stored so a pattern can capture it.",
+            "Line 6: The helper accepts one message and decides what to return.",
+            "Line 7: match begins structural matching on that single value.",
+            "Line 8: This pattern requires a Message whose kind equals lesson and captures its title.",
+            "Line 9: The captured title is returned as the answer.",
+            "Line 10: This pattern accepts any other Message and captures its kind, which is the fallback for known-but-unsupported tags.",
+            "Line 11: The captured kind is included in a specific message.",
+            "Line 12: Reaching this line means the subject was not a Message at all.",
+            "Line 13: A lesson message prints its title, Functions.",
+            "Line 14: The ping message takes the fallback branch and prints unsupported: ping.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Define Shape with __match_args__ = (\"kind\",) and one attribute kind. Match Shape(\"circle\") and print round for the keyword pattern case Shape(kind=\"circle\"), otherwise print other.",
+        starterCode: "class Shape:\n    # Declare the attribute that patterns may capture\n",
+        solution: 'class Shape:\n    __match_args__ = ("kind",)\n    def __init__(self, kind):\n        self.kind = kind\nmatch Shape("circle"):\n    case Shape(kind="circle"):\n        print("round")\n    case Shape():\n        print("other")',
+        solutionExplanation: "The keyword pattern checks the type and one attribute value. The bare class pattern is the fallback for any other shape, so only accepted shapes run the first branch.",
+        testCases: [{ label: "Matched shape", expected: "round" }],
+        hints: ["Declare __match_args__ = (\"kind\",) in the class body.", "Write the first case as Shape(kind=\"circle\").", "Add case Shape() as the fallback branch."],
+      },
+      recap: ["Class patterns match a type and its attributes in one branch.", "__match_args__ declares which attributes positional patterns capture, in order.", "A bare class pattern is the natural fallback when the type is right but no earlier shape matched."],
+      decisionGuide: [
+        { use: "a class pattern for objects with known attributes", insteadOf: "reading attributes inside nested if checks", reason: "The type check and the attribute comparison appear together, so each accepted shape is visible at a glance." },
+        { use: "keyword patterns by default", insteadOf: "positional patterns everywhere", reason: "Named attributes stay correct when the class gains a field, while positional patterns depend on the declared order." },
+      ],
+    },
+  ],
+  24: [
+    {
+      title: "Configuration files and dictionary logging",
+      minutes: 28,
+      summary: "Read settings from an INI file and configure logging from one data structure instead of scattered calls.",
+      learningGoals: ["Read sections and typed values with configparser", "Configure logging with dictConfig", "Keep configuration out of business logic"],
+      explanation: "Configuration belongs outside the code that uses it. configparser reads INI text with labelled sections and key-value pairs, and its typed accessors such as getint convert the stored text into the type the caller needs. Logging has a matching data-driven setup: logging.config.dictConfig accepts one dictionary describing handlers, formatters, and levels, so the entire logging shape is configured in one place. Both tools follow the same boundary rule as environment variables: read and convert at the edge, validate there, then pass plain values into the application. In this browser sandbox a handler must write to stdout, because the console shown here is stdout.",
+      keywordNotes: [
+        "configparser.ConfigParser().read_string(text) parses INI text, and parser[\"section\"][\"key\"] reads a raw string value.",
+        "Typed accessors such as getint and getboolean convert the stored text at the configuration boundary.",
+        "logging.config.dictConfig({...}) configures handlers, formatters, and levels from one dictionary; a StreamHandler writing to ext://sys.stdout reaches this lesson console.",
+      ],
+      examples: [
+        {
+          title: "Read typed settings from INI text",
+          code: 'import configparser\nsettings_text = """[server]\nhost = localhost\nport = 8000\n"""\nparser = configparser.ConfigParser()\nparser.read_string(settings_text)\nprint(parser["server"]["host"])\nprint(parser.getint("server", "port"))',
+          output: "localhost\n8000",
+          explanation: "read_string parses the INI text into sections and keys. The host arrives as plain text, while getint converts the stored port text into an integer, which is the step that keeps string configuration from leaking into arithmetic.",
+          reasons: [
+            "Line 1: The import makes the INI parser available.",
+            "Line 2: A triple-quoted string holds the configuration text exactly as a file would contain it, including the [server] section header.",
+            "Line 3: The host value is stored as text, which is how every configuration value arrives.",
+            "Line 4: The port is also stored as text, even though the program needs a number later.",
+            "Line 5: The closing delimiter ends the configuration text.",
+            "Line 6: A parser instance is created to hold the parsed sections.",
+            "Line 7: read_string parses the text directly, which keeps the example runnable without a real configuration file on disk.",
+            "Line 8: Indexing by section and key reads the raw string value localhost.",
+            "Line 9: getint converts the stored text into the integer 8000, so the boundary is the only place that deals with string conversion.",
+          ],
+        },
+        {
+          title: "Configure logging from one dictionary",
+          code: 'import logging\nimport logging.config\nlogging.config.dictConfig({\n    "version": 1,\n    "handlers": {"console": {"class": "logging.StreamHandler", "stream": "ext://sys.stdout"}},\n    "root": {"handlers": ["console"], "level": "INFO"},\n})\nlogging.getLogger("codeforge.app").info("service ready")',
+          output: "service ready",
+          explanation: "The dictionary states the whole logging shape: one handler that writes to stdout, attached to the root logger at INFO level. After that single call, any named logger in the program follows the same configuration, so logging setup never spreads across modules.",
+          reasons: [
+            "Line 1: The logging package supplies the logger objects the program uses.",
+            "Line 2: The configuration submodule provides dictConfig.",
+            "Line 3: dictConfig opens the single dictionary that describes the whole logging setup.",
+            "Line 4: The version key is required by the configuration schema.",
+            "Line 5: One handler named console is declared as a StreamHandler whose stream is stdout, which is why this lesson can show the logged line.",
+            "Line 6: The root logger receives that handler and an INFO threshold, so lower-priority debug records stay quiet.",
+            "Line 7: The dictionary ends here, and applying it happens during the call.",
+            "Line 8: A named logger created after configuration inherits the root setup, and its info record reaches the console.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Parse the INI text [app] with mode = fast using ConfigParser, print the mode value, then print whether the app section exists.",
+        starterCode: "import configparser\n# Read one section and one setting\n",
+        solution: 'import configparser\nparser = configparser.ConfigParser()\nparser.read_string("[app]\\nmode = fast\\n")\nprint(parser["app"]["mode"])\nprint(parser.has_section("app"))',
+        solutionExplanation: "read_string parses the section header and the key-value pair, indexing returns the raw text, and has_section confirms the parser recognized the section that was read.",
+        testCases: [{ label: "Parsed setting", expected: "fast\nTrue" }],
+        hints: ["Include the [app] header and the mode = fast line in the INI text.", "Read the value with parser[\"app\"][\"mode\"].", "Check the section with parser.has_section(\"app\")."],
+      },
+      recap: ["configparser reads INI sections and gives typed accessors for conversion at the boundary.", "dictConfig configures the whole logging shape in one dictionary.", "Configuration is read and validated at the edge, then passed inward as plain values."],
+      decisionGuide: [
+        { use: "one dictConfig call at startup", insteadOf: "handlers and levels added in several modules", reason: "The configuration is visible in one place, and modules only ask for a named logger instead of reshaping the logging system." },
+        { use: "typed accessors such as getint", insteadOf: "indexing the raw string and converting it deep inside the code", reason: "Conversion and validation happen once at the configuration boundary, so business logic always receives the type it expects." },
+      ],
+    },
+    {
+      title: "Warnings and staged deprecation",
+      minutes: 25,
+      summary: "Signal that an interface is going away, and control how those warnings behave for callers and tests.",
+      learningGoals: ["Issue a DeprecationWarning with context", "Capture and inspect warnings", "Promote a warning to an error to enforce migration"],
+      explanation: "A warning describes the future of an interface rather than a failure of the current call. warnings.warn(..., DeprecationWarning) tells callers that a function or argument is on its way out, and stacklevel=2 points the report at the caller's line instead of the library's own code. Warnings are filterable: the default policy hides DeprecationWarning outside __main__, warnings.simplefilter(\"always\") shows every occurrence, and simplefilter(\"error\") promotes the warning into an exception so a test fails while the old usage is still cheap to fix. Issuing the warning a release before removal is what gives callers time to migrate.",
+      keywordNotes: [
+        "warnings.warn(message, DeprecationWarning, stacklevel=2) reports the deprecation and points the location at the caller.",
+        "warnings.catch_warnings(record=True) captures warnings as objects so a program or test can inspect category and message.",
+        "warnings.simplefilter(\"error\", DeprecationWarning) turns the warning into an exception, which is how a test enforces migration.",
+      ],
+      examples: [
+        {
+          title: "Capture a deprecation warning as evidence",
+          code: 'import warnings\nwith warnings.catch_warnings(record=True) as caught:\n    warnings.simplefilter("always")\n    warnings.warn("load_config() moves to settings.load_config()", DeprecationWarning)\n    print(caught[0].category.__name__)\n    print(caught[0].message)',
+          output: "DeprecationWarning\nload_config() moves to settings.load_config()",
+          explanation: "catch_warnings(record=True) turns warnings into objects instead of console noise, and simplefilter(\"always\") makes sure the record is not filtered out. Reading category and message proves what the caller would see.",
+          reasons: [
+            "Line 1: The import makes the warnings machinery available.",
+            "Line 2: The context manager captures warnings raised inside the block and stores them in the caught list.",
+            "Line 3: The always filter overrides the default policy, which would hide a DeprecationWarning raised outside __main__.",
+            "Line 4: The warning is raised with the standard deprecation category, and its message names the replacement call.",
+            "Line 5: The recorded object exposes its category, and __name__ prints the readable class name.",
+            "Line 6: The message attribute holds the text the developer wrote, which is what a migration guide would quote.",
+          ],
+        },
+        {
+          title: "Promote a warning to an error",
+          code: 'import warnings\ndef old_api():\n    warnings.warn("old_api is deprecated", DeprecationWarning, stacklevel=2)\nwarnings.simplefilter("error", DeprecationWarning)\ntry:\n    old_api()\nexcept DeprecationWarning as problem:\n    print("raised:", problem)',
+          output: "raised: old_api is deprecated",
+          explanation: "The error filter turns the deprecation into an exception, so any remaining use fails immediately instead of scrolling past. stacklevel=2 makes the reported location the caller's line, which is where the fix belongs.",
+          reasons: [
+            "Line 1: The import supplies the warning tools.",
+            "Line 2: The function represents an interface that is being retired.",
+            "Line 3: It warns with the deprecation category, and stacklevel=2 shifts the reported location from this line to the caller's.",
+            "Line 4: The filter is set to treat this category as an error rather than a message.",
+            "Line 5: The call is wrapped so the example can demonstrate the raised exception.",
+            "Line 6: The deprecated function is called, producing the promoted exception.",
+            "Line 7: The handler catches the DeprecationWarning class itself, which is possible precisely because it was promoted.",
+            "Line 8: Printing the exception shows the message that names the deprecated interface.",
+          ],
+        },
+      ],
+      exercise: {
+        prompt: "Capture warnings, emit \"use new_api instead\" as a DeprecationWarning, and print the recorded message.",
+        starterCode: "import warnings\n# Record one deprecation warning\n",
+        solution: 'import warnings\nwith warnings.catch_warnings(record=True) as caught:\n    warnings.simplefilter("always")\n    warnings.warn("use new_api instead", DeprecationWarning)\nprint(caught[0].message)',
+        solutionExplanation: "The recorded list keeps the warning object after the block, and its message attribute holds the text that was passed to warn.",
+        testCases: [{ label: "Recorded warning", expected: "use new_api instead" }],
+        hints: ["Use warnings.catch_warnings(record=True) as caught.", "Add simplefilter(\"always\") so the warning is not filtered out.", "Print caught[0].message."],
+      },
+      recap: ["A deprecation warning announces a planned removal without breaking current callers.", "stacklevel points the report at the caller, which is where the migration happens.", "Filters decide whether a warning is shown, hidden, or raised as an error in tests."],
+      decisionGuide: [
+        { use: "a DeprecationWarning with a replacement named in the message", insteadOf: "silently changing behavior in a release", reason: "Callers learn what to change and why while the old path still works, which is what makes a staged migration possible." },
+        { use: "simplefilter(\"error\") in the project's own tests", insteadOf: "ignoring deprecations until removal", reason: "The test suite fails at the first use of the old API, when the fix is a one-line change instead of an emergency." },
+      ],
+    },
+  ],
+};
+
+const pythonGapLessons: Record<number, LessonSeed[]> = {};
+for (const [key, lessons] of Object.entries(gapLessonRoundOne)) {
+  pythonGapLessons[Number(key)] = [...lessons];
+}
+for (const [key, lessons] of Object.entries(gapLessonRoundTwo)) {
+  const chapter = Number(key);
+  pythonGapLessons[chapter] = [...(pythonGapLessons[chapter] ?? []), ...lessons];
+}
+
+export { pythonGapLessons };
