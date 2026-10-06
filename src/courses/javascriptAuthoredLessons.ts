@@ -115,7 +115,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         example(
           "Guard a missing element before mutation",
           'const title = document.querySelector("h1");\nif (!title) {\n  console.log("missing heading");\n} else {\n  title.textContent = "Ready";\n}',
-          'Heading changes to Ready, or the guard logs missing heading',
+          'Browser preview: the heading changes to Ready, or the guard logs missing heading',
           "The null guard makes the document boundary explicit instead of assuming the page always contains the required element.",
           [
             "Line 1: querySelector asks the browser document for the first h1 element. The result may be an element or null, so this line creates a real branch point in the program's state.",
@@ -129,7 +129,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         example(
           "Delegate one click handler for repeated buttons",
           'const list = document.querySelector("[data-lessons]");\nlist?.addEventListener("click", (event) => {\n  const button = event.target.closest("button[data-lesson-id]");\n  if (!button) return;\n  console.log(button.dataset.lessonId);\n});',
-          'A clicked lesson button logs its lesson id',
+          'Browser preview: clicking a lesson button logs its lesson id',
           "Delegation attaches one listener to a stable parent and then narrows the event target to the child button that matches the intended interaction rule.",
           [
             "Line 1: the parent container is the stable element that will outlive individual child buttons, making it a good delegation anchor.",
@@ -146,7 +146,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         starterCode: "const saveButton = document.querySelector(\"button\");\n// Guard the boundary, then update the visible label\n",
         solution: 'const saveButton = document.querySelector("button");\nif (!saveButton) return;\nsaveButton.textContent = "Saved";',
         solutionExplanation: "The null guard protects the document boundary, and textContent performs a plain-text update without introducing HTML parsing.",
-        testCases: [{ label: "DOM structure", expected: "Guarded button update" }],
+        testCases: [{ label: "DOM structure", expected: "Browser preview: the guard keeps the heading update safe." }],
         hints: ["Treat querySelector as possibly returning null.", "Write the missing-element guard before the mutation.", "Use textContent for the visible label change."],
         checker: {
           mode: "patterns",

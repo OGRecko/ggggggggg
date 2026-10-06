@@ -6,9 +6,19 @@ const MAX_CODE_LENGTH = 20_000;
 const MAX_OUTPUT_LINES = 200;
 const MAX_OUTPUT_CHARS = 8_000;
 
-const workerSource = `
+export const javascriptWorkerSource = `
 const MAX_OUTPUT_LINES = ${MAX_OUTPUT_LINES};
 const MAX_OUTPUT_CHARS = ${MAX_OUTPUT_CHARS};
+
+// Indirect eval and the global Function constructor resolve outside the shadowed parameter list,
+// so they are replaced at the worker scope. The real Function is captured first because this
+// worker builds the user-code wrapper with it.
+const RealFunction = Function;
+const blockedInWorker = () => {
+  throw new Error("CodeForge blocks browser-side networking and nested worker creation in the JavaScript runner.");
+};
+self.eval = blockedInWorker;
+self.Function = blockedInWorker;
 
 function stringifyValue(value) {
   if (typeof value === "string") return value;
@@ -45,7 +55,20 @@ self.onmessage = async (event) => {
     const blocked = () => {
       throw new Error("CodeForge blocks browser-side networking and nested worker creation in the JavaScript runner.");
     };
-    const runner = new Function(
+    // A strict-mode function body may not declare a parameter named eval, so eval is blocked at
+    // the worker scope below instead of being shadowed here.
+    const consoleShim = {
+      log,
+      error: log,
+      warn: log,
+      info: log,
+      // Browser semantics: a failing assertion is reported as console output and execution
+      // continues, unlike a thrown Error.
+      assert: (condition, ...values) => {
+        if (!condition) pushLine(["Assertion failed:", ...values.map(stringifyValue)].join(" "));
+      },
+    };
+    const runner = new RealFunction(
       "console",
       "globalThis",
       "self",
@@ -59,13 +82,13 @@ self.onmessage = async (event) => {
       "postMessage",
       "close",
       "Function",
-      "eval",
       '"use strict";\\n' + code,
     );
+    const shared = Object.freeze({ setTimeout, clearTimeout, setInterval, clearInterval, Promise, Math, Date, JSON });
     const result = runner(
-      { log, error: log, warn: log, info: log },
-      Object.freeze({ setTimeout, clearTimeout, setInterval, clearInterval, Promise, Math, Date, JSON }),
-      Object.freeze({ setTimeout, clearTimeout, setInterval, clearInterval, Promise, Math, Date, JSON }),
+      consoleShim,
+      shared,
+      shared,
       blocked,
       blocked,
       blocked,
@@ -75,7 +98,6 @@ self.onmessage = async (event) => {
       blocked,
       blocked,
       blocked,
-      undefined,
       undefined,
     );
     await Promise.resolve(result);
@@ -100,7 +122,7 @@ export class JavaScriptRunner {
 
   private getWorker() {
     if (this.worker) return this.worker;
-    const source = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+    const source = URL.createObjectURL(new Blob([javascriptWorkerSource], { type: "text/javascript" }));
     this.worker = new Worker(source);
     URL.revokeObjectURL(source);
     return this.worker;
