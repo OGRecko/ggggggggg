@@ -16,7 +16,250 @@ const example = (title: string, code: string, output: string, explanation: strin
   mistakes: jsMistakes,
 });
 
+/**
+ * The statement-boundary, loop, and iteration lessons each fail in their own way, so each
+ * carries a mistake list about its own topic instead of reusing the scope and DOM list above.
+ * Every entry names a real language behavior: the point of the list is to make the failure
+ * mode readable, not to decorate the lesson.
+ */
+const statementMistakes: Example["mistakes"] = [
+  { mistake: "Writing a returned value on the line after return", error: "The function returns undefined and the value becomes a discarded expression", fix: "Keep the value on the same line as return, or wrap it in parentheses so the statement stays open." },
+  { mistake: "Starting a line with an opening bracket or parenthesis without ending the statement above", error: "The new line is parsed as a property access or call on the previous result", fix: "End the earlier statement with an explicit semicolon, or lead the risky line with one." },
+  { mistake: "Trusting insertion to fix a missing semicolon in the middle of an expression", error: "The statement continues across the line break and the meaning changes silently", fix: "Read what starts each line, and let a formatter enforce one semicolon style." },
+  { mistake: "Assuming insertion reports the boundaries it chooses", error: "No error at all, because insertion resolves the ambiguity without a warning", fix: "Treat statement boundaries as something the source states, not something the parser infers." },
+];
+
+const loopMistakes: Example["mistakes"] = [
+  { mistake: "Writing a while loop whose body never changes the condition", error: "An infinite loop that never prints a result", fix: "Change something the condition reads on every pass, and confirm it happens on each path." },
+  { mistake: "Using while when the body must run before its first test", error: "A skipped pass because the condition starts false", fix: "Use do-while so the body runs once before the condition is consulted." },
+  { mistake: "Relying on integer division to shrink a number", error: "A fractional value that never reaches the loop bound", fix: "Wrap the division in Math.floor so the value stays a whole number." },
+  { mistake: "Using for...in on an array and expecting elements", error: "Index strings and inherited property names instead of values", fix: "Use for...of for elements and keep for...in for object keys." },
+];
+
+const iterableMistakes: Example["mistakes"] = [
+  { mistake: "Returning the same iterator object from Symbol.iterator", error: "The second loop or spread sees nothing because the first walk already finished", fix: "Return a fresh iterator from the method so each consumer starts at the beginning." },
+  { mistake: "Returning an object without a next method from Symbol.iterator", error: "A TypeError when a consumer asks for the next value", fix: "Return an object whose next method answers with value and done." },
+  { mistake: "Forgetting done true at the end of the sequence", error: "A consumer that keeps asking for values and never finishes", fix: "Report done true once the sequence is exhausted, even if the final value is undefined." },
+  { mistake: "Making a multi-collection container iterable without stating an order", error: "Callers loop over an order nobody documented", fix: "Expose a named method that returns a specific collection, or document the iteration order explicitly." },
+];
+
+const statementExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: statementMistakes,
+});
+
+const loopExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: loopMistakes,
+});
+
+const iterableExample = (title: string, code: string, output: string, explanation: string, lines: string[]): Example => ({
+  title, code, output, explanation, lines, mistakes: iterableMistakes,
+});
+
 export const javascriptAuthoredLessons: LessonOverrideLibrary = {
+  1: {
+    compare: authoredLesson({
+      title: "Semicolons and automatic semicolon insertion",
+      minutes: 22,
+      summary: "Read JavaScript's statement boundaries: when a line break ends a statement, when it continues the current one, and the places where automatic insertion quietly changes what the code means.",
+      learningGoals: [
+        "Explain when JavaScript inserts a semicolon at a line break and when it continues the statement instead",
+        "Recognize the return, throw, break, and continue rule that turns a wrapped value into undefined",
+        "Keep one consistent semicolon style and know why a leading bracket is the real hazard",
+      ],
+      explanation: "JavaScript ends most statements at a line break, but not because it repairs missing punctuation: the parser inserts a semicolon only when the next token cannot continue the statement it is reading. That rule is why a chain of calls split across lines works, because a leading dot continues the expression, and it is also why a line beginning with a bracket, a parenthesis, a backtick, a plus, or a minus can attach itself to the statement above instead of starting a new one. The second rule is narrower and more dangerous: after return, throw, break, or continue, a line break ends the statement immediately, so a value written on the following line is never returned and the function hands back undefined instead. Reading code for these boundaries means watching what starts a line rather than where semicolons appear, because a statement that begins with an opening bracket is the case readers misread most often. Because insertion only ever adds semicolons and never reports the ambiguity it resolved, the style question is not whether insertion exists but whether a codebase lets the reader depend on it: keeping semicolons explicit, or dropping them with a formatter that already handles the hazards, means the boundaries in the source are the boundaries the reader sees.",
+      keywordNotes: [
+        "Automatic semicolon insertion ends a statement only when the next token cannot continue the current one.",
+        "A leading dot, operator, or bracket continues the previous line instead of starting a statement.",
+        "return, throw, break, and continue end at a line break, so a value on the next line is not part of the statement.",
+        "Insertion never adds a semicolon in the middle of a line and never reports the ambiguity it resolved.",
+        "The real hazard is a line that starts with an opening bracket or parenthesis, not a missing semicolon.",
+      ],
+      examples: [
+        statementExample(
+          "A line break after return is a broken return, not a wrapped one",
+          'function broken() {\n  return\n  42;\n}\nfunction fixed() {\n  return (\n    42\n  );\n}\nconsole.log(broken(), fixed());',
+          "undefined 42",
+          "Both functions look similar, but the first one returns nothing: the line break after return ended the statement, so the 42 below is a separate expression statement that runs and is discarded. The second function stays legal by wrapping the value in parentheses, which leaves the return statement unfinished across the line break, and the printed pair shows the difference.",
+          [
+            "Line 1: this function is written the way a wrapped return is often typed by mistake.",
+            "Line 2: return ends the statement at the line break, so the value below never becomes its operand.",
+            "Line 3: this expression still runs, and its value is discarded immediately.",
+            "Line 4: the function closes having returned undefined on every call.",
+            "Line 5: the second function returns the same value in a form that survives the line break.",
+            "Line 6: an opening parenthesis leaves the statement unfinished, so the newline does not end it.",
+            "Line 7: the value sits on its own line and is still part of the return statement.",
+            "Line 8: the closing parenthesis completes the expression that return is handling.",
+            "Line 9: the printed pair shows undefined from the first function and 42 from the second.",
+            "Line 10: the block ends, and the only difference between the two calls was punctuation.",
+          ],
+        ),
+        statementExample(
+          "A continued expression next to a statement that ends at its semicolon",
+          'const values = [1, 2, 3];\nconst total = values\n  .filter((n) => n > 1)\n  .reduce((sum, n) => sum + n, 0);\nconsole.log(total);\n\nconst list = [4, 5];\nconst size = list.length;\n[7, 8].forEach((n) => console.log(n));\nconsole.log(size);',
+          "5\n7\n8\n2",
+          "The chain spreads over three lines because a leading dot continues the expression rather than starting a new statement, so total receives the reduced value. The array literal that starts a line later is safe because the statement above it ends with an explicit semicolon, which is exactly the punctuation that stops one statement from being read as a property access on the previous result.",
+          [
+            "Line 1: the array is the input both parts of the example work with.",
+            "Line 2: the total is built by a chain rather than a loop.",
+            "Line 3: a leading dot continues the expression, so the line break does not end the statement.",
+            "Line 4: the second stage of the chain completes the reduction.",
+            "Line 5: the total is printed before the array demonstration that follows.",
+            "Line 6: the blank line separates the two demonstrations.",
+            "Line 7: the second array is named so its length can be read later.",
+            "Line 8: the length is captured before the next statement runs.",
+            "Line 9: this statement begins with a bracket, which is safe only because the line above ended with an explicit semicolon.",
+            "Line 10: the printed length shows the earlier statement finished before this array statement ran.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "The starter returns a total on the line after return, so the value is lost. Repair the return without moving the value onto the same line, then log the result.",
+        starterCode: "function total() {\n  return\n  [1, 2, 3].reduce((sum, n) => sum + n, 0);\n}\n// log the repaired total\n",
+        solution: 'function total() {\n  return (\n    [1, 2, 3].reduce((sum, n) => sum + n, 0)\n  );\n}\nconsole.log(total());',
+        solutionExplanation: "Wrapping the expression in parentheses leaves the return statement open across the line break, so the reduced value becomes the returned value and the logged result is 6 instead of undefined.",
+        testCases: [{ label: "Worker output", expected: "6" }],
+        hints: [
+          "A line break after return ends the statement immediately.",
+          "Parentheses keep the statement unfinished across a line break.",
+          "Log the call result to see which value came back.",
+        ],
+      },
+      recap: [
+        "Insertion adds a semicolon when the next token cannot continue the statement, which is why a leading dot continues and a leading bracket can attach.",
+        "return, throw, break, and continue end at a line break, so a value on the next line is a separate statement.",
+        "Consistent semicolon style plus a formatter keeps statement boundaries readable instead of depending on insertion rules.",
+      ],
+      readingCheck: {
+        prompt: "Why does a function whose return value sits on the line after return hand back undefined?",
+        choices: [
+          "Because JavaScript already ended the statement at the line break, so the value is a separate expression",
+          "Because the returned value was garbage collected before the call returned",
+          "Because return can only be followed by a variable name",
+          "Because the function needs an explicit undefined argument",
+        ],
+        correctIndex: 0,
+        explanation: "The break after return ends the statement, so the value below is never part of it; putting the value on the same line or wrapping it in parentheses are the usual repairs.",
+      },
+      decisionGuide: [
+        { use: "an explicit semicolon on any line that could continue", insteadOf: "letting insertion decide where the statement ends", reason: "The reader sees the boundary instead of having to know which leading tokens continue an expression." },
+        { use: "parentheses or a same-line value after return", insteadOf: "a wrapped value on the following line", reason: "The parentheses keep the statement open, so the returned value is the one that was written." },
+        { use: "a formatter setting for semicolons", insteadOf: "deciding punctuation statement by statement", reason: "One enforced style removes the leading-bracket hazard from review, whichever style the project picks." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, edgeCase: true },
+    }),
+  },
+  3: {
+    read: authoredLesson({
+      title: "Looping with while and do-while",
+      minutes: 22,
+      summary: "Read while and do-while as loops whose test position decides whether the body can run zero times, and know when the counted form or for...of is the clearer tool.",
+      learningGoals: [
+        "Trace a while loop through its condition, body, and update step",
+        "Explain the one guarantee do-while adds and when that guarantee matters",
+        "Choose between while, do-while, the counted for, for...of, and for...in from what the loop needs",
+      ],
+      explanation: "A while loop evaluates its condition before each pass, so a condition that is false at the start means the body never runs, and the loop is the right shape when the number of passes is not known in advance: consuming values until a sentinel appears, halving a number until it reaches a bound, or retrying while a budget remains. Because the test is at the top, the body must change something the condition reads, and JavaScript's number handling makes that update worth reading carefully: division produces a float, so a loop that shrinks a number to an integer needs Math.floor rather than relying on integer division. do-while moves the test to the bottom, which guarantees the body runs at least once, and that guarantee is the only difference between the two forms. The counted for keeps start, test, and update in one header when the number of passes is known, while for...of hands over values and for...in hands over property keys as strings, which is why for...in belongs to objects: using it on an array means reading index strings instead of elements. The break and continue statements work in every one of these forms, and reading them as an exit and a skip is what tells you why a loop with several continues still ends for the reason stated in its header.",
+      keywordNotes: [
+        "while tests before the body, so a false condition means zero passes.",
+        "do-while tests after the body, so the body always runs at least once.",
+        "The body must change something the condition reads, or the loop never ends.",
+        "JavaScript division yields a float, so shrinking a number to an integer needs Math.floor.",
+        "for...of hands over values, for...in hands over keys as strings, and the counted for is for when the index matters.",
+      ],
+      examples: [
+        loopExample(
+          "Shrink a value until its own condition ends the loop",
+          'let value = 1250;\nlet digits = 0;\nwhile (value > 0) {\n  value = Math.floor(value / 10);\n  digits += 1;\n}\nconsole.log(digits);',
+          "4",
+          "The value is the loop state and the condition reads it directly rather than comparing a counter with a limit. Integer division is not a separate operator in JavaScript, so Math.floor turns the float result back into a whole number, and removing one digit per pass is what eventually makes the value zero.",
+          [
+            "Line 1: the value being inspected is the loop state, not a counter.",
+            "Line 2: the count starts at zero before any digit has been removed.",
+            "Line 3: the test runs before every pass, so a zero value would skip the body entirely.",
+            "Line 4: Math.floor is required because division gives a float, and dropping the fraction removes one digit.",
+            "Line 5: the counter records one pass against the original value.",
+            "Line 6: the loop closes and control returns to the test with a smaller value.",
+            "Line 7: the printed count is the number of digits the value had.",
+          ],
+        ),
+        loopExample(
+          "Compare a test at the top with a test at the bottom",
+          'let attempts = 0;\ndo {\n  attempts += 1;\n} while (attempts < 3);\n\nlet refused = 0;\nwhile (refused < 0) {\n  refused += 1;\n}\nconsole.log(attempts, refused);',
+          "3 0",
+          "The do-while counts three attempts and finishes when its test fails, and the second loop shows what the other order means: its condition is false before the first pass, so the body never runs and the counter stays at zero. Printing both in one call makes the difference between a guaranteed pass and a possible zero visible.",
+          [
+            "Line 1: the attempt counter starts before the loop so the test has something to read.",
+            "Line 2: do opens a loop whose body comes first.",
+            "Line 3: the body runs before any condition is evaluated.",
+            "Line 4: the test runs afterwards and stops the loop once the counter reaches three.",
+            "Line 5: the blank line separates the two loops.",
+            "Line 6: the second counter starts at zero for the comparison.",
+            "Line 7: this while tests before its body, which is the opposite order.",
+            "Line 8: the condition is false immediately, so the body is skipped.",
+            "Line 9: the loop closes without having executed its body.",
+            "Line 10: the printed pair reports three attempts and zero, which is the whole difference between the two forms.",
+          ],
+        ),
+        loopExample(
+          "Walk the same array with for...of, for...in, and continue",
+          'const scores = [4, 9, 16];\nlet total = 0;\nfor (const score of scores) {\n  if (score === 9) {\n    continue;\n  }\n  total += score;\n}\nlet keys = "";\nfor (const index in scores) {\n  keys += index;\n}\nconsole.log(total + " " + keys);',
+          "20 012",
+          "for...of hands over each element, so continue skips the nine and the total keeps four and sixteen, while for...in walks the property keys and builds the string 012 because array indices arrive as strings. Reading the two loops side by side is the fastest way to remember which one gives values and which one gives keys.",
+          [
+            "Line 1: the array is the data both loops will walk.",
+            "Line 2: the total starts at zero for the element loop.",
+            "Line 3: for...of names the element directly, without an index.",
+            "Line 4: the condition tests the element that was just handed over.",
+            "Line 5: continue skips the rest of this pass and moves to the next element.",
+            "Line 6: the closing brace ends the skip block.",
+            "Line 7: the total adds every element that was not skipped.",
+            "Line 8: the loop closes after the last element.",
+            "Line 9: the key accumulator starts empty for the second loop.",
+            "Line 10: for...in walks property keys rather than values.",
+            "Line 11: the keys are concatenated, which is why the result is a string of digits.",
+            "Line 12: the loop closes after every key was visited.",
+            "Line 13: the printed pair shows the value total and the key string side by side.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Build a countdown from three to one with a while loop, then log the word go together with the countdown, using a string accumulator so the whole line prints at once.",
+        starterCode: "let remaining = 3;\nlet line = \"\";\n// accumulate the countdown, then log the line with the final word\n",
+        solution: 'let remaining = 3;\nlet line = "";\nwhile (remaining > 0) {\n  line += remaining + " ";\n  remaining -= 1;\n}\nconsole.log(line + "go");',
+        solutionExplanation: "The loop appends the current number and a space while the counter is above zero, decrementing each pass so the condition eventually fails, and the final log adds the word after the accumulated digits, which is why the output is one line ending in go.",
+        testCases: [{ label: "Worker output", expected: "3 2 1 go" }],
+        hints: [
+          "Start the counter at three.",
+          "Append the number before decrementing it.",
+          "Add the final word after the loop has finished.",
+        ],
+      },
+      recap: [
+        "while tests first and can run zero times; do-while tests last and always runs once.",
+        "Something in the body must change what the condition reads, and JavaScript needs Math.floor for integer shrinking.",
+        "for...of gives values, for...in gives keys as strings, and break and continue work in every loop form.",
+      ],
+      readingCheck: {
+        prompt: "When is do-while the honest choice over while?",
+        choices: [
+          "When the number of iterations is known in advance",
+          "When the body must run at least once before the condition is consulted",
+          "When the loop should never end",
+          "When the body needs a counter that changes",
+        ],
+        correctIndex: 1,
+        explanation: "The bottom test is the only difference between the two forms, and it guarantees one pass; a while loop would skip the body entirely when the condition starts false.",
+      },
+      decisionGuide: [
+        { use: "while when the number of passes is unknown", insteadOf: "a counted for loop with a guessed limit", reason: "The condition states the real stopping rule instead of a bound that has to be kept in sync with the data." },
+        { use: "do-while when the body must run at least once", insteadOf: "a while loop with its first pass copied above it", reason: "Testing at the bottom states the guarantee directly and avoids duplicating the body." },
+        { use: "for...of when the elements are the point", insteadOf: "an indexed loop or for...in over an array", reason: "The element loop removes the unused index and avoids the string keys that for...in produces." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, prediction: true },
+    }),
+  },
   4: {
     learn: authoredLesson({
       summary: "Understand lexical scope, closures, and why a function remembers the bindings around it rather than copying every value blindly.",
@@ -483,6 +726,109 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         { use: "context-specific security explanations", insteadOf: "one vague browser security slogan", reason: "Learners need to distinguish escaping, same-origin policy, and CORS because they solve different problems." },
       ],
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  23: {
+    design: authoredLesson({
+      title: "Making your own objects iterable",
+      minutes: 24,
+      summary: "Give your own object the iteration protocol so for...of, spread, and Array.from work on it, and choose between a hand-written iterator and a generator method.",
+      learningGoals: [
+        "Describe the iteration protocol as a symbol-keyed method returning an iterator with next",
+        "Implement the protocol by hand and again with a generator method",
+        "Decide when an object should be iterable and when a named method returning an array is more honest",
+      ],
+      explanation: "for...of does not know about arrays, sets, or the classes in this course; it knows one protocol. An object is iterable when it has a method keyed by Symbol.iterator, and that method returns an iterator: an object with a next method that answers { value, done }. Every call to next hands over one value and finally reports done as true, and everything that consumes iterables, including for...of, spread, destructuring, and Array.from, drives exactly that call sequence. Writing the protocol by hand makes the machinery visible: the method closes over its own current position, so each call to Symbol.iterator starts a fresh walk instead of continuing a finished one, which is why the same object can be spread twice with the same result. A generator method expresses the same protocol with less bookkeeping: declaring *[Symbol.iterator]() and yielding values produces the iterator object for you, and the generator's paused state is the position. The design question is when an object should be iterable at all. If the natural meaning of the object is a sequence of things, exposing iteration lets callers use the language's own loops instead of learning a custom method name, but if the object is a container with several internal collections, iteration needs a stated order and a clear element type, and returning an array from a named method is often more honest than making the whole object iterable.",
+      keywordNotes: [
+        "An object is iterable when it has a method keyed by Symbol.iterator that returns an iterator.",
+        "An iterator is an object with a next method that answers { value, done }.",
+        "for...of, spread, destructuring, and Array.from all consume that same protocol.",
+        "Each call to Symbol.iterator must produce a fresh iterator so the object can be walked more than once.",
+        "A generator method declared as *[Symbol.iterator]() with yield implements the protocol without hand-written state.",
+      ],
+      examples: [
+        iterableExample(
+          "Implement the protocol by hand and consume it twice",
+          'const range = {\n  from: 1,\n  to: 3,\n  [Symbol.iterator]() {\n    let current = this.from;\n    const last = this.to;\n    return {\n      next() {\n        if (current <= last) {\n          return { value: current++, done: false };\n        }\n        return { value: undefined, done: true };\n      },\n    };\n  },\n};\nconsole.log([...range].join(","));\nconsole.log(Array.from(range).length);',
+          "1,2,3\n3",
+          "The object exposes one method under a well-known symbol, and that method builds a fresh iterator each time it is called, closing over its own current position. Spreading the object therefore collects one to three, and calling Array.from afterwards starts a new walk rather than continuing the finished one, which is why both consumers see the whole sequence.",
+          [
+            "Line 1: the object is a plain literal that is about to be given the iteration protocol.",
+            "Line 2: from holds the first value of the walk.",
+            "Line 3: to holds the last value the walk should reach.",
+            "Line 4: the computed key Symbol.iterator is the method the language looks up.",
+            "Line 5: the method's first job is to read the start of the range.",
+            "Line 6: the end of the range is captured now so the closure does not depend on later changes.",
+            "Line 7: the method returns the iterator object itself.",
+            "Line 8: next is the method every consumer calls.",
+            "Line 9: the guard decides whether a value is still available.",
+            "Line 10: done false reports that this value counts and the walk continues.",
+            "Line 11: the closing brace ends the available branch.",
+            "Line 12: the finished branch reports that the sequence is over.",
+            "Line 13: the closing brace ends the finished branch.",
+            "Line 14: the closing brace ends next.",
+            "Line 15: the closing brace ends the returned iterator object.",
+            "Line 16: the closing brace ends the Symbol.iterator method.",
+            "Line 17: spreading calls the protocol and collects every value in order.",
+            "Line 18: Array.from drives a fresh iterator, so the finished walk does not make this call empty.",
+          ],
+        ),
+        iterableExample(
+          "Express the same protocol with a generator method",
+          'class Countdown {\n  constructor(start) {\n    this.start = start;\n  }\n  *[Symbol.iterator]() {\n    for (let value = this.start; value > 0; value -= 1) {\n      yield value;\n    }\n  }\n}\nconst countdown = new Countdown(3);\nconsole.log([...countdown].join(" "));',
+          "3 2 1",
+          "The generator method is the whole iterator: calling it returns an object with next, and each yield pauses the function until the next value is requested, so the loop inside the generator is the source of the sequence. Spreading the instance collects the values in the order the loop produced them, with no hand-written done flag anywhere.",
+          [
+            "Line 1: the class is a reusable shape for something that can be counted down.",
+            "Line 2: the constructor takes the starting value.",
+            "Line 3: the parameter is stored so the generator can read it later.",
+            "Line 4: the closing brace ends the constructor.",
+            "Line 5: the asterisk marks a generator, and the computed key makes it the iteration protocol.",
+            "Line 6: the loop counts down from the stored start.",
+            "Line 7: yield hands over the current value and pauses here until the next value is requested.",
+            "Line 8: the closing brace ends the loop that produces the sequence.",
+            "Line 9: the closing brace ends the generator method, whose return value is the iterator.",
+            "Line 10: the closing brace ends the class.",
+            "Line 11: the instance is created with three as its starting value.",
+            "Line 12: spreading drives the generator and collects three, two, one in order.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Give the letters object the iteration protocol with a generator method so that spreading it yields the upper-cased items, then log the spread as one string.",
+        starterCode: "const letters = {\n  items: [\"a\", \"b\"],\n  // implement the iteration protocol here, then log the spread\n};\n",
+        solution: 'const letters = {\n  items: ["a", "b"],\n  *[Symbol.iterator]() {\n    for (const item of this.items) {\n      yield item.toUpperCase();\n    }\n  },\n};\nconsole.log([...letters].join(""));',
+        solutionExplanation: "Declaring the generator method under Symbol.iterator makes the object iterable, and each yield hands over one item already converted to upper case, so spreading collects A and B and joining them prints one string.",
+        testCases: [{ label: "Worker output", expected: "AB" }],
+        hints: [
+          "The method key is Symbol.iterator.",
+          "An asterisk makes the method a generator.",
+          "Yield each converted item, then log the spread of the object.",
+        ],
+      },
+      recap: [
+        "Iterable means a Symbol.iterator method that returns an iterator with next.",
+        "Consumer syntax such as for...of, spread, and Array.from all drive that same protocol.",
+        "A generator method implements the protocol without hand-written state, and every call must produce a fresh iterator.",
+      ],
+      readingCheck: {
+        prompt: "What must an object provide so that for...of and spread syntax work on it?",
+        choices: [
+          "A method keyed by Symbol.iterator that returns an iterator with a next method",
+          "An array property named items",
+          "A class declaration instead of an object literal",
+          "A length property and numeric keys",
+        ],
+        correctIndex: 0,
+        explanation: "The protocol is the contract: the symbol-keyed method returns an iterator whose next method answers with value and done, and every consumer of iterables uses exactly that sequence.",
+      },
+      decisionGuide: [
+        { use: "a generator method for a value sequence", insteadOf: "hand-written next and done bookkeeping", reason: "The generator keeps the position in its own paused state, which removes the flag that is easiest to get wrong." },
+        { use: "an iterable object when the object's nature is a sequence", insteadOf: "a custom method name every caller must learn", reason: "for...of, spread, and destructuring already exist, so the object joins the language instead of adding vocabulary." },
+        { use: "a named method returning an array when the object has several collections", insteadOf: "making the whole object iterable with an unclear order", reason: "A named method states which collection is being read and in what order, instead of leaving that to the reader's guess." },
+      ],
+      verification: ["executed"],
+      quality: { codeReading: true, edgeCase: true },
     }),
   },
   24: {
