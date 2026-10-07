@@ -1595,3 +1595,69 @@ debug examples that exist in order to fail.
   (218 at the start of the sweep series).
 - `.arena-stats.ts` — 817 lessons, 1,682 examples, **109 authored lessons**.
 - `npm run build` — succeeds, 3,839.44 kB (gzip 1,153.72 kB).
+
+## Appendix R — C++ round closed: one real conversions lesson and the last names (this commit)
+
+Appendix Q's own list of "naming pass still available" items was worked through to the end.
+
+### A real gap: chapter 2 promised conversions and shipped none
+
+The chapter 2 sample declared one `const int` and printed it. No conversion between fundamental types
+appeared anywhere in the chapter, so the promise could not be met by naming something that was not there.
+Chapter 2 gained an authored `read` lesson, **Conversions: widening, narrowing, and explicit casts**, with
+two compiled examples — a widening conversion where `lessons / 2.0` keeps the fraction (prints `3.5`) and a
+narrowing conversion written as `static_cast<int>(score + 0.5)` beside a `char`-to-`int` promotion (prints
+`10 66`) — plus an exercise whose reference solution prints `41 20.75`.
+
+Naming was enough for the rest, because the constructs were already shipped:
+
+| Ch | Concept named | Where |
+| --- | --- | --- |
+| 2 | built-in types | the `int lessons = 7;` declaration in the new lesson |
+| 5 | iteration and indexing | the structured-binding range-for over a map |
+| 8 | inheritance, abstract classes | the `struct Square : Shape` base clause and the `= 0` pure virtual function of the Appendix P lesson |
+| 13 | `unique_ptr` | the `std::make_unique<int>(3)` line whose pointer type is the one being named |
+
+### Three process defects, all caught by the toolchain before commit
+
+1. **A patch was overwritten by its own script.** The first attempt edited the gap library directly and then
+   wrote a stale copy of the same file from an in-memory map, silently discarding the chapter 2 lesson and
+   the chapter 8 comments. The dump showed the lesson missing, and the edits were re-applied and re-verified.
+2. **The lesson emitter dropped field commas again** (`title`, `summary`, `prompt`), which `npx tsc --noEmit`
+   reported before any test ran.
+3. **A naming comment can be true in prose and absent from code** — chapter 2's "built-in types" stayed
+   flagged until the words were placed on a declaration rather than only in the explanation.
+
+### Evidence
+
+Every program added or touched in this round was compiled and run: **18 programs, 0 failures, 0 warnings,
+18/18 declared outputs matched** with `g++ 12.2.0 -std=c++20 -Wall -Wextra`.
+
+### Measured state
+
+| Check | Before | After |
+| --- | --- | --- |
+| C++ sweep flags | 33 (start of the C++ residual work) | **12** |
+| All five courses named-not-shown | 94 | **68** |
+| Authored lessons (corpus) | 107 | **110** |
+| C++ examples | 305 (63 authored) | **306 (66 authored)** |
+| Tests / build | 69 / 3,810.63 kB | 69 / **3,849.50 kB** (gzip 1,156.57 kB) |
+
+### The 12 remaining C++ flags, classified
+
+- **Environment boundary** — ch1 preprocessing and compilation, translation units and linking (no toolchain
+  in the browser, and the chapter states that boundary), ch18 URI/HTTP and serialization (no network client
+  in this sandbox), ch24 debugging workflow (a human sequence of steps).
+- **Reasoning or policy** — ch20 invalid memory access, validation and reliability boundaries; ch22 layering
+  and serialization boundaries; ch25 ownership and repositories, validation. These are design judgements the
+  prose argues for; the code cannot carry the name of a decision it does not make.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **69 tests, all passing**.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **68 named-not-shown, 0 with no trace**.
+- `.arena-stats.ts` — 817 lessons, 1,683 examples, **110 authored lessons**.
+- `npm run build` — succeeds, 3,849.50 kB (gzip 1,156.57 kB).

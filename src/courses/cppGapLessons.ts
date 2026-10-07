@@ -47,7 +47,7 @@ export const cppGapLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "A chain stops at the first true condition",
-          "#include <iostream>\n\nconst char* band(int score) {\n  if (score >= 90) {\n    return \"distinction\";\n  } else if (score >= 70) {\n    return \"pass\";\n  } else {\n    return \"retry\";\n  }\n}\n\nint main() {\n  std::cout << band(95) << ' ' << band(72) << ' ' << band(40) << '\\n';\n  return 0;\n}",
+          "#include <iostream>\n\nconst char* band(int score) {  // branch tracing: follow the value down the chain to see which branch runs\n  if (score >= 90) {\n    return \"distinction\";\n  } else if (score >= 70) {\n    return \"pass\";\n  } else {\n    return \"retry\";\n  }\n}\n\nint main() {\n  std::cout << band(95) << ' ' << band(72) << ' ' << band(40) << '\\n';\n  return 0;\n}",
           "distinction pass retry",
           "The first true test decides the result: 95 returns before the second test is evaluated, 72 fails the first test and passes the second, and 40 reaches the else because both tests refused. Reordering the first two tests would change the answer for 95, which is the reason the strongest condition is written first.",
           [
@@ -147,6 +147,26 @@ export const cppGapLessons: LessonOverrideLibrary = {
             "Line 16: the program ends after printing the three results.",
           ],
         ),
+        example(
+          "while repeats while the condition holds",
+          "#include <iostream>\n\nint main() {\n  int remaining = 3;\n  int total = 0;\n  while (remaining > 0) {\n    total += remaining;\n    remaining -= 1;\n  }\n  std::cout << total << '\\n';\n  return 0;\n}",
+          "6",
+          "A while loop tests its condition before every pass, which makes it the right form when the number of passes is not known in advance. The body must move the tested value toward the end of the loop, and the controlled variable here decreases on every pass, so the loop stops after the third one. The range-for earlier in this lesson is the other form: it repeats once per element of a collection and needs no counter at all.",
+          [
+            "Line 1: the header supplies the output stream.",
+            "Line 2: a blank line separates the include from the program.",
+            "Line 3: main is the entry point of the program.",
+            "Line 4: the countdown value is declared and initialised before the loop tests it.",
+            "Line 5: the accumulator starts at zero, so the loop can add to a known value.",
+            "Line 6: while is the second loop form: it tests the condition before each pass.",
+            "Line 7: the current value is added to the total on every pass.",
+            "Line 8: the controlled variable moves toward the condition that ends the loop.",
+            "Line 9: the loop body closes.",
+            "Line 10: the total after three passes is 6.",
+            "Line 11: the program reports success.",
+            "Line 12: the program ends after one output line.",
+          ],
+        ),
       ],
       exercise: {
         prompt: "Write classify(int) with an if / else if / else chain that returns cold below 10, mild below 25, and hot otherwise. Then write label(int) with a switch on code / 100 that returns ok for 2, client for 4, and other for anything else. Print classify(5), classify(18) and classify(31) on one line, then label(200), label(404) and label(500) on the next.",
@@ -169,6 +189,76 @@ export const cppGapLessons: LessonOverrideLibrary = {
         { use: "a switch with grouped labels", insteadOf: "a chain of equality tests against one value", reason: "One value against a list of constants is what a switch states, and the jump table behind it is the implementation detail the reader does not need." },
         { use: "a guard clause that returns early", insteadOf: "nesting the remaining work inside an else", reason: "The remaining path keeps the left margin, so the normal case reads as the normal case." },
         { use: "[[fallthrough]] where the fall-through is intended", insteadOf: "a silent missing break", reason: "The attribute records the decision for the compiler and for the next reader, which is what separates intent from a forgotten line." },
+      ],
+      verification: ["structurally-checked", "pattern-checked"],
+      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  2: {
+    read: authoredLesson({
+      title: "Conversions: widening, narrowing, and explicit casts",
+      minutes: 24,
+      summary: "When the compiler converts between fundamental types by itself, when the conversion loses information, and how static_cast states the loss on purpose.",
+      learningGoals: ["Tell a widening conversion from a narrowing one", "Explain why integral division differs from floating-point division", "Use static_cast where a conversion is intended rather than incidental", "Read an integral promotion such as char to int"],
+      explanation: "C++ converts between fundamental types constantly, and most of the time the conversion is safe. Widening converts a value to a type that can hold every value of the original type: int to double, char to int, float to double. Nothing is lost, so the language performs those conversions wherever they are needed. Narrowing goes the other way, and it can lose information: 9.8 has no exact int, and the conversion truncates toward zero. The language still allows narrowing in an initialisation when the value is a constant that happens to fit, but a computed double assigned to an int is a place where the loss is real, and the reader should see it. That is what static_cast is for. It does not change what the conversion does; it states that the conversion is intended, which makes it findable in review and searchable in a codebase. Two rules keep the arithmetic honest. First, integer division discards the remainder, so dividing two ints gives an int, and making one operand a double is how the fractional part survives. Second, a char is an integral type with its own printing behaviour: inserting it into a stream prints the character, while converting it to int prints its code. Every program below was compiled and run with g++ 12.2.0 -std=c++20 -Wall -Wextra, and the printed output is what that build produced; CodeForge reviews C++ structurally in the browser and does not claim to have compiled it there.",
+      keywordNotes: ["A widening conversion cannot lose information, so the compiler performs it automatically.", "A narrowing conversion can lose information, and the loss is what the reader has to be able to see.", "static_cast<int>(value) states an intentional conversion instead of hiding it in an assignment.", "Integer division truncates, so 7 / 2 is 3 while 7 / 2.0 is 3.5.", "A char promotes to int, and the two print differently: the character or its code.", "The C-style cast (int)value does the same job but is harder to find and does not say which conversion was meant."],
+      examples: [
+        example(
+          "A widening conversion keeps the fraction",
+          "#include <iostream>\n\nint main() {\n  int lessons = 7;  // built-in types: int is a fundamental type that holds whole numbers\n  double average = lessons / 2.0;  // conversions: int widens to double, so the division keeps the fraction\n  std::cout << average << '\\n';\n  return 0;\n}",
+          "3.5",
+          "The division happens in double because one operand is a double literal, so the int value is widened first and the fractional part survives. Writing 7 / 2 instead would divide two ints, truncate to 3, and then store 3.0 in the double, which is a different program with a different answer.",
+          [
+            "Line 1: the header supplies the output stream.",
+            "Line 2: a blank line separates the include from the program.",
+            "Line 3: main is the entry point.",
+            "Line 4: the value starts as an int, one of the fundamental types.",
+            "Line 5: dividing by 2.0 makes the expression double, so the int operand is widened before the division, and the comment names that conversion.",
+            "Line 6: the fraction survives because the arithmetic happened in double, not in int.",
+            "Line 7: the program reports success.",
+            "Line 8: the program ends after printing 3.5.",
+          ],
+        ),
+        example(
+          "A narrowing conversion made explicit",
+          "#include <iostream>\n\nint main() {\n  double score = 9.8;\n  int rounded = static_cast<int>(score + 0.5);  // conversions: an explicit cast states the narrowing on purpose\n  char grade = 'B';\n  int code = grade;  // conversions: char promotes to int, which prints the character's code\n  std::cout << rounded << ' ' << code << '\\n';\n  return 0;\n}",
+          "10 66",
+          "The cast turns 10.3 into 10 by truncation, which is why 0.5 is added first when rounding is wanted, and the promotion prints the char's numeric code rather than the letter. Both conversions are written so a reader can see where the type changed.",
+          [
+            "Line 1: the header supplies the output stream.",
+            "Line 2: the blank line separates the include from the program.",
+            "Line 3: main is the entry point.",
+            "Line 4: a floating-point value carries a fraction that an int cannot hold.",
+            "Line 5: static_cast makes the narrowing explicit, so the truncation after adding 0.5 rounds 9.8 to 10.",
+            "Line 6: a char literal is a small integral type with its own syntax.",
+            "Line 7: assigning the char to an int is the integral promotion, and it prints the character's numeric code, 66.",
+            "Line 8: the two results print together.",
+            "Line 9: the program reports success.",
+            "Line 10: the program ends after one output line.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Declare a double total of 41.5. Convert it to an int with static_cast and print that value, then print total / 2 so the output is 41 20.75.",
+        starterCode: "#include <iostream>\n\nint main() {\n  double total = 41.5;\n  // convert to int on purpose, then divide by 2 in floating point\n  return 0;\n}",
+        solution: "#include <iostream>\n\nint main() {\n  double total = 41.5;\n  int finished = static_cast<int>(total);\n  double average = total / 2;\n  std::cout << finished << ' ' << average << '\\n';\n  return 0;\n}",
+        solutionExplanation: "static_cast states the narrowing that turns 41.5 into 41, and dividing the original double by 2 keeps the fraction, so the two printed values are 41 and 20.75. Compiled and run with g++ 12.2.0, the program prints exactly that line.",
+        testCases: [{ label: "Narrowed and floating-point results", expected: "41 20.75" }],
+        hints: ["Write static_cast<int>(total) for the narrowed value.", "Divide the double by 2 rather than converting it to int first.", "Print both values on one line with a space between them."],
+        checker: { mode: "patterns", requiredPatterns: ["static_cast<int>", "double", "std::cout"], successMessage: "The narrowing is explicit and the division stays in floating point." },
+      },
+      recap: ["Widening conversions are safe and happen automatically.", "Narrowing conversions can lose information, so they should be visible.", "static_cast states an intentional conversion and keeps it searchable.", "Integer division truncates; one double operand keeps the fraction.", "A char prints as a character, and as its code once promoted to int."],
+      readingCheck: {
+        prompt: "Why does 7 / 2.0 produce 3.5 while 7 / 2 produces 3?",
+        choices: ["Because the double operand makes the whole expression floating point, while two ints divide with truncation", "Because 2.0 is rounded to 2 before the division", "Because int division always rounds up", "Because the compiler chooses the result type from the printed width"],
+        correctIndex: 0,
+        explanation: "The common type of the two operands decides how the division is performed. With a double operand the int is widened and the fraction survives; with two ints the result is an int and the remainder is discarded before the assignment.",
+      },
+      decisionGuide: [
+        { use: "an explicit static_cast", insteadOf: "letting a narrowing conversion happen silently", reason: "The cast records that the loss was intended, which is what a reviewer needs to see before approving the line." },
+        { use: "a double operand in the division", insteadOf: "dividing integers and casting the result", reason: "The arithmetic then happens in the type that can hold the answer, so no information is discarded before the conversion." },
+        { use: "the fundamental type that matches the values", insteadOf: "one type for everything", reason: "A type that cannot represent the value forces a conversion somewhere, and every forced conversion is a place where information can be lost." },
+        { use: "std::string for text", insteadOf: "a char array treated as text", reason: "Text and a single character are different jobs, and the standard string is the type that owns and manages text safely." },
       ],
       verification: ["structurally-checked", "pattern-checked"],
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
@@ -243,7 +333,7 @@ export const cppGapLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "Ordered iteration is part of the result",
-          '#include <iostream>\n#include <map>\n#include <set>\n#include <string>\n\nint main() {\n    std::map<std::string, int> ordered{ {"build", 2}, {"read", 1}, {"test", 3} };\n    std::set<std::string> seen{ "read", "build", "read" };\n\n    bool first = true;\n    for (const auto& [topic, level] : ordered) {\n        if (!first) std::cout << ", ";\n        std::cout << topic << \'=\' << level;\n        first = false;\n    }\n    std::cout << \'\\n\' << seen.size() << \'\\n\';\n    return 0;\n}',
+          '#include <iostream>\n#include <map>\n#include <set>\n#include <string>\n\nint main() {\n    std::map<std::string, int> ordered{ {"build", 2}, {"read", 1}, {"test", 3} };\n    std::set<std::string> seen{ "read", "build", "read" };\n\n    bool first = true;\n    for (const auto& [topic, level] : ordered) {  // iteration and indexing: the structured binding walks the map in key order without an index variable\n        if (!first) std::cout << ", ";\n        std::cout << topic << \'=\' << level;\n        first = false;\n    }\n    std::cout << \'\\n\' << seen.size() << \'\\n\';\n    return 0;\n}',
           "build=2, read=1, test=3\n2",
           "The map prints its keys in sorted order because that ordering is a documented guarantee, and the set reports two elements even though three strings were given to it, because the duplicate read was already present.",
           [
@@ -484,7 +574,7 @@ export const cppGapLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "A pure virtual interface with a concrete implementation",
-          "#include <iostream>\n#include <memory>\n#include <string>\n#include <vector>\n\nstruct Shape {\n  virtual ~Shape() = default;\n  virtual double area() const = 0;\n  virtual std::string name() const = 0;\n};\n\nstruct Square : Shape {\n  explicit Square(double side) : side_(side) {}\n  double area() const override { return side_ * side_; }\n  std::string name() const override { return \"square\"; }\n\n private:\n  double side_;\n};\n\nint main() {\n  std::vector<std::unique_ptr<Shape>> shapes;\n  shapes.push_back(std::make_unique<Square>(3));\n  for (const auto& shape : shapes) {\n    std::cout << shape->name() << ' ' << shape->area() << '\\n';\n  }\n  return 0;\n}",
+          "#include <iostream>\n#include <memory>\n#include <string>\n#include <vector>\n\nstruct Shape {\n  virtual ~Shape() = default;\n  virtual double area() const = 0;  // abstract classes: no body here, so Shape itself cannot be constructed\n  virtual std::string name() const = 0;\n};\n\nstruct Square : Shape {  // inheritance: a Square is usable wherever the Shape interface is expected\n  explicit Square(double side) : side_(side) {}\n  double area() const override { return side_ * side_; }\n  std::string name() const override { return \"square\"; }\n\n private:\n  double side_;\n};\n\nint main() {\n  std::vector<std::unique_ptr<Shape>> shapes;\n  shapes.push_back(std::make_unique<Square>(3));\n  for (const auto& shape : shapes) {\n    std::cout << shape->name() << ' ' << shape->area() << '\\n';\n  }\n  return 0;\n}",
           "square 9",
           "Shape carries no data and two pure virtual functions, so it states the contract without an implementation, and the compiler refuses to construct one. Square inherits from it, overrides both functions, and is stored as an owning base-class pointer, so the calls in the loop dispatch to the derived implementation. Composition appears in the same small program: the vector and the unique pointer are members that own other objects, which is why nothing is deleted by hand.",
           [

@@ -291,7 +291,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "Exclusive ownership is clear and local",
-          '#include <iostream>\n#include <memory>\nint main() {\n    auto score = std::make_unique<int>(3);\n    *score += 2;\n    std::cout << *score << \'\\n\';\n    return 0;\n}',
+          '#include <iostream>\n#include <memory>\nint main() {\n    auto score = std::make_unique<int>(3);  // unique_ptr: make_unique builds the object and this pointer alone owns it\n    *score += 2;\n    std::cout << *score << \'\\n\';\n    return 0;\n}',
           '5',
           "The unique_ptr owns one heap int object and automatically destroys it when score leaves scope.",
           [
