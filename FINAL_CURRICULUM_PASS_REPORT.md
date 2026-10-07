@@ -810,8 +810,79 @@ across all 125 chapters**.
 
 - `npx tsc --noEmit` — silent.
 - `npm test` — 8 files, 69 tests, all passing.
-- `npm run build` — succeeds, 3,482.73 kB (gzip 1,060.07 kB).
+- `npm run build` — succeeds, 3,492.56 kB (gzip 1,062.47 kB).
 - All five courses, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
-- 1,670 examples dumped and grouped: Python 0 duplicated texts; non-Python 210 same-chapter, 0
-  cross-chapter.
-- Gap sweep: 125 chapters, 0 concepts with no textual trace.
+
+---
+
+## Appendix I — Claim audit across all five courses
+
+The earlier claim-level pass read specific lessons. This round turned the standard into a
+measurement and ran it over the whole corpus: **for every lesson, every code-shaped construct named
+in its goals, keyword notes, decision-guide rows, hints, and exercise explanation must appear in
+that lesson's own code — or in a sibling lesson of the same chapter (the Appendix D evidence
+class)**. The extraction is deliberately narrow (snake_case, camelCase, dotted paths, `__dunder__`,
+`*Error` types, `NAME_CONSTANT`, and hyphenated CSS properties drawn from the corpus itself), so
+English prose such as "blank-page" or "browser-safe" is not counted as a claim.
+
+The first run flagged 855 + 858 + 582 + 554 + 671 raw hits, nearly all of them English compounds and
+standard-library paths written in prose (`functools.wraps` while the code imports `wraps`). Tightening
+the matcher to the claim standard left **36 claims with no trace anywhere in their chapter**. Each was
+read; they split into the classes below.
+
+### Fixed (real gaps)
+
+| Lesson | Claim | Fix |
+| --- | --- | --- |
+| cpp-12 (new authored `compare` lesson) | `unordered_set` — the chapter promised ordered and unordered sets and shipped no set at all | Authored a full compare lesson: ordered iteration versus hashed lookup, duplicate-insert reporting, exercise and reading check. Compiled with `g++ -std=c++20 -Wall -Wextra` (zero warnings); outputs `map 1`, `2 0 read`, and exercise `2 0` are the compiler's real results |
+| cpp-16-1 | `unique_lock` in the goal "condition_variable or unique_lock is needed beyond a simple mutex" | Extended the coordination sketch with `wait_for_work()` using `std::unique_lock<std::mutex>` plus `ready.wait(lock, predicate)`. Compiles clean with `-Wall -Wextra`; four line notes added |
+| python-6-9 | `safe_substitute` described but never shown | The third example now shows both behaviours: strict `substitute` raising `KeyError`, then `safe_substitute` leaving `$count` in place. Verified on CPython 3.11.2 |
+| python-7-11 | `shutil.copytree` / `shutil.rmtree` described but never shown | Added a third example that copies a directory tree, proves the copy with `listdir`, removes it with `rmtree`, and proves removal. Verified on CPython 3.11.2 |
+| python-8-9 | `pyproject.toml` named in goals, keywords, and guide | The package-layout example now lists `pyproject.toml` and checks for it. Verified |
+| python-13-9 | `zip(iterable_a, iterable_b)` placeholder names | Note reworded to describe the behaviour without inventing identifiers |
+| python-15-8 | my own lab said the guard raises `ValueError` while the code raises `TypeError` | Explanation aligned to the code |
+| python-21-2 | `set_defaults` described; the lesson ships `add_subparsers` | Note now names the mechanism the code uses |
+| python-24-4 | guide row said `from original_error`; the example named it `error` | Example renamed to `original_error` (and the explanation updated), matching its own guide |
+| java-8-5 | explanation named `IOException`; the code caught `Exception` | The catch now names `java.io.IOException`, which is the checked exception `Files.readString` throws, so code and explanation agree |
+| htmlcss-16-3 | note promised `aspect-ratio`, `controls`, and `poster`; the lesson shows width/height only | Note now states what the lesson shows: `width`/`height` plus `loading="lazy"` |
+
+### Verified as already correct (not defects)
+
+- **`javascript-12-3` (`TypeError`) and `javascript-15-8` (`AbortError`)** name error *values*, not
+  code: the WeakMap example prints `error.name`, and the cancellation lab declares
+  `AbortError` as its executed output. Re-executed under Node 22.22.3: the WeakMap example prints
+  `undefined / undefined / TypeError` exactly as declared.
+- **`cpp-13-*` (`unique_ptr`)** name the type whose factory the code calls:
+  `auto value = std::make_unique<int>(4);` creates a `std::unique_ptr<int>`, which the lesson's
+  explanation and hints state explicitly.
+- **`python-17-8` (`OperationalError`)** is the *declared output* of the broken program, verified on
+  CPython earlier in this session.
+
+### Documented as deliberate prose (unchanged)
+
+- Contrast rows that name the technique the lesson advises **against**: `sys.argv` (python-21-6),
+  `IndexOutOfBoundsException` (java-10-7), `startsWith` (javascript-6-6), `enable_if` (cpp-9-3),
+  `system_clock` (cpp-17-6), `invert` (htmlcss-19-3).
+- Browser-sandbox limits stated honestly rather than demonstrated: `IndexError` (python-11-7),
+  `breakpoint` and `coverage.py` (python-14-8).
+
+### Measured state after this round
+
+| Check | Before | After |
+| --- | --- | --- |
+| Claims with no trace in their chapter | 36 over 34 lessons | **18, all in the documented classes above** |
+| C++ authored chapters | 14 | **15** (chapter 12 now authored, scaffolded list 9 → 8) |
+| C++ chapter 12 sets coverage | none anywhere in the course | ordered and unordered set lesson, compiler-verified |
+| Tests / build | 69 / 3,482.73 kB | 69 / 3,492.56 kB |
+| All courses, dump-verify | 0 failing exercises, 0 failing projects | unchanged |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing.
+- `npm run build` — succeeds, 3,492.56 kB (gzip 1,062.47 kB).
+- All five courses, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
+- The new C++ lesson's two examples and its exercise were compiled and executed with
+  `g++ -std=c++20 -Wall -Wextra`; the extended chapter-16 sketch compiles to an object file with no
+  warnings. Java has no JVM in this environment, so its lesson remains structurally validated only,
+  as the app states.

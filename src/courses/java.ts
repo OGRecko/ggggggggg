@@ -255,7 +255,7 @@ requiredPatterns: ["trim\\(\\)", "toLowerCase\\(\\)", "replace\\("], hints: ["Ch
       extensionTasks: ["Add finally or try-with-resources commentary about cleanup.", "Name a custom exception you would use for malformed content."],
       rubric: reviewRubric("Java exception and file handling"),
       prompt: "Use Path.of(\"notes.txt\") and show a try/catch path that prints missing when the file read fails.",
-      solution: "import java.nio.file.Files;\nimport java.nio.file.Path;\npublic class Main {\n    static String readNotes() {\n        Path path = Path.of(\"notes.txt\");\n        try {\n            return Files.readString(path);\n        } catch (Exception error) {\n            return \"missing\";\n        }\n    }\n    public static void main(String[] args) {\n        System.out.println(readNotes());\n    }\n}",
+      solution: "import java.nio.file.Files;\nimport java.nio.file.Path;\npublic class Main {\n    static String readNotes() {\n        Path path = Path.of(\"notes.txt\");\n        try {\n            return Files.readString(path);\n        } catch (java.io.IOException error) {\n            return \"missing\";\n        }\n    }\n    public static void main(String[] args) {\n        System.out.println(readNotes());\n    }\n}",
       solutionExplanation: "Files.readString throws the checked IOException when notes.txt is absent, and the catch branch turns that failure into the domain value missing. No JDK runs in this browser: CodeForge reviews this source structurally and the expected output is derived by hand from the code, not executed.",
       testCases: [{ label: "8 project", expected: "missing" }],
       requiredPatterns: ["Path\\.of|Paths\\.get", "try", "catch"],

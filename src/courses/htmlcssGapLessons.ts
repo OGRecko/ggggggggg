@@ -892,7 +892,7 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
         "sizes tells the browser how wide the image will be rendered at each breakpoint, which makes the srcset choice meaningful.",
         "picture with source elements swaps the image itself, using media for art direction and type for format support.",
         "The img inside picture is required: it is the fallback and the element that carries alt text.",
-        "width and height or aspect-ratio reserve layout space, and controls plus poster make video and audio usable.",
+        "width and height reserve layout space so the image does not reflow while it loads, and loading=\"lazy\" defers offscreen images until they are needed.",
       ],
       examples: [
         example(

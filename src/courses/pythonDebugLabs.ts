@@ -568,7 +568,7 @@ const pythonDebugLabs: Record<number, LessonSeed> = {
       prompt: "Write double(value: int) -> int that raises TypeError when value is not an int and otherwise returns value * 2. Print double(3).",
       starterCode: 'def double(value: int) -> int:\n    # Reject a value the rule cannot use\n',
       solution: 'def double(value: int) -> int:\n    if not isinstance(value, int):\n        raise TypeError("value must be int")\n    return value * 2\nprint(double(3))',
-      solutionExplanation: "The isinstance guard converts the annotated contract into a runtime check, so the int input is rejected with a clear ValueError instead of producing a wrong total.",
+      solutionExplanation: "The isinstance guard converts the annotated contract into a runtime check, so the int input is rejected with a clear TypeError instead of producing a wrong total.",
       testCases: [{ label: "Typed boundary", expected: '6' }],
       hints: ["Use isinstance for the check.", "Raise TypeError with a short message.", "Return the doubled value after the guard."],
     },
