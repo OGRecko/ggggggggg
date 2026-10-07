@@ -349,7 +349,7 @@ one found defects the previous could not see, and the Python corpus is clean und
 
 ---
 
-## Appendix C — Closing the claim gaps in C++, Java, and JavaScript (commit `46a6e1a`)
+## Appendix C — Closing the claim gaps across the four non-Python courses (commits `46a6e1a`, `a0e037e`)
 
 Appendix B closed the Python corpus. This appendix records the same three-in-one
 treatment — plan-versus-code sweep, teach-probe, and a real execution audit where a
