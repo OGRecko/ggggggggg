@@ -52,7 +52,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
         ),
         example(
           "Returning a reference to a dead local is a bug",
-          '#include <string>\nconst std::string& bad() {\n    std::string text{"temporary"};\n    return text;\n}',
+          '#include <string>\nconst std::string& bad() {  // dangling lifetime bugs: the local dies at return, so the reference outlives its object\n    std::string text{"temporary"};\n    return text;\n}',
           'A dangling reference bug',
           "The returned reference would refer to a std::string whose lifetime ended when bad returned, so any later use is undefined behavior.",
           [
@@ -117,7 +117,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "Destructor order makes cleanup visible",
-          '#include <iostream>\nstruct Guard {\n    ~Guard() { std::cout << "cleanup\\n"; }\n};\nint main() {\n    Guard guard;\n    std::cout << "work\\n";\n    return 0;\n}',
+          '#include <iostream>\nstruct Guard {\n    ~Guard() { std::cout << "cleanup\\n"; }  // destructors: the compiler calls this at scope exit, so cleanup is observable\n};\nint main() {\n    Guard guard;\n    std::cout << "work\\n";\n    return 0;\n}',
           'work\ncleanup',
           "The destructor runs because guard's lifetime ends at scope exit, not because main remembered to call a cleanup function by hand.",
           [
@@ -134,7 +134,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
         ),
         example(
           "Prefer rule-of-zero members over raw ownership",
-          '#include <memory>\n#include <string>\nstruct Lesson {\n    std::string title;\n    std::unique_ptr<int> minutes;\n};',
+          '#include <memory>\n#include <string>\nstruct Lesson {  // special member rules: these members are Rule-of-Zero, so no hand-written copy, move or destructor is needed\n    std::string title;\n    std::unique_ptr<int> minutes;  // resource ownership: the unique pointer owns the value and releases it automatically\n};',
           'A rule-of-zero owning type',
           "The class lets std::string and std::unique_ptr own their own cleanup rules, which is often safer than storing a raw owning pointer and hand-writing deletion logic.",
           [
@@ -150,7 +150,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
       exercise: {
         prompt: "Define struct Guard with a destructor that prints cleanup. In main, create Guard guard; print work; then let scope exit print cleanup.",
         starterCode: "#include <iostream>\n\n// Build one RAII-style guard type\n",
-        solution: '#include <iostream>\nstruct Guard {\n    ~Guard() { std::cout << "cleanup\\n"; }\n};\nint main() {\n    Guard guard;\n    std::cout << "work\\n";\n    return 0;\n}',
+        solution: '#include <iostream>\nstruct Guard {\n    ~Guard() { std::cout << "cleanup\\n"; }  // destructors: the compiler calls this at scope exit, so cleanup is observable\n};\nint main() {\n    Guard guard;\n    std::cout << "work\\n";\n    return 0;\n}',
         solutionExplanation: "Guard's destructor performs the cleanup message automatically when the object leaves scope, which is the central RAII idea.",
         testCases: [{ label: "Destructor order", expected: "work\ncleanup" }],
         hints: ["Use ~Guard() for the destructor.", "Create a local Guard object inside main.", "Print work before returning so the destructor order stays visible."],
@@ -373,7 +373,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "Guard one read-modify-write update",
-          '#include <iostream>\n#include <mutex>\nstruct Counter {\n    int value{0};\n    std::mutex mutex;\n    void increment() {\n        std::lock_guard<std::mutex> lock(mutex);\n        ++value;\n    }\n};\nint main() {\n    Counter counter;\n    counter.increment();\n    std::cout << counter.value << \'\\n\';\n    return 0;\n}',
+          '#include <iostream>\n#include <mutex>\nstruct Counter {\n    int value{0};\n    std::mutex mutex;\n    void increment() {\n        std::lock_guard<std::mutex> lock(mutex);  // races: without this lock the read-modify-write of value could interleave\n        ++value;\n    }\n};\nint main() {\n    Counter counter;\n    counter.increment();\n    std::cout << counter.value << \'\\n\';\n    return 0;\n}',
           '1',
           "The mutex and lock_guard make the increment a critical section whose ownership is clear in the source code.",
           [
@@ -397,7 +397,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
         ),
         example(
           "Waiting needs a different tool than one short lock",
-          '#include <condition_variable>\n#include <mutex>\nstruct QueueState {\n    std::mutex mutex;\n    std::condition_variable ready;\n    bool has_work{false};\n    void wait_for_work() {\n        std::unique_lock<std::mutex> lock(mutex);\n        ready.wait(lock, [this] { return has_work; });\n    }\n};',
+          '#include <condition_variable>\n#include <mutex>\nstruct QueueState {\n    std::mutex mutex;\n    std::condition_variable ready;  // deadlocks: a waiting thread must release the lock first, which the condition variable arranges\n    bool has_work{false};\n    void wait_for_work() {\n        std::unique_lock<std::mutex> lock(mutex);\n        ready.wait(lock, [this] { return has_work; });\n    }\n};',
           'A coordination state sketch',
           "A simple mutex guards immediate shared access, while condition_variable exists so threads can wait for a state transition instead of spinning or checking repeatedly.",
           [
@@ -436,7 +436,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
       exercise: {
         prompt: "Create struct Counter with int value{0} and std::mutex mutex. In increment(), use std::lock_guard<std::mutex> lock(mutex); then ++value. Print the value after one call.",
         starterCode: "#include <iostream>\n#include <mutex>\n\n// Protect one shared counter update\n",
-        solution: '#include <iostream>\n#include <mutex>\nstruct Counter {\n    int value{0};\n    std::mutex mutex;\n    void increment() {\n        std::lock_guard<std::mutex> lock(mutex);\n        ++value;\n    }\n};\nint main() {\n    Counter counter;\n    counter.increment();\n    std::cout << counter.value << \'\\n\';\n    return 0;\n}',
+        solution: '#include <iostream>\n#include <mutex>\nstruct Counter {\n    int value{0};\n    std::mutex mutex;\n    void increment() {\n        std::lock_guard<std::mutex> lock(mutex);  // races: without this lock the read-modify-write of value could interleave\n        ++value;\n    }\n};\nint main() {\n    Counter counter;\n    counter.increment();\n    std::cout << counter.value << \'\\n\';\n    return 0;\n}',
         solutionExplanation: "The shared state and mutex live in the same type, and lock_guard makes the protected update scope-bound and obvious to reviewers.",
         testCases: [{ label: "Protected increment", expected: "1" }],
         hints: ["Keep mutex next to the state it protects.", "Acquire the lock_guard inside increment before ++value.", "Print the counter after calling increment once."],
@@ -505,7 +505,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
         ),
         example(
           "The build system names the target boundary",
-          'add_executable(codeforge_app\n  main.cpp\n  lesson_repository.cpp\n)',
+          'add_executable(codeforge_app  # dependencies: the target names every source it needs to link\n  main.cpp\n  lesson_repository.cpp\n)',
           'A CMake target sketch',
           "The build file, not the C++ source file, is the right place to describe which translation units and libraries belong to one artifact.",
           [

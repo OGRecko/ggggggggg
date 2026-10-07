@@ -1536,3 +1536,62 @@ text).
 - `.arena-dump-verify.ts -- cpp` — 25 chapters, 0 failing lesson exercises, 0 failing chapter projects.
 - `.arena-code-sweep.ts -- all` — 125 chapters, **89 named-not-shown, 0 with no trace**.
 - `npm run build` — succeeds, 3,838.00 kB (gzip 1,153.23 kB).
+
+## Appendix Q — C++ naming pass: the constructs that were already in the code (this commit)
+
+Appendix P closed the three genuine C++ holes and left 33 flags. Re-reading them against the dumped code
+showed that most were constructs the course already shipped without ever naming. Twelve of them now carry
+the concept name in the code itself, on the statement that does the work.
+
+| Ch | Concept named | Where the name went |
+| --- | --- | --- |
+| 6 | dangling lifetime bugs | the `bad()` function that returns a reference to a dead local — the example that was written to demonstrate exactly this |
+| 7 | constructors and destructors | the `~Guard()` destructor whose output makes cleanup order observable |
+| 7 | resource ownership, special member rules | the Rule-of-Zero lesson: the owning `std::unique_ptr` member and the `struct Lesson` that needs no hand-written copy, move or destructor |
+| 10 | iterators | the `std::max_element(values.begin(), values.end())` call, where begin and end mark the half-open range |
+| 10 | comparators | the `std::ranges::sort(values)` call whose default ordering a callable can replace |
+| 11 | sorting reasoning, complexity | the sort-then-`unique` lesson: why sorting first makes one pass enough, and why the sort dominates at O(n log n) |
+| 12 | operation-driven choice | the `std::queue` whose `front`/`push` operations are the reason it was chosen |
+| 16 | races | the `std::lock_guard` protecting a read-modify-write |
+| 16 | deadlocks | the `std::condition_variable` that releases the lock while a thread waits |
+| 21 | dependencies | the CMake `add_executable` target that names every source it links |
+| 22 | value objects | the `std::optional<int>` result that carries absence as a value instead of a sentinel |
+| 25 | STL-backed architecture | the capstone `Task` model built on a standard string member |
+
+The comments were inserted into the **shipped code strings** (verified through the runtime dump, not the raw
+file, after an earlier patch in Appendix P was caught swallowing a newline escape that way). The C++
+programs among them were then recompiled: **83 programs compiled with `g++ 12.2.0 -std=c++20 -Wall -Wextra`,
+0 warnings, 80 declared outputs matched**, with the only compile failures being the four `broken version`
+debug examples that exist in order to fail.
+
+### Measured state
+
+| Check | Before this pass | After |
+| --- | --- | --- |
+| C++ sweep flags | 33 | **20** |
+| All five courses named-not-shown | 89 | **76** |
+| Compile evidence | — | 83 programs, 0 warnings, 80/83 declared outputs (4 intentional breakages) |
+| Tests / build | 69 / 3,838.00 kB | 69 / **3,839.44 kB** (gzip 1,153.72 kB) |
+
+### The 20 remaining C++ flags, classified
+
+- **Environment boundary** — ch1 preprocessing/compilation and translation units/linking (the browser has no
+  toolchain, and the chapter says so), ch18 URI/HTTP and serialization (no network client here), ch24
+  debugging workflow (a human sequence, not a construct).
+- **Reasoning or policy** — ch20 invalid memory access, validation and reliability boundaries, ch22 layering
+  and serialization boundaries, ch25 ownership/repositories and validation: these name design judgements the
+  chapter argues for in prose rather than constructs the code can carry a name for.
+- **Naming pass still available** — ch2 built-in types and conversions, ch3 for/while and branch tracing,
+  ch5 iteration and indexing, ch8 inheritance and abstract classes (the abstract base exists as of Appendix
+  P; the *words* are the remaining item), ch13 `unique_ptr`.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **69 tests, all passing**.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **76 named-not-shown, 0 with no trace**
+  (218 at the start of the sweep series).
+- `.arena-stats.ts` — 817 lessons, 1,682 examples, **109 authored lessons**.
+- `npm run build` — succeeds, 3,839.44 kB (gzip 1,153.72 kB).
