@@ -1098,3 +1098,101 @@ architecture boundaries and integration in the capstone chapters.
   chapter projects (every new checker passes on its own reference solution).
 - `npm run build` — succeeds, 3,647.02 kB (gzip 1,101.35 kB).
 - All declared outputs recomputed independently; no execution claimed for Java.
+
+## Appendix L — Code-level concept sweep: the JavaScript half (this commit)
+
+Appendix J closed C++ and Appendix K closed Java. This appendix does JavaScript, where the sweep
+started at 47 named-not-shown concepts over 25 chapters.
+
+### Method, and the strongest verification available in the corpus
+
+The sweep and the construct probe were the same as before (`.arena-dump-code.ts -- javascript` writes
+all 620 code strings; the probe counts each construct anywhere in the course). What differs is the
+evidence standard. JavaScript is the one non-Python language this app really executes: the runner is a
+Worker sandbox, and `src/data/javascriptRuntime.test.ts` collects **every** example, starter, solution,
+and project solution from the course and feeds each one through the shipped worker source, comparing
+the result with the declared output on every test run. So a new JavaScript lesson is not merely
+structurally checked — it is executed, and its declared output is checked byte for byte by tests that
+already existed. `.arena-jsrun.ts` was written to run candidate snippets through the same worker source
+while authoring, so every output in this appendix was recorded from real execution rather than
+predicted. It caught a real prediction error immediately: `Promise.all([doubled(1), doubled(2),
+doubled(3)])` prints `2,4,6`, not the `1,2,3` a reading of the source suggests.
+
+### What the probe found (zero occurrences anywhere in the course's code)
+
+Class and prototype machinery: `extends`, `super(`, `Object.create`, `getPrototypeOf`/`__proto__`,
+`bind`/`call`/`apply`. Data access: destructuring, `Object.entries/keys/values`. Checks: `Array.isArray`,
+`Number.isNaN`. Async: `Promise.all`, `setTimeout`. Security and storage: `sessionStorage`,
+`structuredClone`. And the DOM construct set that the browser-free worker cannot execute at all:
+`createElement`, `classList`, document fragments, `requestAnimationFrame`, `IntersectionObserver`,
+`ResizeObserver`.
+
+### What was added: eight authored lessons, every output executed
+
+| Chapter | Lesson | Code that now demonstrates it | Sandbox output |
+| --- | --- | --- | --- |
+| 2 | typeof, Array.isArray, and the equality traps | `typeof` across primitives, `null` and arrays, `==` versus `===`, `NaN`, `Object.is(-0, 0)` | `string/number/boolean/undefined/object/object/true`, then `true/false/false/true/true/false` |
+| 4 | this, bind, and the temporal dead zone | method call, detached method, `bind`, `call`, `apply`, hoisted declaration, caught TDZ `ReferenceError` | `3/9/7/8`, then `ready` and `ReferenceError: Cannot access 'later' before initialization` |
+| 5 | The prototype chain, Object.create, and destructuring | `Object.create` + `getPrototypeOf`, own keys versus `in`, defaults and rest in object and array patterns | `true/hi/1/true`, `loops 20/{"tags":["core"]}/1 2` |
+| 9 | extends, super, and private fields | class inheritance, `super(title)`, `super.describe()`, `#` fields, getter, chaining, composition | `task build 30s/true`, `count 3/0` |
+| 14 | Assertions, test cases, and catching a regression | `console.assert` pass and fail, a case table with destructuring, boundary assertions | `Assertion failed: this claim is false, so it prints`, `checked 2 cases` |
+| 15 | The event loop: synchronous lines, microtasks, and Promise.all | sync order versus `then`/`queueMicrotask`, `Promise.all` keeping input order | `A sync/B sync/C microtask/D microtask`, `asked for three results/3 results/2,4,6` |
+| 19 | Repository separation, parameterized statements, and transactions | injected storage behind a repository, statement text apart from parameters, commit/rollback | `2 tasks`, `rolled back/1 rows/INSERT INTO tasks (title) VALUES (?) ["build"]` |
+| 21 | Escaping untrusted text before it reaches markup | one-pass escape map, escaped script and image tags, containment check | `&lt;script&gt;alert(1)&lt;/script&gt;`, `false/&lt;img s` |
+
+### Honest boundaries stated in the lessons themselves
+
+- **The macrotask phase is described, not printed.** The runner reports output once the synchronous
+  code and the microtask queue have drained, so a `setTimeout` callback's line would arrive after the
+  panel already reported. The event-loop lesson says this in its explanation and decision guide, and
+  ships no timer example that would pretend otherwise. `setTimeout` therefore remains a documented
+  construct rather than a demonstrated one, which is exactly the honesty rule this pass follows.
+- **The database lesson has no database.** There is no database server in this environment, so the
+  storage engine is an in-memory stand-in and the lesson says so in its explanation and recap. What is
+  demonstrated is the code shape — repository seam, parameters beside the statement, commit/rollback —
+  not a connection.
+- **`textContent` is a browser behaviour.** The escaping lesson states that `textContent` is the safer
+  browser alternative and that the app's HTML/CSS preview is where it can be observed; the escaping
+  function itself is exercised here.
+
+### Sweep result
+
+| Scope | Before | After |
+| --- | --- | --- |
+| JavaScript named-not-shown | 47 | **31** |
+| All five courses named-not-shown | 145 | **129** |
+| Concepts with no trace at all | 0 | **0** |
+
+Remaining JavaScript items, classified by probe rather than by impression:
+
+- **Demonstrated but unnamed** — chapter 6 uses `.trim()` and `.replace(`; chapter 11 uses `findIndex`
+  four times and `+=` accumulation seven times; chapter 12 ships `function*` and `yield`; chapter 13
+  uses `.map(` seventeen times and `.reduce(`; chapter 23 ships `new Proxy` seventeen times. The
+  concepts are in the code; only the concept words are absent.
+- **Browser-boundary** — chapter 7 form boundaries, chapter 17 rendering from data and batching,
+  chapter 20 memory leaks and render batching, chapter 22 accessibility, chapter 25 capstone UI: the
+  JavaScript worker has no DOM, so these belong with the HTML/CSS preview rather than this runner.
+- **Environment-boundary** — chapter 18 configuration (no server process in this sandbox).
+- **Reasoning-only** — chapter 8 debugging workflow, chapter 13 data-flow reasoning.
+
+### Measured state after this round
+
+| Check | Before | After |
+| --- | --- | --- |
+| JavaScript authored lessons | 16 in 14 chapters | **24 in 20 chapters** |
+| JavaScript zero-hit promised constructs | 22 | the eight lessons above; DOM-only constructs recorded as browser-boundary |
+| Corpus totality | 817 lessons / 1,675 examples | 817 / **1,691** (98 authored lessons) |
+| Tests / build | 69 / 3,647.02 kB | 69 / **3,717.44 kB** (gzip 1,120.40 kB) |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing, including `javascriptRuntime.test.ts`, which executed
+  **32 new code rows** (16 examples, 8 starters, 8 solutions) in the real Worker sandbox and matched
+  every declared output byte for byte.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects; every new checker passes on its own reference solution.
+- `npm run build` — succeeds, 3,717.44 kB (gzip 1,120.40 kB).
+- The concept words now appearing inside shipped code (composition, assertions, test cases, regression,
+  parameterized queries, escaping, XSS) were added as comments on statements that already did the work,
+  and the affected snippets were re-executed afterward to confirm their output did not change.

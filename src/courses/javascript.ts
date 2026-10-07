@@ -1,6 +1,7 @@
 import { buildCourse } from "./courseFactory";
 import { applyAuthoredLessons, applyProjectSolutions, beginnerMilestones, chapterPlan, intermediateMilestones, projectPlan, q, reviewRubric } from "./chapterPlanHelpers";
 import { javascriptAuthoredLessons } from "./javascriptAuthoredLessons";
+import { javascriptGapLessons } from "./javascriptGapLessons";
 import { javascriptProjectSolutions } from "./javascriptProjectSolutions";
 
 const jsProject = (title: string, brief: string, scenario: string, prompt: string, requiredPatterns: string[], requirements: string[], acceptanceCriteria: string[], edgeCases: string[], hints: string[]) => projectPlan({
@@ -54,7 +55,7 @@ const cumulativeTests = {
   25: [q("What makes the JavaScript capstone actually cumulative?", ["It combines state, events, async thinking, validation, safe rendering, and architecture choices", "It repeats Hello World only", "It removes accessibility", "It ignores previous chapters"], 0, "The capstone must integrate the curriculum."), q("Why is private state plus a copied read model a strong capstone pattern?", ["It separates controlled state transitions from consumer-facing views", "It makes arrays immutable by magic", "It disables methods", "It removes the need for validation"], 0, "The pattern supports maintainability and testability."), q("Which runtime claim would be dishonest at the capstone boundary?", ["Saying a full backend, database, or WebSocket server ran when only browser-safe pieces were checked", "Saying a Worker executed safe JavaScript", "Saying HTML preview is sandboxed", "Saying textContent is safer for plain text"], 0, "The capstone must preserve technical honesty across its integrated parts.")],
 } as const;
 
-const javascriptPlans = applyAuthoredLessons(applyProjectSolutions([...rawJavascriptPlans], javascriptProjectSolutions), javascriptAuthoredLessons);
+const javascriptPlans = applyAuthoredLessons(applyAuthoredLessons(applyProjectSolutions([...rawJavascriptPlans], javascriptProjectSolutions), javascriptAuthoredLessons), javascriptGapLessons);
 
 export const javascriptCourse = buildCourse({
   id: "javascript", name: "JavaScript", version: "ECMAScript 2024", accent: "#d9ad19", icon: "JS",
