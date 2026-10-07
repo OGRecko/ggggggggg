@@ -886,3 +886,103 @@ read; they split into the classes below.
   `g++ -std=c++20 -Wall -Wextra`; the extended chapter-16 sketch compiles to an object file with no
   warnings. Java has no JVM in this environment, so its lesson remains structurally validated only,
   as the app states.
+
+## Appendix J — Code-level concept sweep: concepts must be shown, not only named (this commit)
+
+Appendix I traced *claims* to the chapter that makes them. It could not see a weaker failure: a chapter
+whose plan promises a concept, whose prose explains it, and whose shipped code never demonstrates it.
+That is exactly how chapter 12 promised ordered and unordered sets while the course shipped none.
+
+### Method
+
+`.arena-code-sweep.ts` splits every chapter's content into two corpora — **code** (`code`, `starterCode`,
+`solution`, `edgeCode` fields) and **prose** (titles, explanations, notes, hints, recaps, guides, reading
+checks) — then asks, for every concept the chapter plan lists in `lesson.quality.coveredConcepts`,
+whether any significant word of that concept appears in the chapter's code. Trailing-`s` normalization
+covers plural forms. A concept with a prose trace and no code trace is **named, not shown**; a concept
+with no trace at all is a promise with no fulfilment. `.arena-dump-code.ts` and `.arena-cppchk.ts` dump
+the raw code strings so a flagged chapter can be read before anything is declared a gap.
+
+### What the sweep found (C++)
+
+Baseline for the course: 47 named-not-shown concepts. Reading the flagged chapters separated three
+classes:
+
+| Class | Chapters | Decision |
+| --- | --- | --- |
+| Real code gap | 4 recursion, 5 deque, 9 explicit specialization, 16 futures, 17 file streams, 19 measurement + allocation cost | fixed in this commit |
+| Reasoning concepts that live in prose by nature | 11 complexity, 24 debugging workflow, 3 branch tracing, 20 validation | left as prose, documented |
+| Concepts deliberately not fabricated | 18 networking/serialization, 22 layering/value objects, 23 ranges | left as prose; no invented code |
+
+Words that had no code trace anywhere in the course were `deque`, `template <>`, `ifstream`/`ofstream`,
+`std::async`, `steady_clock` in a measurement shape, and `reserve`. Those are real gaps, not sweep noise.
+
+### What was added
+
+Five authored C++ gap lessons (chapter 4 *learn*, chapter 5 *read*, chapter 9 *read*, chapter 17 *read*,
+chapter 19 *learn*), each with two examples, line-by-line notes, a reading check, a decision guide, an
+exercise and a patterns checker; plus one example and a keyword note folded into the existing chapter 16
+authored lesson.
+
+| Chapter | Lesson | Code that now demonstrates the concept | Compiled output |
+| --- | --- | --- | --- |
+| 4 | Recursion: a function that solves a smaller version of itself | `factorial` self-call, `countdown` unwind order; per-frame local state | `120`, `3/2/1/done` |
+| 5 | `std::deque`: a container that grows at both ends | `push_front`/`push_back`/`pop_front`, sliding-window eviction | `plan build 3` / `read`, `0 3 3` |
+| 9 | Explicit specialization: one type gets its own implementation | `template <>` for a function and for a class template | `int generic`, `double generic` |
+| 16 | (existing lesson, extended) | `std::async(std::launch::async, …)` and `future::get()` | `3` |
+| 17 | Reading and writing text files with streams | `ofstream` write → `close` → `ifstream` + `getline` round trip, failed-open state | `2`, `missing` |
+| 19 | Measure allocation cost instead of guessing | `steady_clock` timed region; `reserve` versus growth; capacity/size evidence | `1000 1`, `1 1` |
+
+Each lesson states the honest boundary: `verification: ["structurally-checked"]` where the exercise is
+pattern-checked rather than executed by the app, because the app has no C++ compiler at runtime.
+
+Six concepts still lacked the concept *word* inside shipped code even though the statements demonstrated
+it (recursion, local scope, explicit specialization, resource ownership, measurement, allocation cost,
+data trade-off). Those examples now carry one-line inline comments naming what the surrounding statements
+already do, and the line-by-line notes explain the same behaviour in full sentences. No statement was
+changed; the comments were added to code that had already been compiled and run.
+
+### Verification (real compiler, this environment)
+
+- `g++ (Debian 12.2.0-14+deb12u1) 12.2.0`, invoked as `g++ -std=c++20 -Wall -Wextra`.
+- `.arena-extract.ts` dumped every code string of the six touched chapters (4, 5, 9, 16, 17, 19):
+  **142 files compiled, 0 warnings**, 100 complete programs ran, and **100 of 100 printed exactly the
+  output their lesson declares** (trailing newline normalized).
+- The 12 non-compiling files are the corpus's six deliberate "broken version" examples and six empty
+  starter files — they are expected to fail and the lessons say so.
+- No output was written by hand: every number in the table above came from running the extracted file.
+
+### Sweep result
+
+| Scope | Before | After |
+| --- | --- | --- |
+| C++ named-not-shown | 47 | **38** |
+| All five courses named-not-shown / chapters | 218 / 125 | **166 / 125** |
+| Concepts with no trace at all | 0 | **0** |
+
+Remaining per course: Java 42, JavaScript 47, C++ 38, HTML/CSS 39. Python reports 0 only because its
+replanned lessons carry no `coveredConcepts` metadata, so this sweep cannot judge Python — Python was
+audited claim-by-claim in Appendices F–I instead. The Java, JavaScript and HTML/CSS numbers are the next
+round; most of them are reasoning concepts (complexity, invariants, debugging workflow) plus the
+deliberately-not-fabricated networking/serialization material, and each will be read before it is
+declared a gap or a documentable residual.
+
+### Measured state after this round
+
+| Check | Before | After |
+| --- | --- | --- |
+| C++ authored lessons (`cppGapLessons` + `cppAuthoredLessons`) | 20 | **25** |
+| C++ chapters containing authored material | 15 | **17** (chapters 4 and 19 added) |
+| Corpus totality | 817 lessons / 1,672 examples | unchanged (817 / 1,672; 79 authored lessons) |
+| Tests / build | 69 / 3,492.56 kB | 69 / **3,529.72 kB** (gzip 1,072.39 kB) |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing, including the integrity test that requires every example's
+  line notes to match its code length and every authored C++ exercise to carry checker patterns.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, **0 failing lesson exercises,
+  0 failing chapter projects** (the new checkers pass on their own reference solutions).
+- `npm run build` — succeeds, 3,529.72 kB (gzip 1,072.39 kB).
+- Every new C++ example, starter and solution of the six touched chapters compiled with
+  `-Wall -Wextra` with zero warnings; 100 run outputs matched their declared outputs exactly.

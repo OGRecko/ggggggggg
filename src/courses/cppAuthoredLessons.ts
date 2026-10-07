@@ -368,6 +368,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
         "A race condition occurs when correctness depends on timing between unsynchronized operations.",
         "A critical section is the smallest shared-state region that must not interleave with another thread.",
         "std::lock_guard<std::mutex> acquires the mutex now and releases it automatically at scope exit.",
+        "std::async starts work and returns a std::future whose get() collects the result.",
       ],
       examples: [
         example(
@@ -413,6 +414,24 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
             "Line 11: The closing brace completes the type definition, so the sketch ends after naming the coordination primitives and the wait that uses them.",
           ],
         ),
+        example(
+          "Start work now and collect it later",
+          "#include <future>\n#include <iostream>\n\nint count_lessons() { return 3; }\n\nint main() {\n    auto pending = std::async(std::launch::async, count_lessons);\n    std::cout << pending.get() << '\\n';\n    return 0;\n}",
+          "3",
+          "async starts the function on a separate thread of execution and hands back a future immediately, so the caller is not blocked at that line. get() waits only if the work is not finished and then returns the value, which is why printing it yields 3. The same handle can also report an exception from the asynchronous call, which is the failure path a longer program would handle.",
+          [
+            "Line 1: future provides std::async and the std::future handle that collects its result.",
+            "Line 2: iostream is included for the printed value.",
+            "Line 3: A blank line separates the includes from the function.",
+            "Line 4: count_lessons is the ordinary function the asynchronous call will run.",
+            "Line 5: A blank line separates the function from main.",
+            "Line 6: main begins the program.",
+            "Line 7: std::async starts the work with the async launch policy and returns a future immediately, so main continues without waiting.",
+            "Line 8: get() blocks only if the result is not ready yet, then returns the value the asynchronous call produced.",
+            "Line 9: return 0 reports successful completion.",
+            "Line 10: The closing brace ends main.",
+          ],
+        ),
       ],
       exercise: {
         prompt: "Create struct Counter with int value{0} and std::mutex mutex. In increment(), use std::lock_guard<std::mutex> lock(mutex); then ++value. Print the value after one call.",
@@ -431,6 +450,7 @@ export const cppAuthoredLessons: LessonOverrideLibrary = {
         "Concurrency correctness depends on interleaving, so bugs may be real even when a small test run looks fine.",
         "lock_guard is the first scope-bound tool for protecting one short critical section.",
         "condition_variable solves waiting-for-state-change problems that a plain mutex alone does not address clearly.",
+        "std::async and std::future separate starting work from collecting its result.",
       ],
       readingCheck: {
         prompt: "Why would ++value be a race without the mutex if two threads called increment at the same time?",
