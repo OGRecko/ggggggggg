@@ -91,7 +91,7 @@ export const htmlcssProjectSolutions: Partial<Record<number, ProjectSolution>> =
     line-height: 1.6;
   }
   h1 {
-    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-size: clamp(1.5rem, 4vw, 2.5rem);  /* fluid type: the size scales with the viewport but stays inside its limits */
   }
 </style>
 <article>

@@ -1736,3 +1736,84 @@ the same boundary the Java library has carried since Appendix K.
   (218 at the start of the series).
 - `.arena-stats.ts` — 817 lessons, 1,683 examples, **112 authored lessons**.
 - `npm run build` — succeeds, 3,870.87 kB (gzip 1,162.23 kB).
+
+## Appendix T — HTML/CSS residuals closed (this commit)
+
+The HTML/CSS list was the last one, and it was read the same way: check the flagged chapter's own code,
+then either name the construct on the line that already demonstrates it or author the material that is
+genuinely absent.
+
+### Three authored lessons
+
+| Ch | Kind | Lesson | What it closes |
+| --- | --- | --- | --- |
+| 9 | learn | `Mobile-first: the viewport, the base layout, and the image that follows` | *responsive images*, *mobile-first design*, *viewport thinking* |
+| 21 | debug | `A debugging pass you can repeat: outline, reduce, fix, re-check` | *visual debugging*, *inspection workflow*, *regression awareness* |
+| 24 | learn | `Delivery: one token theme, a dark colour scheme, and a check you can repeat` | *dark mode*, *maintainability*, *delivery workflow* |
+
+Chapter 9 had no image markup at all, so the responsive-image gap was real rather than a labelling problem;
+the lesson adds a `srcset`/`sizes` example, an exercise whose checker covers the viewport meta, the
+`min-width` upgrade, and the candidates, and it keeps the fallback, alt text, and reserved box on every
+image. Chapter 21 had exactly one scaffold example, so the debugging lesson introduces the outline-reduce-fix
+sequence, and its text states plainly that a browser inspector panel and a real device are described rather
+than demonstrated. Chapter 24 had no authored lesson at all, so the delivery lesson carries a token theme
+with `prefers-color-scheme`, `color-scheme`, and print rules.
+
+### The naming pass
+
+| Ch | Concept named | Where |
+| --- | --- | --- |
+| 3 | metadata and SEO | the heading that names the page, beside the head metadata that carries the name to search results |
+| 6 | layout debugging | `box-sizing: border-box` keeping the visible box equal to the declared width |
+| 8 | tracks | `repeat(2, minmax(0, 1fr))` as two equal columns that may shrink but never overflow |
+| 9 | mobile-first design, viewport thinking | the base single-column rule and the `min-width` query |
+| 10 | fluid type, visual hierarchy | `clamp()` on the heading; weight and tracking carrying the level |
+| 13 | maintainability | one token, every reader of it follows |
+| 15 | progressive enhancement | a usable default, upgraded by a theme's custom property |
+| 17 | resource trust, privacy-aware defaults, metadata boundaries | the `noopener noreferrer` link, the link that leaves without a referrer, and the description that is public |
+| 19 | reusable patterns, consistency | one named spacing step, reused instead of guessed |
+| 22 | page refinement | the sticky header's stated stacking order |
+| 23 | consistent spacing | the rhythm coming from one repeated step |
+
+### One defect caught before commit
+
+The chapter 24 exercise checker pattern for the token read was written with four backslashes instead of two
+in the TypeScript source, so the compiled regex looked for a literal backslash and never matched the
+solution — `courseIntegrity.test.ts` failed on it and `.arena-dump-verify.ts` named the pattern. The escape
+was corrected at the source; the test was not weakened. A second, structural slip (inserting the new chapter
+blocks after chapter 20's closing brace instead of the library's) was caught by `tsc` and repaired before any
+verification run.
+
+### Measured state
+
+| Check | Before | After |
+| --- | --- | --- |
+| HTML/CSS sweep flags | 23 | **0** |
+| All five courses named-not-shown | 52 | **29** |
+| Authored lessons (corpus) | 112 | **115** |
+| HTML/CSS authored lessons / authored examples | 24 / 51 | 27 / 57 |
+| Tests / build | 69 / 3,870.87 kB | 69 / **3,896.91 kB** (gzip 1,169.32 kB) |
+
+### What the 29 remaining flags are
+
+- **Java (5)** and **C++ (12)**: the environment and reasoning boundaries classified in Appendices R and S —
+  compiler and linker behaviour, a debugger workflow, repositories, layering, serialization policy, and
+  architecture integration, none of which this sandbox can run.
+- **JavaScript (12)**: the browser and runtime boundaries — a real Worker in the learner's browser,
+  configuration sources, memory behaviour, and the accessibility standards those lessons discuss.
+- **HTML/CSS (0)**: every planned concept is now either demonstrated and named in the flagged chapter, or
+  taught by an authored lesson that states its own boundary. The concepts that remain outside the preview —
+  an inspector panel, a physical device, an assistive-technology audit — are described in prose inside the
+  chapter 21 lesson rather than claimed as evidence.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **69 tests, all passing**.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **29 named-not-shown, 0 with no trace**
+  (218 at the start of the series; HTML/CSS 23 → 0 this round).
+- `.arena-hmap.ts` — chapter 9 `learn`, chapter 21 `debug`, and chapter 24 `learn` all show as authored.
+- `.arena-stats.ts` — 817 lessons, 1,683 examples, **115 authored lessons**.
+- `npm run build` — succeeds, 3,896.91 kB (gzip 1,169.32 kB).

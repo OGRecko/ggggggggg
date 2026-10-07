@@ -374,6 +374,89 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
   },
 
   9: {
+    learn: authoredLesson({
+      title: "Mobile-first: the viewport, the base layout, and the image that follows",
+      minutes: 26,
+      summary: "Write the narrow layout as the base, let one min-width query add the wider arrangement, and give images several files so the browser can pick one that fits the space.",
+      learningGoals: [
+        "Write the narrow base styles first and add width with min-width queries",
+        "Declare the viewport so the layout is measured in CSS pixels at the device width",
+        "Offer responsive images with srcset and sizes instead of one oversized file",
+      ],
+      explanation: "Mobile-first is an order of work rather than a slogan: the single-column rules are written first and every media query only adds what more space allows, so the layout that most visitors meet is also the one that cannot break. The viewport meta is what makes those rules meaningful on a phone, because without it the browser lays out a desktop-width canvas and scales it down, which turns every carefully chosen width into a guess. A min-width query is viewport thinking in practice: it asks how much room the page has instead of asking what kind of device is looking at it, and because the base rules already work, an unsupported query costs nothing. Images follow the same idea. A single src keeps every browser working, srcset lists the same picture at several real file widths, and sizes tells the browser how wide the image will be laid out at each breakpoint, which is the information it needs to choose a candidate rather than default to the largest. Alt text and explicit dimensions stay on every candidate, so the box is reserved before the bytes arrive. The sandboxed preview and the on-device structure checker are what this lesson relies on; no device measurement is claimed here.",
+      keywordNotes: [
+        "The viewport meta makes the layout width follow the device width instead of a scaled-down desktop canvas.",
+        "Mobile-first means the narrow rules are the base and min-width queries only add to them.",
+        "A min-width query is viewport thinking: it asks about available space, not about a device name.",
+        "srcset lists candidates with w descriptors and sizes describes the layout width, which lets the browser choose.",
+        "Every candidate keeps alt text and explicit dimensions, so reserved space does not depend on the download.",
+      ],
+      examples: [
+        example(
+          "The narrow layout first, the wide layout added",
+          "<head>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">  <!-- viewport thinking: the layout is measured at the device width, not on a zoomed-out desktop canvas -->\n</head>\n<style>\n  .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }  /* mobile-first design: the base rule describes the narrow layout */\n  @media (min-width: 40rem) { .grid { grid-template-columns: repeat(2, 1fr); } }\n</style>\n<div class=\"grid\"><p>One</p><p>Two</p></div>",
+          "Browser preview: one column on a narrow screen and two columns once the viewport reaches 40rem, decided by the base rule plus a single query.",
+          "The base rule describes the layout that always works, and the min-width query is the only place that adds a second column, so the wider arrangement is an addition rather than a requirement. The viewport meta above it is what makes the width mean the device width in the first place.",
+          [
+            "Line 1: the head is where the document declares how it expects to be measured.",
+            "Line 2: the viewport meta ties the layout width to the device width, which is the first step of viewport thinking.",
+            "Line 3: the head closes, and everything below it describes layout rather than the document's identity.",
+            "Line 4: the base rule comes first, because the narrow layout is the one that must always work.",
+            "Line 5: one column with a gap is the mobile-first default, and the comment names the decision rather than the syntax.",
+            "Line 6: the min-width query only adds the second column once the space actually exists.",
+            "Line 7: the stylesheet ends without a second guess about which layout is the base.",
+            "Line 8: the markup is a plain grid of two items, identical on every screen.",
+          ],
+        ),
+        example(
+          "One image, two files, and the width the browser needs",
+          "<!-- responsive images: offer the same picture at more than one file size, and name the layout width -->\n<img src=\"lesson-640.jpg\" alt=\"Lesson dashboard\"\n     srcset=\"lesson-640.jpg 640w, lesson-1280.jpg 1280w\"\n     sizes=\"(min-width: 40rem) 640px, 100vw\"\n     width=\"640\" height=\"360\" loading=\"lazy\">",
+          "Browser preview: the same dashboard image, served from whichever candidate the browser judges right for the layout width it was told about.",
+          "src supplies the fallback and srcset supplies candidates, while sizes translates the layout into the width the browser needs before it can compare them. Dimensions and alt text are unchanged from a fixed image, which is what keeps responsive images an ordinary img element.",
+          [
+            "Line 1: the comment states why candidates exist before any file is named.",
+            "Line 2: the src attribute stays as the fallback every browser understands, and the alt text names the picture.",
+            "Line 3: srcset lists the same image at two real file widths, described in w descriptors.",
+            "Line 4: sizes states the layout width at each breakpoint, which is what makes the candidate choice informed.",
+            "Line 5: explicit dimensions reserve the box before the bytes arrive, and loading is deferred for off-screen media.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Write a mobile-first card section: a viewport-ready document, one column by default, two columns from 40rem, and an image that offers two file sizes with sizes, alt text, and explicit dimensions.",
+        starterCode: "<!-- Start narrow: base styles first, then one min-width query -->\n",
+        solution: "<head>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n</head>\n<style>\n  .cards { display: grid; grid-template-columns: 1fr; gap: 1rem; }\n  @media (min-width: 40rem) { .cards { grid-template-columns: repeat(2, 1fr); } }\n  .cards img { width: 100%; height: auto; }\n</style>\n<section class=\"cards\">\n  <article>\n    <img src=\"lesson-640.jpg\" alt=\"Lesson dashboard\"\n         srcset=\"lesson-640.jpg 640w, lesson-1280.jpg 1280w\"\n         sizes=\"(min-width: 40rem) 320px, 100vw\"\n         width=\"640\" height=\"360\" loading=\"lazy\">\n    <h2>Responsive by default</h2>\n  </article>\n</section>",
+        solutionExplanation: "The base rule is the single-column layout, the min-width query adds the second column only when the space exists, and the image carries its fallback, two candidates, the layout width, a name, and its dimensions, so nothing about it depends on a guess.",
+        testCases: [{ label: "Mobile-first card section", expected: "Preview: a single column on narrow screens, two columns from 40rem, and an image that offers two file sizes while keeping its reserved space." }],
+        hints: ["Write the base rule for the narrow layout before any query.", "Add the viewport meta in the head so the width is the device width.", "Give the image srcset, sizes, alt text, width, and height."],
+        checker: {
+          mode: "html",
+          requiredPatterns: ["viewport", "min-width: 40rem", "repeat\\(2", "srcset=", "sizes=", "alt="],
+          successMessage: "The layout starts narrow, widens from a min-width query, and the image offers candidates while staying named and sized."},
+      },
+      recap: [
+        "Mobile-first is an order: the narrow rules are the base and queries only add to them.",
+        "The viewport meta and min-width queries are what make layout widths mean the space the page actually has.",
+        "Responsive images keep the fallback, the alt text, and the reserved box, and add candidates the browser can choose from.",
+      ],
+      readingCheck: {
+        prompt: "Why does the single-column rule come before the min-width query?",
+        choices: [
+          "Because the narrow layout is the one that must work everywhere, and the query only adds columns when there is room",
+          "Because CSS ignores rules written after a query",
+          "Because min-width queries cannot change grid columns",
+          "Because the viewport meta only applies to the first rule in the stylesheet",
+        ],
+        correctIndex: 0,
+        explanation: "Writing the base first means the layout is complete without any query; each query then adds an arrangement that more space allows, which is what mobile-first means in practice.",
+      },
+      decisionGuide: [
+        { use: "a min-width query that adds columns", insteadOf: "a max-width query that removes them", reason: "Starting from the layout that always works keeps the content reachable on the smallest screen and makes each query a pure addition." },
+        { use: "srcset with sizes on the image", insteadOf: "one large file scaled down by CSS", reason: "The browser can only pick a sensible candidate when it knows the layout width, and CSS scaling still pays for the largest download." },
+      ],
+      verification,
+      quality: { codeReading: true, prediction: true, modification: true },
+    }),
     compare: authoredLesson({
       title: "Scroll snap for galleries",
       minutes: 22,
@@ -560,7 +643,7 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "Weight and tracking carry the hierarchy",
-          "<style>\n  .card { max-width: 34ch; font-family: system-ui, sans-serif; }\n  .card h2 { font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }\n  .card p { font-weight: 400; line-height: 1.5; letter-spacing: 0.01em; }\n  .card .meta { font-weight: 600; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }\n</style>\n<article class=\"card\">\n  <p class=\"meta\">Grid layout</p>\n  <h2>A heading that does not orphan its last word</h2>\n  <p>Body text keeps a slightly open tracking and a comfortable line height.</p>\n</article>",
+          "<style>\n  .card { max-width: 34ch; font-family: system-ui, sans-serif; }\n  .card h2 { font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }  /* visual hierarchy: the heading takes the heaviest weight and the tightest tracking */\n  .card p { font-weight: 400; line-height: 1.5; letter-spacing: 0.01em; }\n  .card .meta { font-weight: 600; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }\n</style>\n<article class=\"card\">\n  <p class=\"meta\">Grid layout</p>\n  <h2>A heading that does not orphan its last word</h2>\n  <p>Body text keeps a slightly open tracking and a comfortable line height.</p>\n</article>",
           "Browser preview: a small uppercase label, a bold heading whose two lines are evenly balanced, and a paragraph with open tracking and comfortable line spacing.",
           "The three rules rank the same card's text by weight and size first: the label is the smallest and heaviest relative to its size, the heading is the largest, and the body text is the lightest. Tracking moves in two directions on purpose: the heading takes a slightly negative value because large text looks loose, and the small uppercase label takes a clearly positive one because small capitals look cramped. text-wrap: balance is what keeps the heading from leaving a single word on its second line.",
           [
@@ -599,7 +682,7 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
       exercise: {
         prompt: "Style a card with three levels: a small uppercase label with wide tracking, a heading with a slightly tightened tracking and balanced wrapping, and body text with a comfortable line height within a measure of about 34 characters.",
         starterCode: "<style>\n  /* .card: measure and font */\n  /* heading level */\n  /* label level */\n  /* body level */\n</style>\n<article class=\"card\">\n  <p class=\"meta\">Grid layout</p>\n  <h2>Balanced headings</h2>\n  <p>Body text stays readable.</p>\n</article>",
-        solution: "<style>\n  .card { max-width: 34ch; font-family: system-ui, sans-serif; }\n  .card h2 { font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }\n  .card .meta { font-weight: 600; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }\n  .card p { font-weight: 400; line-height: 1.5; }\n</style>\n<article class=\"card\">\n  <p class=\"meta\">Grid layout</p>\n  <h2>Balanced headings</h2>\n  <p>Body text stays readable.</p>\n</article>",
+        solution: "<style>\n  .card { max-width: 34ch; font-family: system-ui, sans-serif; }\n  .card h2 { font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }  /* visual hierarchy: the heading takes the heaviest weight and the tightest tracking */\n  .card .meta { font-weight: 600; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }\n  .card p { font-weight: 400; line-height: 1.5; }\n</style>\n<article class=\"card\">\n  <p class=\"meta\">Grid layout</p>\n  <h2>Balanced headings</h2>\n  <p>Body text stays readable.</p>\n</article>",
         solutionExplanation: "Weight and size rank the three levels, tracking moves in opposite directions for the large heading and the small label, and balance keeps the heading's lines even. The measure is expressed in characters so it scales with the font, and the body keeps a comfortable line height.",
         testCases: [{ label: "Three typographic levels", expected: "Browser preview: a card with a wide-tracked uppercase label, a balanced bold heading, and comfortable body text inside a character-based measure." }],
         hints: ["Set font-weight and font-size before reaching for colour.", "Large text can take a slightly negative tracking; small uppercase labels need a positive value.", "text-wrap: balance belongs on short blocks such as headings."],
@@ -811,7 +894,7 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "One declaration for every place the value is used",
-          ':root {\n  --accent: #2563eb;  /* custom properties: one named value, reused below */\n}\n.btn {\n  background: var(--accent);\n}\n.banner {\n  border-left: 0.25rem solid var(--accent);\n}',  /* custom properties: the value comes from a token declared once */
+          ':root {\n  --accent: #2563eb;  /* custom properties: one named value, reused below */\n}\n.btn {\n  background: var(--accent);  /* maintainability: change the token once and every reader of it follows */\n}\n.banner {\n  border-left: 0.25rem solid var(--accent);\n}',  /* custom properties: the value comes from a token declared once */
           "Browser preview: the button and the banner share the same accent colour because both read the token declared in one place.",
           "The accent exists once, as a named token on :root, and both rules consume it. Changing the brand colour is then a single edit, which is what makes the stylesheet maintainable rather than merely tidy.",
           [
@@ -857,7 +940,7 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
       exercise: {
         prompt: "Move the repeated accent colour and the spacing into custom properties on :root, read them with var() inside the button rule, and declare a layer order so component rules resolve above base rules.",
         starterCode: "/* Name the values once, then declare the order the concerns resolve in */\n\n.btn {\n  /* read the tokens here instead of repeating literals */\n}\n",
-        solution: ':root {\n  --accent: #2563eb;\n  --space-2: 0.5rem;\n}\n@layer base, components;\n.btn {\n  background: var(--accent);\n  padding: var(--space-2) calc(var(--space-2) * 2);\n}',
+        solution: ':root {\n  --accent: #2563eb;\n  --space-2: 0.5rem;\n}\n@layer base, components;\n.btn {\n  background: var(--accent);  /* maintainability: change the token once and every reader of it follows */\n  padding: var(--space-2) calc(var(--space-2) * 2);\n}',
         solutionExplanation: "The token block names the accent and the spacing once, the layer statement fixes the resolution order, and the button rule consumes the tokens with var() so a theme change is a single edit in the token block.",
         testCases: [{ label: "tokenised button", expected: "Browser preview: a button whose colour and padding come from custom properties declared in one block, with layers declaring the order of concerns." }],
         hints: [
@@ -1330,7 +1413,7 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "A header that sticks inside the page",
-          '.site-header {\n  position: sticky;\n  top: 0;\n  z-index: 10;\n}',
+          '.site-header {\n  position: sticky;\n  top: 0;\n  z-index: 10;  /* page refinement: the sticky header states its stacking order instead of leaving it to chance */\n}',
           "Browser preview: the header scrolls with the page and then holds at the top edge while its container continues to scroll.",
           "sticky keeps the header in normal flow, so nothing is reserved or removed, and the top inset states where the stick starts. A modest z-index keeps it above following content inside the same stacking context without needing an extreme number.",
           [
@@ -1360,7 +1443,7 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
       exercise: {
         prompt: "Make a header stick to the top while scrolling, then place a badge in the corner of a relatively positioned card and keep focus outlines visible.",
         starterCode: "/* Choose position values from the behaviour you need */\n",
-        solution: '.site-header {\n  position: sticky;\n  top: 0;\n  z-index: 10;\n}\n.card {\n  position: relative;\n}\n.card__badge {\n  position: absolute;\n  top: 0.5rem;\n  right: 0.5rem;\n}\na:focus-visible { outline: 3px solid #345; outline-offset: 2px; }',
+        solution: '.site-header {\n  position: sticky;\n  top: 0;\n  z-index: 10;  /* page refinement: the sticky header states its stacking order instead of leaving it to chance */\n}\n.card {\n  position: relative;\n}\n.card__badge {\n  position: absolute;\n  top: 0.5rem;\n  right: 0.5rem;\n}\na:focus-visible { outline: 3px solid #345; outline-offset: 2px; }',
         solutionExplanation: "The header uses sticky with an explicit inset so it holds at the top of its scroll container, the card is relatively positioned so it becomes the containing block for the absolutely positioned badge, and the focus style keeps keyboard navigation visible.",
         testCases: [{ label: "Positioning and focus", expected: "Browser preview: a sticky header and a corner badge on a card, with focus outlines still visible." }],
         hints: ["Sticky needs an inset such as top: 0.", "An absolute child resolves against a positioned ancestor.", "Add the focus style so the overlay cannot hide keyboard focus."],
@@ -1592,6 +1675,172 @@ export const htmlcssGapLessons: LessonOverrideLibrary = {
       ],
       verification: ["previewed", "structurally-checked"],
       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+    }),
+  },
+  21: {
+    debug: authoredLesson({
+      title: "A debugging pass you can repeat: outline, reduce, fix, re-check",
+      minutes: 24,
+      summary: "Make the invisible visible with a temporary outline, reduce the page to the smallest case that still fails, fix the one declaration that caused it, and re-check the pages you already repaired.",
+      learningGoals: [
+        "Expose box boundaries with a temporary outline instead of guessing at widths",
+        "Reduce a failing page to the smallest markup and styles that still show the problem",
+        "Re-check the pages you already fixed so one change cannot quietly undo another",
+      ],
+      explanation: "Debugging a layout is a sequence, not a lucky guess. The first move is to make the invisible visible: a single rule that outlines every box shows exactly which element is wider or taller than expected, and because an outline is painted outside the box model it reveals the layout without changing it, unlike a border that would add to the very width you are investigating. The rule belongs in a scratch stylesheet, and removing it is part of the pass. The second move is reduction: keep the smallest markup and the shortest stylesheet that still reproduce the fault, because a page with one flex row and one item has exactly one place the cause can hide. The third move is the fix, stated as the declaration that caused the problem rather than as a pile of overrides that hide the symptom. The step most people skip comes last: a change that repairs one page can reintroduce a fault on a page that was already repaired, so the pass closes by re-opening the earlier work and checking the same properties again. What this lesson can show is the outline rule and the reduced page in the sandboxed preview; a browser inspector panel and a real device are outside what this course claims to run, so they are described rather than demonstrated.",
+      keywordNotes: [
+        "A temporary outline marks every box without disturbing the layout, because outlines are drawn outside the box model.",
+        "The diagnostic belongs in a scratch stylesheet, and deleting it is the last step of the pass.",
+        "Reduction means keeping the smallest markup and the shortest rules that still show the fault.",
+        "A fix names one declaration with a reason instead of stacking overrides that hide the symptom.",
+        "Regression awareness means re-opening the pages you already repaired and checking the same properties again.",
+      ],
+      examples: [
+        example(
+          "Outline every box while you look",
+          "<style>\n  * { outline: 1px solid color-mix(in srgb, red 30%, transparent); }  /* visual debugging: a temporary outline shows the real box */\n</style>\n<div><p>Inspect box boundaries</p></div>",
+          "Browser preview: the paragraph and its parent are both revealed by a thin red outline, with no change to the size or position of either box.",
+          "One rule on the universal selector exposes every box at once, and the outline property is chosen precisely because it is drawn outside the box model, so the diagnostic cannot become part of the problem it is showing.",
+          [
+            "Line 1: the scratch stylesheet is separate from the delivered one, so the diagnostic cannot ship by accident.",
+            "Line 2: one rule outlines every box, and because an outline is drawn outside the box model it cannot change the layout it is revealing.",
+            "Line 3: the stylesheet ends; removing this rule is the last step of the pass.",
+            "Line 4: the ordinary markup stays untouched, which is what makes the outline the only difference between looking and not looking.",
+          ],
+        ),
+        example(
+          "Reduce the page, then record the re-check",
+          "<!-- The smallest page that still shows the problem: one row, one item -->\n<style>\n  .row { display: flex; gap: 1rem; }\n  .wide { flex: 0 0 120%; }  /* the cause: a flex item whose basis is wider than the row */\n</style>\n<div class=\"row\"><p class=\"wide\">A row that overflows</p></div>\n<!-- inspection workflow: outline, reduce, fix, re-check; regression awareness: re-open the pages you already repaired -->",
+          "Browser preview: a single row whose only item is wider than the space it has, which is the smallest page that still shows the overflow.",
+          "The reduced page has two rules and one child, so the cause is not buried under unrelated styles; the trailing comment records the order of work and the re-check step that closes it.",
+          [
+            "Line 1: the first comment states the goal of the reduction before any rule is written.",
+            "Line 2: the style block holds only the two rules that the problem needs, so the suspect is on the page.",
+            "Line 3: the row is declared as a flex container, which is the context the item overflows inside.",
+            "Line 4: the item is given a basis wider than the row, which is the one declaration that reproduces the fault.",
+            "Line 5: the style block closes with nothing else competing for attention.",
+            "Line 6: one row and one item reproduce the overflow in a page small enough to reason about.",
+            "Line 7: the last comment records the order of work and the re-check step, which is the part a fix usually skips.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Write a debugging scratch block that outlines every box and reduces an overflowing row to the smallest page that still shows it, with a reduced flex item as the stated cause.",
+        starterCode: "<!-- Outline every box, then reduce the page to one row and one item -->\n",
+        solution: "<style>\n  * { outline: 1px solid color-mix(in srgb, red 30%, transparent); }\n  .row { display: flex; gap: 1rem; }\n  .wide { flex: 0 0 120%; }\n</style>\n<div class=\"row\"><p class=\"wide\">A row that overflows</p></div>",
+        solutionExplanation: "The universal rule outlines every box for inspection, the row establishes the flex context, and the single item with a basis wider than the row is the reduced case that reproduces the fault, so the diagnostic page is small enough to reason about.",
+        testCases: [{ label: "Debugging scratch block", expected: "Preview: a row that overflows its container while every box is outlined, so the cause is visible in the smallest page that still shows it." }],
+        hints: ["Use one rule on * so every box is revealed at once.", "Make the row a flex container with a gap.", "Give one item a flex basis wider than the row to reproduce the overflow."],
+        checker: {
+          mode: "html",
+          requiredPatterns: ["outline", "display: flex", "flex: 0 0"],
+          successMessage: "The scratch block outlines every box and reduces the overflow to one row and one stated cause."},
+      },
+      recap: [
+        "Outline first: a diagnostic that is drawn outside the box model reveals boxes without changing them.",
+        "Reduce second: the smallest page that still fails leaves only one place for the cause to be.",
+        "Fix the cause and re-check the earlier pages, because a repair on one page can undo another.",
+      ],
+      readingCheck: {
+        prompt: "Why is an outline a better diagnostic than a border when you are investigating a width?",
+        choices: [
+          "Because an outline is drawn outside the box model, so it cannot change the size you are measuring",
+          "Because outlines only apply to block elements",
+          "Because borders are ignored by the preview",
+          "Because an outline removes the element from the layout",
+        ],
+        correctIndex: 0,
+        explanation: "A border adds to the box and therefore to the measurement under investigation, while an outline is painted outside the box and leaves the layout alone.",
+      },
+      decisionGuide: [
+        { use: "a scratch outline rule you delete afterwards", insteadOf: "permanent debug borders on components", reason: "The diagnostic stays a step in a pass rather than a declaration that leaks into the delivered stylesheet." },
+        { use: "a reduced page that still fails", insteadOf: "debugging the full page in place", reason: "Fewer competing rules make the cause obvious, and the reduced case documents the fault for the next person." },
+      ],
+      verification,
+      quality: { codeReading: true, debugging: true, modification: true },
+    }),
+  },
+  24: {
+    learn: authoredLesson({
+      title: "Delivery: one token theme, a dark colour scheme, and a check you can repeat",
+      minutes: 26,
+      summary: "Serve light and dark from the same token block, declare color-scheme so the browser follows the theme, remove interactivity for print, and close the delivery with a check the next person can repeat.",
+      learningGoals: [
+        "Support a dark colour scheme by swapping token values rather than duplicating component rules",
+        "Declare color-scheme so form controls, scrollbars, and the surrounding canvas follow the theme",
+        "Finish with print rules and a repeatable review instead of a silent publish",
+      ],
+      explanation: "Delivery is where a stylesheet stops being a draft. The theme is the first thing to make maintainable: one block of token values describes the light scheme, the rules read those tokens, and the dark scheme arrives as a prefers-color-scheme query that changes nothing but the values. color-scheme belongs beside them because the browser uses it for the parts of the interface the page does not paint itself, such as form controls, scrollbars, and the canvas behind the document. Printing is a second delivery target with its own rules: navigation and buttons are interaction, so they are removed, and the page is given ink-and-paper colours that survive on white paper. Keyboard focus stays visible in the delivered stylesheet rather than being treated as development polish. The workflow closes with a check that can be repeated by someone else: read the token block, read the print rules, tab through the page, and confirm that the scheme you did not design first still shows every piece of content. The sandboxed preview and the structure checker are the evidence this lesson stands on; no screenshot comparison or audit score is claimed here.",
+      keywordNotes: [
+        "Dark mode starts from the tokens: the same rules read --surface and --text, and prefers-color-scheme swaps the values.",
+        "color-scheme tells the browser which palette to use for form controls, scrollbars, and the canvas around the page.",
+        "Maintainability means the theme lives in one token block instead of duplicated component rules.",
+        "Print is a delivery target: @media print removes navigation and buttons and states ink-and-paper colours.",
+        "A delivery workflow ends in a check someone else can repeat, covering the theme, the print rules, and focus styles.",
+      ],
+      examples: [
+        example(
+          "One token block, two colour schemes",
+          "<style>\n  :root { --surface: #ffffff; --text: #1b1f24; color-scheme: light; }  /* maintainability: one token block feeds every rule in the theme */\n  body { background: var(--surface); color: var(--text); }\n  @media (prefers-color-scheme: dark) {\n    :root { --surface: #12161c; --text: #f2f5f8; color-scheme: dark; }  /* dark mode: the same tokens, new values */\n  }\n</style>",
+          "Browser preview: a page painted from two tokens, showing its light values or its dark values depending on the preference the browser reports.",
+          "Nothing in the component rules mentions a theme: the light values are declared once, the dark query replaces only the values, and color-scheme keeps the browser's own surfaces consistent with the choice.",
+          [
+            "Line 1: the stylesheet holds the theme once, rather than one block per component.",
+            "Line 2: the light values live in one token block, and color-scheme tells the browser which palette the page expects.",
+            "Line 3: the rules that paint the page read the tokens instead of repeating the colours.",
+            "Line 4: the dark scheme is opened as a media query, because the reader's preference arrives through CSS rather than script.",
+            "Line 5: only the token values change, which is what keeps dark mode a change of values instead of a second stylesheet.",
+            "Line 6: the query closes, and the rest of the page never learns that a theme exists.",
+            "Line 7: the stylesheet ends with one source of truth for both schemes.",
+          ],
+        ),
+        example(
+          "Print rules and the check that closes delivery",
+          "<style>\n  @media print { nav, button { display: none; } body { color: black; background: white; } }\n  :focus-visible { outline: 3px solid var(--text); }  /* delivery workflow: review the theme, the print rules, and the focus styles before publishing */\n</style>",
+          "Browser preview: the page on screen keeps its focus styles, while the print media query removes the navigation and the button and states colours that suit paper.",
+          "Print is treated as a target rather than an afterthought: interaction is removed because paper cannot use it, the colours are chosen for ink, and the focus styles stay in the delivered stylesheet so the check has something to verify.",
+          [
+            "Line 1: the style block is the only place the delivery rules live.",
+            "Line 2: print rules remove interaction that paper cannot use and state legible ink colours for the page that is printed.",
+            "Line 3: focus styles stay in the delivered stylesheet so keyboard readers can see where they are, and the comment records the check that closes the delivery.",
+            "Line 4: the stylesheet ends, ready to be published rather than published by hope.",
+          ],
+        ),
+      ],
+      exercise: {
+        prompt: "Deliver a themed page: declare a light token pair with color-scheme, swap the values under prefers-color-scheme: dark, read the tokens in the page rules, and remove navigation and buttons for print.",
+        starterCode: "<!-- One token block, a dark query, and one print rule -->\n",
+        solution: "<style>\n  :root { --surface: #ffffff; --text: #1b1f24; color-scheme: light; }  /* maintainability: one token block feeds every rule in the theme */\n  body { background: var(--surface); color: var(--text); }\n  @media (prefers-color-scheme: dark) {\n    :root { --surface: #12161c; --text: #f2f5f8; color-scheme: dark; }\n  }\n  @media print { nav, button { display: none; } body { color: black; background: white; } }\n</style>",
+        solutionExplanation: "The light scheme is declared once as token values, the dark query replaces those values without touching the component rules, color-scheme keeps the browser surfaces consistent, and the print query removes what paper cannot use while stating legible colours.",
+        testCases: [{ label: "Delivery check", expected: "Preview: a light page whose token values swap under a dark colour scheme, with navigation and buttons removed when the page is printed." }],
+        hints: ["Declare the light values and color-scheme in one root block.", "Change only the token values inside prefers-color-scheme: dark.", "Add @media print and remove the interactive elements."],
+        checker: {
+          mode: "html",
+          requiredPatterns: ["prefers-color-scheme: dark", "color-scheme: dark", "@media print", "display: none", "var\\(--surface"],
+          successMessage: "The theme is delivered from tokens, the dark scheme swaps values only, and print rules remove what paper cannot use."},
+      },
+      recap: [
+        "One token block serves both schemes, so a theme change is a value change.",
+        "color-scheme keeps the browser surfaces the page does not paint in step with the theme.",
+        "Print rules and a repeatable review are the delivery step that turns a draft into something published on purpose.",
+      ],
+      readingCheck: {
+        prompt: "Why declare color-scheme next to the token values?",
+        choices: [
+          "Because the browser uses it for form controls, scrollbars, and the canvas around the page, which tokens alone do not reach",
+          "Because it replaces the need for token values",
+          "Because it disables the dark scheme for images",
+          "Because it is required before prefers-color-scheme can be written",
+        ],
+        correctIndex: 0,
+        explanation: "Tokens style the elements the stylesheet paints; color-scheme tells the browser how to render the interface surfaces it draws itself.",
+      },
+      decisionGuide: [
+        { use: "prefers-color-scheme with swapped token values", insteadOf: "a second stylesheet per theme", reason: "One set of rules reads the tokens, so a theme stays a change of values rather than a second page to maintain." },
+        { use: "a print stylesheet that removes navigation", insteadOf: "printing the screen layout as it stands", reason: "Paper has no interactivity, and removing it is a delivery decision rather than a stylistic one." },
+      ],
+      verification,
+      quality: { codeReading: true, prediction: true, modification: true },
     }),
   },
 };

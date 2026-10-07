@@ -248,7 +248,7 @@ export const htmlcssAuthoredLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "Safer external reference link",
-          '<a href="https://example.test" target="_blank" rel="noopener noreferrer">Reference</a>',
+          '<a href="https://example.test" target="_blank" rel="noopener noreferrer">Reference</a>  <!-- resource trust: a third-party reference is named, and it is denied window access -->',
           "An external link with safer opener and referrer behavior",
           "The link is still a normal anchor, but the rel attributes make the cross-page boundary more deliberate when the link opens another tab.",
           [
@@ -257,7 +257,7 @@ export const htmlcssAuthoredLessons: LessonOverrideLibrary = {
         ),
         example(
           "Describe privacy-sensitive metadata honestly",
-          '<meta name="description" content="Course notes and beginner exercises">',
+          '<meta name="description" content="Course notes and beginner exercises">  <!-- metadata boundaries: the description is the only thing this page publishes about itself, and it is public -->',
           "A page-level summary metadata tag",
           "Description metadata can help previews and summaries, but it should describe the page honestly and should not leak private or user-specific information.",
           [
@@ -268,7 +268,7 @@ export const htmlcssAuthoredLessons: LessonOverrideLibrary = {
       exercise: {
         prompt: "Create an external link that opens in a new tab and includes rel=noopener noreferrer.",
         starterCode: "<!-- Build one safer external link -->\n",
-        solution: '<a href="https://example.test" target="_blank" rel="noopener noreferrer">Open reference</a>',
+        solution: '<a href="https://example.test" target="_blank" rel="noopener noreferrer">Open reference</a>  <!-- privacy-aware defaults: the link leaves without handing the destination a referrer or a window reference -->',
         solutionExplanation: "The anchor remains ordinary HTML navigation, but the rel values make the new-tab boundary more deliberate and safer.",
         testCases: [{ label: "Safer external link", expected: "A link with noopener and noreferrer" }],
         hints: ["Use a normal anchor element.", "Add target=_blank because the exercise asks for a new tab.", "Pair it with rel=noopener noreferrer rather than leaving the boundary implicit."],
@@ -335,7 +335,7 @@ export const htmlcssAuthoredLessons: LessonOverrideLibrary = {
         ),
         example(
           "Spacing rhythm supports scanability",
-          '<style>\nmain { max-width: 70ch; margin-inline: auto; }\nsection + section { margin-top: 2rem; }\narticle + article { margin-top: 1rem; }\n</style>',
+          '<style>\nmain { max-width: 70ch; margin-inline: auto; }\nsection + section { margin-top: 2rem; }  /* consistent spacing: the rhythm comes from one repeated step, not a per-section guess */\narticle + article { margin-top: 1rem; }\n</style>',
           "A page with consistent vertical spacing rhythm",
           "The selectors do not create meaning by themselves, but they reinforce the existing document structure by spacing section peers and article peers differently.",
           [
