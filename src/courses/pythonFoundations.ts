@@ -27,6 +27,7 @@ function example(title: string, code: string, output: string, explanation: strin
 
 const expressions: Lesson = {
   id: "python-1-3", chapter: 1, order: 3, title: "Evaluate expressions precisely", minutes: 25,
+  kind: "learn",
   summary: "Combine values with operators and control exactly how print separates output.",
   learningGoals: ["Predict arithmetic order", "Use + with text and numbers", "Control print separators"],
   explanation: "An expression is code that produces a value. Python evaluates arithmetic using precedence: multiplication and division happen before addition and subtraction unless parentheses say otherwise. The plus operator adds numbers but joins strings. print can receive more than one value, and its sep option controls the text between them.",
@@ -41,6 +42,7 @@ const expressions: Lesson = {
 
 const booleans: Lesson = {
   id: "python-2-3", chapter: 2, order: 3, title: "Reason with booleans", minutes: 28,
+  kind: "learn",
   summary: "Create True and False values, compare safely, and convert between useful data types.",
   learningGoals: ["Use boolean comparisons", "Combine conditions with and or not", "Convert values deliberately"],
   explanation: "A boolean value is either True or False. Comparisons create booleans, and logical operators combine them. and requires both conditions to be true; or accepts either; not reverses a boolean. Conversion functions make type changes visible, so a program does not rely on accidental behavior.",
@@ -55,6 +57,7 @@ const booleans: Lesson = {
 
 const whileLoops: Lesson = {
   id: "python-3-3", chapter: 3, order: 3, title: "Control repetition with while", minutes: 31,
+  kind: "learn",
   summary: "Repeat while a condition is true, update the loop state, and use break or continue intentionally.",
   learningGoals: ["Write a terminating while loop", "Use break safely", "Use continue to skip one iteration"],
   explanation: "A while loop repeats while its condition is True. Unlike a for loop over a known sequence, while is useful when the stopping point depends on changing program state. Every while loop needs a path that changes that state or exits with break. continue skips the rest of the current iteration and begins the next condition check.",
@@ -69,6 +72,7 @@ const whileLoops: Lesson = {
 
 const debugging: Lesson = {
   id: "python-1-4", chapter: 1, order: 4, title: "Read errors and inspect values", minutes: 27,
+  kind: "debug",
   summary: "Use type(), repr(), and small prints to turn a confusing program state into evidence.",
   learningGoals: ["Read a NameError", "Inspect a value with repr", "Use a minimal debugging print"],
   explanation: "Debugging starts with evidence. Read the final error line first, then the line number, then inspect the smallest value involved. repr shows a developer representation that exposes quotes and escape characters that normal print may hide. Temporary debugging prints are useful during investigation, but remove or replace them with tests once the behavior is understood.",
@@ -85,6 +89,7 @@ const debugging: Lesson = {
 
 const numericPrecision: Lesson = {
   id: "python-2-4", chapter: 2, order: 4, title: "Choose numeric types deliberately", minutes: 31,
+  kind: "learn",
   summary: "Understand float precision, integer division choices, and Decimal for exact base-10 money work.",
   learningGoals: ["Predict / and // results", "Recognize float precision limits", "Use Decimal for exact decimal values"],
   explanation: "Integers are exact whole numbers. Floats are fast binary approximations for many scientific and measurement tasks, but some decimal fractions cannot be represented exactly in binary. For money-like base-10 decimal rules, Decimal created from strings can preserve the decimal values you intend. Choose the type from the domain rule, not from how the value happens to look on screen.",
@@ -100,6 +105,7 @@ const numericPrecision: Lesson = {
 
 const inputValidation: Lesson = {
   id: "python-3-4", chapter: 3, order: 4, title: "Validate before you decide", minutes: 34,
+  kind: "learn",
   summary: "Combine loops, conversion errors, and conditions to keep invalid input away from program rules.",
   learningGoals: ["Loop until input is valid", "Catch conversion failure", "Separate validation from business logic"],
   explanation: "Input validation answers a different question from business logic. Validation asks whether a value can be used safely, for example whether text can become an integer. Business logic then asks what the valid value means. Keep those steps separate so a program can give a helpful retry message instead of mixing invalid input with a real decision.",
@@ -115,6 +121,7 @@ const inputValidation: Lesson = {
 
 const firstProgramWorkflow: Lesson = {
   id: "python-1-5", chapter: 1, order: 5, title: "Build a readable first program", minutes: 30,
+  kind: "integration",
   summary: "Combine variables, expressions, comments, and output into a short program another person can follow.",
   learningGoals: ["Name intermediate values", "Use a comment for intent", "Format a final message"],
   explanation: "A useful beginner program has a small flow: input data or constants, one transformation, and one visible result. Give intermediate values names when they explain meaning. Use comments for why a decision exists, not for restating obvious syntax. Finish with output that tells a person what the calculation means.",
@@ -130,6 +137,7 @@ const firstProgramWorkflow: Lesson = {
 
 const inputWorkflow: Lesson = {
   id: "python-2-5", chapter: 2, order: 5, title: "Turn typed text into a useful result", minutes: 32,
+  kind: "integration",
   summary: "Combine input, conversion, arithmetic, and formatted output in one safe small workflow.",
   learningGoals: ["Collect typed text", "Convert before arithmetic", "Format a calculated result"],
   explanation: "Input is always text at the boundary. A program should convert the text immediately when a calculation needs a number, give the converted value a meaningful name, and then apply its normal arithmetic. This keeps the program's type changes visible instead of relying on guesswork or string concatenation.",
@@ -145,6 +153,7 @@ const inputWorkflow: Lesson = {
 
 const controlWorkflow: Lesson = {
   id: "python-3-5", chapter: 3, order: 5, title: "Build a controlled scoring workflow", minutes: 34,
+  kind: "integration",
   summary: "Combine validation, a loop, a condition, and a running total in one predictable decision process.",
   learningGoals: ["Accumulate values", "Choose a final branch", "Keep loop and decision responsibilities clear"],
   explanation: "A reliable control-flow workflow usually has three stages: repeat collection or processing, keep a clear running state, then make a final decision from that state. Do not hide the final rule inside every loop turn unless each turn truly needs its own decision. A separate final if makes the program easier to trace and test.",
@@ -160,6 +169,7 @@ const controlWorkflow: Lesson = {
 
 const firstProgramCaseStudy: Lesson = {
   id: "python-1-6", chapter: 1, order: 6, title: "Case study: learning introduction", minutes: 32,
+  kind: "case-study",
   summary: "Create a small introduction program with named data, one calculation, and readable output.",
   learningGoals: ["Combine variables and expressions", "Use f-strings for presentation", "Trace a short complete program"],
   explanation: "This first case study combines the chapter's related ideas: store meaningful values, calculate from them once, and present the result in readable text. The code is still small enough to inspect line by line, but it follows the same separation used in larger programs: data first, transformation second, output last.",
@@ -175,6 +185,7 @@ const firstProgramCaseStudy: Lesson = {
 
 const calculationCaseStudy: Lesson = {
   id: "python-2-6", chapter: 2, order: 6, title: "Case study: ticket cost calculator", minutes: 34,
+  kind: "case-study",
   summary: "Turn two typed values into a validated numeric total and a clear final message.",
   learningGoals: ["Convert two inputs", "Calculate a total", "Keep numeric and display types separate"],
   explanation: "A calculator is a useful boundary example because it receives text, transforms it into numbers, applies an arithmetic rule, and displays a result. Each stage has one type expectation. Keeping the stages separate makes it easy to add validation later without changing the core multiplication rule.",
@@ -190,6 +201,7 @@ const calculationCaseStudy: Lesson = {
 
 const scoringCaseStudy: Lesson = {
   id: "python-3-6", chapter: 3, order: 6, title: "Case study: score review", minutes: 36,
+  kind: "case-study",
   summary: "Loop through results, ignore invalid entries, calculate a total, and choose one final status.",
   learningGoals: ["Use continue for invalid data", "Maintain a running total", "Choose a final branch after processing"],
   explanation: "This case study uses the whole control-flow chapter as one small process. The loop handles each candidate score. continue removes an invalid score from normal work. The running total records accepted values. A final conditional makes one decision after all valid information is known.",
@@ -205,6 +217,7 @@ const scoringCaseStudy: Lesson = {
 
 const firstProgramChallenge: Lesson = {
   id: "python-1-7", chapter: 1, order: 7, title: "Challenge: personal study card", minutes: 34,
+  kind: "challenge",
   summary: "Build a complete, readable study-card program from named values and one calculation.",
   learningGoals: ["Model a small requirement", "Calculate one derived value", "Write a clear final message"],
   explanation: "This challenge is your first small deliverable. A study card needs named learner data, a calculated total, and one clear output. Keep the code in order: define facts first, calculate next, and present last. This is the basic shape that larger programs keep as they gain functions and classes.",
@@ -220,6 +233,7 @@ const firstProgramChallenge: Lesson = {
 
 const calculationChallenge: Lesson = {
   id: "python-2-7", chapter: 2, order: 7, title: "Challenge: budget total with a fee", minutes: 36,
+  kind: "challenge",
   summary: "Collect two typed values, apply a numeric rule, and present the result without mixing types early.",
   learningGoals: ["Translate a word problem into variables", "Keep arithmetic numeric", "Test more than one input"],
   explanation: "This challenge represents a realistic calculator rule: price multiplied by quantity plus a fixed fee. Read the problem for nouns and operations. The price, count, and fee each become named numbers. The final total stays numeric until one output line presents it. That separation is what lets a later program test multiple inputs reliably.",
@@ -235,6 +249,7 @@ const calculationChallenge: Lesson = {
 
 const scoringChallenge: Lesson = {
   id: "python-3-7", chapter: 3, order: 7, title: "Challenge: milestone finder", minutes: 38,
+  kind: "challenge",
   summary: "Search a sequence with a loop, skip unusable values, and stop as soon as the goal is found.",
   learningGoals: ["Write a search loop", "Use continue and break together", "Represent a not-found result"],
   explanation: "A search has a different loop goal from a total. It does not need to process every value after the answer is found. continue skips data that cannot qualify. break stops the loop once the answer is known. A found variable records the result so code after the loop can make one clear final output decision.",

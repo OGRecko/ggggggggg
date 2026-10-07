@@ -550,3 +550,58 @@ than as gaps, and they are listed here so the count is auditable:
 - Claim trace: 48 lessons still carry a flagged token, and every one of them is on the
   documented list above — goals that were filled, or prose that deliberately contrasts,
   warns about, or quizzes a construct the lesson does not need to run.
+
+## Appendix E — Repetition and lesson metadata
+
+Appendices A–D closed claim-level gaps. This appendix answers a different question the
+curriculum quality module already asks: **is any lesson text or metadata repeated in a way the
+learner would notice?**
+
+### Duplicate lesson prose
+
+A per-course scan for example code and explanation text repeated across different lessons found
+one real defect and one deliberate category:
+
+- **Python (fixed):** 44 lessons — every "Case study:" and "Challenge:" lesson — shared one
+  explanation paragraph verbatim, differing only in a scenario word. Each of the 44 now states
+  its own engineering reading: the boundary the code actually has, the rule it enforces, the state
+  it keeps, the visible result, and what the second example changes. The lesson texts were written
+  from the code each lesson ships, not from a template.
+- **Java / JavaScript / C++ / HTML-CSS:** every repeated example belongs to a *scaffolded*
+  foundational chapter, where one sample is intentionally reused across the lesson kinds inside a
+  single chapter (learn / read / debug / compare / build). No authored lesson, deep-dive lab, or
+  chapter project repeats another's code, and no repetition crosses chapters. Zero authored
+  lessons are duplicated in any course.
+
+### The quality module's own counts
+
+`summarizeCourseQuality` reported **611 repetition findings for Python** (441 repeated lesson
+explanations and 170 repeated test questions) and 0 for the other four courses. After the fix:
+
+| Course | Findings | Composition |
+| --- | --- | --- |
+| Python | 170 | all 170 pair a chapter with a cumulative checkpoint (chapters 5/10/15/20/25 reuse earlier questions by design) |
+| Java / JavaScript / C++ / HTML-CSS | 0 | — |
+
+### Lesson metadata
+
+No Python lesson carried a `kind`, and no Python chapter carried `major`, while every other
+course sets both. The module therefore reported Python as missing "blank page" coverage in all 25
+chapters and as having zero authored major chapters — both artifacts of absent metadata rather
+than curriculum facts. Python lessons now carry the kind of activity they actually are
+(128 learn, 25 integration, 25 case-study, 25 challenge, 1 debug), and all 25 Python chapters are
+marked major because none of them is scaffolded.
+
+That change removes the false negatives and leaves one honest finding standing: **21 Python
+chapters do not contain a dedicated debugging activity**, while chapters 1 (Read errors and
+inspect values), 2, and 10 do. That is a real coverage question for the next round, not a
+metadata problem.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 67 tests, all passing.
+- `npm run build` — succeeds, 3,392.61 kB (gzip 1,036.70 kB).
+- Every course, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
+- Python lesson kinds: 128 learn, 25 integration, 25 case-study, 25 challenge, 1 debug; all 25
+  chapters marked major.

@@ -5,6 +5,7 @@ import { pythonGapLessons } from "./pythonGaps";
 
 const helloWorld: Lesson = {
   id: "python-1-1",
+  kind: "learn",
   chapter: 1,
   order: 1,
   title: "Make Python speak",
@@ -59,6 +60,7 @@ const helloWorld: Lesson = {
 
 const variablesAndComments: Lesson = {
   id: "python-1-2",
+  kind: "learn",
   chapter: 1,
   order: 2,
   title: "Name information with variables",
@@ -117,6 +119,7 @@ const variablesAndComments: Lesson = {
 
 const numberTypes: Lesson = {
   id: "python-2-1",
+  kind: "learn",
   chapter: 2,
   order: 1,
   title: "Work with numbers and types",
@@ -177,6 +180,7 @@ const numberTypes: Lesson = {
 
 const inputAndConversion: Lesson = {
   id: "python-2-2",
+  kind: "learn",
   chapter: 2,
   order: 2,
   title: "Ask for input and convert it",
@@ -240,6 +244,7 @@ const inputAndConversion: Lesson = {
 
 const decisions: Lesson = {
   id: "python-3-1",
+  kind: "learn",
   chapter: 3,
   order: 1,
   title: "Make decisions with if",
@@ -307,6 +312,7 @@ const decisions: Lesson = {
 
 const loops: Lesson = {
   id: "python-3-2",
+  kind: "learn",
   chapter: 3,
   order: 2,
   title: "Repeat work with for loops",
@@ -369,6 +375,7 @@ const chapters: Chapter[] = [
   {
     number: 1,
     title: "Start with Python",
+    major: true,
     description: "Output, strings, variables, and comments. Build a tiny course introduction program.",
     lessons: [helloWorld, variablesAndComments, foundationDeepDives.expressions, foundationDeepDives.debugging, foundationDeepDives.firstProgramWorkflow, foundationDeepDives.firstProgramCaseStudy, foundationDeepDives.firstProgramChallenge],
     available: true,
@@ -391,6 +398,7 @@ const chapters: Chapter[] = [
   {
     number: 2,
     title: "Values from people and programs",
+    major: true,
     description: "Numbers, types, input, conversion, and reliable calculation.",
     lessons: [numberTypes, inputAndConversion, foundationDeepDives.booleans, foundationDeepDives.numericPrecision, foundationDeepDives.inputWorkflow, foundationDeepDives.calculationCaseStudy, foundationDeepDives.calculationChallenge],
     available: true,
@@ -413,6 +421,7 @@ const chapters: Chapter[] = [
   {
     number: 3,
     title: "Control the path",
+    major: true,
     description: "Conditions, comparisons, indentation, and controlled repetition.",
     lessons: [decisions, loops, foundationDeepDives.whileLoops, foundationDeepDives.inputValidation, foundationDeepDives.controlWorkflow, foundationDeepDives.scoringCaseStudy, foundationDeepDives.scoringChallenge],
     available: true,
@@ -457,7 +466,7 @@ const chaptersWithGapLessons: Chapter[] = chapters.map((chapter) => {
   const startOrder = chapter.lessons.length + 1;
   return {
     ...chapter,
-    lessons: [...chapter.lessons, ...extras.map((seed, index) => makeLesson(chapter.number, seed, startOrder + index))],
+    lessons: [...chapter.lessons, ...extras.map((seed, index) => makeLesson(chapter.number, seed, startOrder + index, "learn"))],
   };
 });
 
