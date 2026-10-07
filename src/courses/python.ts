@@ -381,7 +381,7 @@ const chapters: Chapter[] = [
     description: "Output, strings, variables, and comments. Build a tiny course introduction program.",
     lessons: [helloWorld, variablesAndComments, foundationDeepDives.expressions, foundationDeepDives.debugging, foundationDeepDives.firstProgramWorkflow, foundationDeepDives.firstProgramCaseStudy, foundationDeepDives.firstProgramChallenge],
     available: true,
-    project: {
+    project: { acceptanceCriteria: ["The learner name is stored in a variable named learner before it is used.", "The first output line joins the fixed label CodeForge learner: with the stored name.", "The second output line is exactly Ready to learn Python."],
       title: "Project: Course badge",
       brief: "Create a short three-line badge. Store your name in a variable named learner, then print exactly: CodeForge learner: followed by the name, and finally Ready to learn Python.",
       prompt: "Write your course badge program. The test uses the name Ada, but any correct approach is accepted if it produces the required three lines.",
@@ -404,7 +404,7 @@ const chapters: Chapter[] = [
     description: "Numbers, types, input, conversion, and reliable calculation.",
     lessons: [numberTypes, inputAndConversion, foundationDeepDives.booleans, foundationDeepDives.numericPrecision, foundationDeepDives.inputWorkflow, foundationDeepDives.calculationCaseStudy, foundationDeepDives.calculationChallenge],
     available: true,
-    project: {
+    project: { acceptanceCriteria: ["Both entered values are converted with int before they are multiplied.", "The total is computed from the two converted values rather than written as a literal.", "The printed line starts with Total: and matches the product of the entered numbers."],
       title: "Project: Two-ticket total",
       brief: "Ask for the price of one ticket and the number of tickets. Convert both values and print the total price. The test enters 8 then 3 and expects Total: 24.",
       prompt: "Use input() twice, convert the entered strings, multiply, and print the label with the total.",
@@ -427,7 +427,7 @@ const chapters: Chapter[] = [
     description: "Conditions, comparisons, indentation, and controlled repetition.",
     lessons: [decisions, loops, foundationDeepDives.whileLoops, foundationDeepDives.inputValidation, foundationDeepDives.controlWorkflow, foundationDeepDives.scoringCaseStudy, foundationDeepDives.scoringChallenge],
     available: true,
-    project: {
+    project: { acceptanceCriteria: ["A for loop over range() produces the three round lines instead of three separate print calls.", "Each round line joins the fixed label with the current number.", "Complete is printed once after the loop, not inside it."],
       title: "Project: Even study rounds",
       brief: "Use a for loop to print Study round 1 through Study round 3, then print Complete. The exact output uses four lines.",
       prompt: "Build a loop with range() and join the text label with the loop number.",

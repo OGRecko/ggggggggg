@@ -700,8 +700,67 @@ pre-existing finding for Python is the by-design reuse of cumulative checkpoint 
 ### Verified state at this commit
 
 - `npx tsc --noEmit` — silent.
-- `npm test` — 8 files, 68 tests, all passing (67 before, plus the new debugging-coverage test).
-- `npm run build` — succeeds, 3,477.50 kB (gzip 1,058.66 kB).
+- `npm test` — 8 files, 69 tests, all passing.
+- `npm run build` — succeeds, 3,482.69 kB (gzip 1,060.05 kB).
 - All five courses, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
-- 21 shipped labs re-executed from the built course object on CPython 3.11.2 with 0 output
-  mismatches.
+
+---
+
+## Appendix G — Python project acceptance criteria
+
+Tracing the one remaining structural finding left `chaptersMissingStructuralCompleteness` listing
+**all 25 Python chapters**, while Java, JavaScript, C++, and HTML-CSS were clean. The cause was a
+single missing field: every Python chapter project shipped a brief, a prompt, a solution, and a
+test case, but no `acceptanceCriteria`, so the acceptance-criteria check failed for the whole
+course. In the UI the gap was visible as three generic placeholder lines (`App.tsx` falls back to
+"addresses the project brief / key concept is visible / result is clear enough to check").
+
+Each of the 25 projects now states **three acceptance criteria written from the code it ships**, so
+the criteria describe the actual solution rather than a template. Examples:
+
+- Chapter 5 (Reading list): the three titles live in one list named `books`; the printed count comes
+  from `len(books)` rather than a hard-coded number; the printed count for the three titles is 3.
+- Chapter 17 (Task count): the table is created in an in-memory SQLite connection; both rows are
+  inserted with bound parameters instead of string concatenation; the printed count comes from a
+  `COUNT(*)` query and equals 2.
+- Chapter 23 (Trim decorator): `trim` returns a wrapper that calls the decorated function and strips
+  its result; `label` is attached to the decorator with `@trim`; the printed value is `Ready`, with
+  the surrounding spaces removed.
+
+### Evidence
+
+- **All 25 project solutions were executed with a local CPython 3.11.2 interpreter**, including
+  chapter 2's `input()` stdin, and each printed exactly the output its test case declares (25/25, no
+  mismatches).
+- A criteria-to-code check confirmed every construct named in a criterion appears in that project's
+  own solution. Two named values are deliberately not in the code: chapter 6 names the produced
+  username `ada_lovelace`, and chapter 5 names the printed count 3 — those are declared outputs,
+  and writing them literally into the code is exactly the defect the criteria steer away from.
+- A first draft of the test rejected one thin criterion ("The output is 3."); instead of relaxing
+  the test, eight short criteria were rewritten to be informative (for example "The printed count
+  for the three titles is 3."), so all 75 criteria are at least 26 characters and end as a full
+  sentence.
+- `courseIntegrity.test.ts` gains one test: the acceptance-criteria and structural-completeness
+  lists for Python must both be empty, every project must state at least three criteria, each
+  criterion must be a real sentence, and **no criterion sentence may be reused between chapters**
+  (75 criteria, 75 unique).
+
+### Measured state after this round
+
+| Check | Before | After |
+| --- | --- | --- |
+| Python `chaptersMissingAcceptanceCriteria` | all 25 chapters | **[]** |
+| Python `chaptersMissingStructuralCompleteness` | all 25 chapters | **[]** |
+| Python projects with authored acceptance criteria | 0 | 25 (75 criteria, 0 duplicated) |
+| Repetition findings | 170 | 170 (unchanged; still only the by-design checkpoint reuse) |
+| Python lessons / kinds | 225 / 128 learn, 22 debug, 25 integration, 25 case-study, 25 challenge | unchanged |
+| Java / JavaScript / C++ / HTML-CSS | 0 findings, 0 structural gaps | unchanged |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing (68 before, plus the new acceptance-criteria test).
+- `npm run build` — succeeds, 3,482.69 kB (gzip 1,060.05 kB).
+- All five courses, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
+- 25/25 Python project solutions re-executed from the built course object on CPython 3.11.2 with 0
+  output mismatches.

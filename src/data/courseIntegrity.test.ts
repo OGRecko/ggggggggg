@@ -435,6 +435,26 @@ describe("CodeForge curriculum integrity", () => {
     expect(new Set(exampleCodes).size).toBe(exampleCodes.length);
   });
 
+  it("keeps every Python chapter project checkable by stating its own acceptance criteria", () => {
+    const python = courseById("python")!;
+    const summary = summarizeCourseQuality(python);
+    expect(summary.structuralCompleteness.chaptersMissingAcceptanceCriteria).toEqual([]);
+    expect(summary.structuralCompleteness.chaptersMissingStructuralCompleteness).toEqual([]);
+
+    const criteria: string[] = [];
+    for (const chapter of python.chapters) {
+      const stated = chapter.project?.acceptanceCriteria ?? [];
+      // A generic fallback is not a criterion: each project states at least three checkable ones.
+      expect(stated.length).toBeGreaterThanOrEqual(3);
+      for (const criterion of stated) {
+        expect(criterion.trim().length).toBeGreaterThan(25);
+        criteria.push(criterion);
+      }
+    }
+    // The criteria describe the projects that ship, so no sentence is reused between chapters.
+    expect(new Set(criteria).size).toBe(criteria.length);
+  });
+
   it("keeps default scaffold samples aligned with late-course chapter topics", () => {
     const java = courseById("java")!;
     const javaConcurrencyRead = java.chapters[15].lessons.find((lesson) => lesson.kind === "read");
