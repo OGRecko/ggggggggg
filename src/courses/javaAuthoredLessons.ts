@@ -296,7 +296,7 @@ export const javaAuthoredLessons: LessonOverrideLibrary = {
       examples: [
         example(
           "One immutable value object is cheap to reason about",
-          'record Lesson(String title, int minutes) {}\npublic class Main {\n    public static void main(String[] args) {\n        Lesson lesson = new Lesson("Java", 20);\n        System.out.println(lesson.title());\n    }\n}',
+          'record Lesson(String title, int minutes) {}\npublic class Main {\n    public static void main(String[] args) {\n        Lesson lesson = new Lesson("Java", 20);  // references and allocation: the constructor allocates the object and the variable holds a reference  // references and allocation: the constructor allocates the object and the variable holds a reference\n        System.out.println(lesson.title());\n    }\n}',
           'Java',
           "A small immutable record makes the program's state easy to reason about and tends to avoid accidental long-lived mutation bugs.",
           [

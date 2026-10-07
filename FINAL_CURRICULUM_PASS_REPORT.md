@@ -1661,3 +1661,78 @@ Every program added or touched in this round was compiled and run: **18 programs
 - `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **68 named-not-shown, 0 with no trace**.
 - `.arena-stats.ts` — 817 lessons, 1,683 examples, **110 authored lessons**.
 - `npm run build` — succeeds, 3,849.50 kB (gzip 1,156.57 kB).
+
+## Appendix S — Java residuals: two authored lessons and a naming pass (this commit)
+
+The Java half of the residual list was read the same way as the C++ and JavaScript halves: every flagged
+concept checked against the whole course, then either a lesson was written or the name was placed on code
+that already did the work.
+
+### Two authored lessons
+
+| Ch | Kind | Lesson | What it closes |
+| --- | --- | --- | --- |
+| 15 | design | `Sealed types and one responsibility per class` | *sealed classes* and *naming and responsibility*: a sealed interface with two records, and a formatter class whose name states its single job |
+| 20 | learn | `Failure handling: validate what you can, catch what you cannot` | *input validation* and *failure handling*: a guard that rejects unusable values, and a try/catch that turns a parse failure into a documented `-1` |
+
+Both lessons carry two examples, an exercise whose reference solution satisfies its own checker, a reading
+check and a decision guide. Their declared outputs were recomputed **outside Java**: all
+**13/13 printed values were reproduced independently** in Python (string concatenation, `int("12")`,
+`int(" 3 ".strip())`, the blank and negative guard paths, and the documented failure value). The lesson text
+states that these programs are authored for review rather than executed, because this sandbox has no JDK —
+the same boundary the Java library has carried since Appendix K.
+
+### The naming pass
+
+| Ch | Concept named | Where |
+| --- | --- | --- |
+| 2 | primitive vs reference types, operators and assignment, casting | the `int` and `String` declarations, the concatenation, and `(int) average` |
+| 5 | encapsulation | the `private final` field |
+| 11 | Big-O vocabulary | the halving step of the binary search |
+| 13 | lambdas, method references, pure transformations | the arrow form, the `::` form, and the untouched source list |
+| 14 | test cases and assertions | the `assert` statement |
+| 15 | naming and responsibility | the one-purpose method |
+| 18 | resource management | `try (Connection …)` |
+| 19 | references and allocation | the constructor call and the reference that holds it |
+| 20 | input validation, failure handling | the guard and the `try` block of the new lesson |
+| 22 | route handling | the path-to-status mapping |
+
+### Three defects caught before commit
+
+1. A comment inserted mid-expression (`…map(String::toUpperCase  // …).orElse(…)`) would have shipped
+   **invalid Java**. It was reverted and re-inserted at the end of the code line, and the runtime dump was
+   used to confirm the final text of every patched line.
+2. The new exercise's checker pattern `catch (NumberFormatException` was a **regex** whose parentheses
+   formed a group, so it could never match the solution; `courseIntegrity.test.ts` failed on exactly that,
+   the pattern was escaped, and the test was not weakened.
+3. The chapter 15 example had **ten notes for eleven code lines** (a blank line was missing its note); the
+   parity invariant caught it before the lesson was written.
+
+### Measured state
+
+| Check | Before | After |
+| --- | --- | --- |
+| Java sweep flags | 21 | **5** |
+| All five courses named-not-shown | 68 | **52** |
+| Authored lessons (corpus) | 110 | **112** |
+| Java examples / authored examples | 319 / 77 | 319 / **77** (lesson examples replaced scaffold where the kind already existed) |
+| Tests / build | 69 / 3,849.50 kB | 69 / **3,870.87 kB** (gzip 1,162.23 kB) |
+
+### The 5 remaining Java flags, classified
+
+- **Environment boundary** — ch14 *mocking concepts* (no mocking framework and no JVM in this sandbox) and
+  *debugging workflow* (a human sequence of steps), ch22 *service layering* and ch24 *architecture
+  boundaries*, ch25 *architecture integration*: these describe structure a real project would assemble with
+  frameworks and a running server, which this course never claims to provide.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **69 tests, all passing**.
+- `.arena-one.ts java 15,20` — both new lessons present and authored.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **52 named-not-shown, 0 with no trace**
+  (218 at the start of the series).
+- `.arena-stats.ts` — 817 lessons, 1,683 examples, **112 authored lessons**.
+- `npm run build` — succeeds, 3,870.87 kB (gzip 1,162.23 kB).
