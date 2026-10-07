@@ -1817,3 +1817,61 @@ verification run.
 - `.arena-hmap.ts` — chapter 9 `learn`, chapter 21 `debug`, and chapter 24 `learn` all show as authored.
 - `.arena-stats.ts` — 817 lessons, 1,683 examples, **115 authored lessons**.
 - `npm run build` — succeeds, 3,896.91 kB (gzip 1,169.32 kB).
+
+## Appendix U — Program end state and the last open item (this commit)
+
+### The last open item: the eleven JavaScript "audit flags"
+
+`.arena-audit.ts` has reported *javascript: 11 authored lesson problems* in every round of this series. The
+cause is now written down: the audit asks whether an authored lesson's exercise declares
+`requiredPatterns`, which is the right question for Java, C++, and HTML/CSS — the courses whose exercises are
+graded by a browser-side **structure check** — and the wrong question for JavaScript, whose exercises are
+graded by **running the learner's code in the real Worker sandbox and comparing the output**. Those eleven
+lessons have no pattern list because they do not need one; each declares exactly one test case with an
+expected output, and `src/data/javascriptRuntime.test.ts` executes every lesson solution against that
+expectation on every test run.
+
+That claim was checked rather than assumed: the eleven solutions were executed through the shipped Worker
+source, outside the test file, and **11/11 reproduced their declared output byte for byte** — `6`;
+`3 2 1 go`; `JS: closures`; `true false`; `12.5%` and `in 3 days`; `2 15`; `42`; `200`; `&lt;tag>`;
+`AB`; `JS: architecture`. Two decisions follow, and both are deliberate:
+
+- **No structural patterns were added to those lessons.** A pattern list is a weaker check than execution,
+  and it would reject correct alternative solutions that the sandbox currently accepts.
+- **The audit tool was left as it is.** Editing a checker so that it reports fewer problems is the wrong
+  move even when the criterion is the thing at fault; the criterion and its limitation are recorded here
+  instead, with the execution evidence that answers the question it raises.
+
+### End state of the concept sweep, by course
+
+| Course | Chapters | Lessons | Authored lessons | Examples | Sweep flags at series start | Flags now | Remaining flags are |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Python | 25 | 225 | 0 (all chapters authored directly) | 462 | 0 | **0** | — |
+| Java | 25 | 155 | 34 | 319 | 21 (before this round) | **5** | environment and reasoning boundaries (Appendix S) |
+| JavaScript | 25 | 146 | 26 | 307 | 31 | **12** | browser and runtime boundaries (Appendix O) |
+| C++ | 25 | 148 | 28 | 306 | 33 | **12** | environment and reasoning boundaries (Appendix R) |
+| HTML/CSS | 25 | 143 | 27 | 289 | 23 | **0** | every planned concept is demonstrated and named, or taught by a lesson that states its own boundary (Appendix T) |
+| **Total** | **125** | **817** | **115** | **1,683** | **218 at the first sweep** | **29** | all 29 classified, none unaccounted for |
+
+### What the 29 are, in one list
+
+- **Compiler and toolchain environment (C++ 3, Java 1):** preprocessing, translation units and linking, a
+  debugger workflow, and mocking frameworks — none of which exist in a static site with no native toolchain.
+- **Reasoning and policy (C++ 9, Java 4):** invalid memory access, validation and reliability boundaries,
+  serialization and layering policy, ownership and repositories, architecture boundaries and integration —
+  decisions a project makes with tools this course never claims to run.
+- **Browser and runtime boundaries (JavaScript 12):** a real Worker in the learner's own browser,
+  configuration sources, memory and collection behaviour, DOM batching, and the accessibility standards those
+  lessons discuss rather than measure.
+
+### Final verification of the whole program
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **69 tests, all passing**, including the JavaScript runtime contract that executes
+  every JavaScript sample, starter, solution, and project in the shipped Worker.
+- `.arena-code-sweep.ts -- all` — 125 chapters, **29 named-not-shown, 0 with no trace** (218 at the start).
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, **0 failing lesson exercises, 0 failing
+  chapter projects**.
+- `.arena-audit.ts` — C++, Python, Java, HTML/CSS 0; JavaScript 11, explained above.
+- `.arena-stats.ts` — 125 chapters, 817 lessons, 115 authored lessons, 1,683 examples.
+- `npm run build` — succeeds, 3,896.91 kB (gzip 1,169.32 kB).
