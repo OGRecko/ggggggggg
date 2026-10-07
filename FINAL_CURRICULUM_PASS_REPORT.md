@@ -759,8 +759,59 @@ the criteria describe the actual solution rather than a template. Examples:
 ### Verified state at this commit
 
 - `npx tsc --noEmit` — silent.
-- `npm test` — 8 files, 69 tests, all passing (68 before, plus the new acceptance-criteria test).
-- `npm run build` — succeeds, 3,482.69 kB (gzip 1,060.05 kB).
+- `npm test` — 8 files, 69 tests, all passing.
+- `npm run build` — succeeds, 3,482.73 kB (gzip 1,060.07 kB).
 - All five courses, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
-- 25/25 Python project solutions re-executed from the built course object on CPython 3.11.2 with 0
-  output mismatches.
+
+---
+
+## Appendix H — The last two carried-over findings
+
+Two items had been measured and deliberately left open because each looked like it might be an
+artifact rather than a defect. Both were traced to their source this round, and both turned out to
+be genuine but small.
+
+### Python's one repeated example
+
+A dump of every example body in the shipped courses (1,670 examples) showed Python had exactly one
+case where two lessons shipped the same example text: chapter 21's integration lab and chapter 25's
+configuration lesson both used `import os / mode = os.getenv("CODEFORGE_MODE", "development") / print(mode)`.
+Every other repeated example in the corpus belongs to a scaffolded non-Python chapter, and **none of
+those crosses a chapter boundary**.
+
+Chapter 21's integration lesson teaches "handle a boundary deliberately", so its boundary example is
+now the validation form that decision belongs to:
+
+```python
+import os
+raw = os.getenv("CODEFORGE_MODE", "study")
+mode = raw if raw in {"study", "review"} else "study"
+print(mode)
+```
+
+Only supported modes survive; anything else falls back to the documented default, which is the rule
+chapter 21's project already applies through `argparse` choices. Executed with CPython 3.11.2: unset
+→ `study`, `review` → `review`, `broken` → `study`, matching the lesson's declared output.
+
+After the change, **Python ships 0 duplicated example texts** and the non-Python scaffold reuse is
+unchanged (210 same-chapter texts, 0 cross-chapter).
+
+### The HTML/CSS chapter-8 "gap"
+
+The plan-versus-shipped-lesson sweep (`125 chapters scanned`) reported exactly one concept with no
+textual trace anywhere in its chapter: `gaps` in the HTML/CSS Grid chapter. Reading the chapter
+showed the opposite of a gap: 9 of the 10 examples write `gap: 1rem`, and the chapter project's own
+checker requires the `gap` pattern. The plan's label was the plural noun `"gaps"` while the property
+itself is singular, so the label did not name what the chapter teaches. The concept is now listed as
+`"gap property"`, which appears in the shipped text, and **the sweep reports 0 untraced concepts
+across all 125 chapters**.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing.
+- `npm run build` — succeeds, 3,482.73 kB (gzip 1,060.07 kB).
+- All five courses, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
+- 1,670 examples dumped and grouped: Python 0 duplicated texts; non-Python 210 same-chapter, 0
+  cross-chapter.
+- Gap sweep: 125 chapters, 0 concepts with no textual trace.
