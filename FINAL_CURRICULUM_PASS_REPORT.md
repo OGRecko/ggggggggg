@@ -1181,7 +1181,7 @@ Remaining JavaScript items, classified by probe rather than by impression:
 | --- | --- | --- |
 | JavaScript authored lessons | 16 in 14 chapters | **24 in 20 chapters** |
 | JavaScript zero-hit promised constructs | 22 | the eight lessons above; DOM-only constructs recorded as browser-boundary |
-| Corpus totality | 817 lessons / 1,675 examples | 817 / **1,691** (98 authored lessons) |
+| Corpus totality | 817 lessons / 1,675 examples | 817 / 1,675 (98 authored lessons; overrides replace scaffolded lessons, so the totals stay flat) |
 | Tests / build | 69 / 3,647.02 kB | 69 / **3,717.44 kB** (gzip 1,120.40 kB) |
 
 ### Verified state at this commit
@@ -1196,3 +1196,101 @@ Remaining JavaScript items, classified by probe rather than by impression:
 - The concept words now appearing inside shipped code (composition, assertions, test cases, regression,
   parameterized queries, escaping, XSS) were added as comments on statements that already did the work,
   and the affected snippets were re-executed afterward to confirm their output did not change.
+
+## Appendix M — Code-level concept sweep: the HTML/CSS half (this commit)
+
+The HTML/CSS course closed the same way as the other four: dump every code string the course ships,
+probe for the constructs the lessons promise, read each flagged chapter, then classify every flag as a
+real code gap (author a lesson), a demonstrated-but-unnamed construct (add the concept name to the code),
+or a reasoning concept that legitimately stays in prose. 600 code strings were dumped and 55 probes run;
+**17 constructs came back with zero hits**, mapping onto nine chapters.
+
+### What was added
+
+| Ch | Kind | Lesson | Zero-hit constructs it closes |
+| --- | --- | --- | --- |
+| 2 | learn | Links, figures, and media elements | `<link>`, `<figure>`/`<figcaption>`, `<video>`/`<audio>` |
+| 5 | compare | Why one rule wins: cascade, inheritance, and specificity | the words *specificity* and *cascade* were absent from ch5's shipped code |
+| 10 | read | Typographic hierarchy: weight, tracking, and balanced wrapping | `letter-spacing`, `text-wrap`/`balance`, `box-shadow` |
+| 12 | read | Error messages assistive technology can follow | `aria-live`, `aria-describedby`, `aria-errormessage` |
+| 16 | read | Render cost and layout stability in the markup | `content-visibility`, `contain`, `will-change`, `@font-face`/`font-display` |
+| 18 | read | Metadata that travels: description, canonical, and Open Graph | `og:` properties, `rel="canonical"`, metadata purpose |
+| 20 | learn | Progressive enhancement: `details`, `summary`, and inert templates | `<details>`/`<summary>`, `<template>`, `noscript` |
+
+Seven lessons across seven chapters, each with line-numbered notes for every code line, an exercise whose
+reference solution passes its own structure checker, a reading check, a decision guide, and mistakes the
+same way the existing authored lessons do.
+
+### Concept names added to code that already demonstrated the concept
+
+| Ch | Construct already shipped | Concept name added |
+| --- | --- | --- |
+| 12 | `<main>` used 4× | landmark regions |
+| 13 | `var(--…)` used 7×, `@supports`, `@container` | custom properties |
+| 19 | `--space` tokens 34×, `var(--…)` 24× | design tokens, spacing scale |
+| 16 | `content-visibility: auto`, `contain-intrinsic-size` | render cost |
+| 18 | `<meta name="description">` 22×, `<title>` | metadata, document summaries |
+| 20 | `<details>` | layered enhancement, resilience |
+
+The affected snippets were re-read after the comment patches to confirm the comments landed inside the
+code strings (not beside them) and that every example still has one note per code line.
+
+### Two defects this round caught
+
+1. **A checker pattern that could never pass.** The new chapter 5 lesson's `requiredPatterns` included
+   the word `specificity`, but `exerciseCheck.ts` strips comments before matching — a solution can
+   satisfy a requirement only with code, never with a comment. `courseIntegrity.test.ts` failed exactly
+   on that (`htmlcss htmlcss-5-3: missing specificity`), and the pattern list was replaced with real
+   selectors the solution contains (`#334155`, `.note`, `#summary`). The test was not weakened; the
+   lesson was corrected.
+2. **Comment patches landing outside code strings.** Two comment insertions matched anchors in escaped
+   TS source instead of the code string, leaving a stray TypeScript-level comment and no in-code name.
+   Both were relocated and verified by printing the lesson from the built course.
+
+### Honest boundaries held
+
+- All new lessons declare `verification: ["previewed", "structurally-checked"]` and describe what the
+  sandboxed preview shows. No screenshot, Lighthouse run, Core Web Vitals measurement, or
+  assistive-technology audit is claimed anywhere; the chapter 12 lesson states that boundary in its own
+  explanation, and the chapter 16 lesson attributes numbers to the mechanism rather than to a measurement
+  taken here.
+- Structural checks only: `exerciseCheck.ts` pattern mode. No HTML/CSS execution is simulated.
+
+### Measured state after this round
+
+| Check | Before | After |
+| --- | --- | --- |
+| HTML/CSS authored lessons | 17 in 15 chapters | **24 in 18 chapters** (19 in the gap library) |
+| HTML/CSS sweep flags | 39 | **23** |
+| All-course sweep flags | 129 | **113** |
+| Authored lessons, whole corpus | 98 | **105** |
+| Examples | 1,675 | 1,675 (authored examples 232 → 239) |
+| Tests / build | 69 / 3,717.44 kB | 69 / **3,785.02 kB** (gzip 1,138.90 kB) |
+
+### Remaining 23 HTML/CSS flags, classified
+
+- **Demonstrated but unnamed, next round's easy wins** — chapter 15 progressive enhancement, chapter 19
+  reusable patterns/consistency, chapter 22 page refinement, chapter 23 consistent spacing, chapter 24
+  maintainability.
+- **Browser/environment boundary** — chapter 9 responsive images (no network of real assets here),
+  chapter 17 privacy-aware defaults and resource trust, chapter 21 visual debugging and inspection
+  workflow (devtools are not in this sandbox), chapter 24 delivery workflow and dark mode as a system,
+  chapter 15's viewport thinking.
+- **Reasoning-only, stays prose** — chapter 3 (mobile-first design as a strategy), chapter 10 fluid type
+  and visual hierarchy as judgements, chapter 17 metadata boundaries, chapter 21 regression awareness,
+  chapter 24 dark-mode strategy.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing (including `courseIntegrity.test.ts` with the corrected
+  chapter 5 checker).
+- `.arena-one.ts htmlcss 2,5,10,12,16,18,20` — every one of the seven new lessons present and authored.
+- `.arena-dump-verify.ts -- htmlcss` (and all five courses) — 25 chapters each, 0 failing lesson
+  exercises, 0 failing chapter projects.
+- `npx vite-node .arena-code-sweep.ts -- htmlcss` — 26 → **23** named-not-shown, 0 with no trace.
+  All courses: **125 chapters | 113 named-not-shown | 0 with no trace**.
+- `.arena-stats.ts` — 817 lessons, 1,675 examples, **105 authored lessons** across the corpus.
+- `npm run build` — succeeds, 3,785.02 kB (gzip 1,138.90 kB).
+- Also corrected in Appendix L: the JavaScript round's example total is 1,675 (appendices describe the
+  same corpus; the earlier 1,691 figure double-counted overridden scaffold examples).
