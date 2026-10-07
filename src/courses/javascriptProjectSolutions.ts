@@ -78,7 +78,7 @@ export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>
   },
   // Chapter 12: Data Structures
   12: {
-    solution: "const lookup = new Map([[\"js\", 1]]);\nconst tags = new Set([\"core\"]);\nfunction* history() {\n  yield \"open\";\n  yield \"edit\";\n}\nconsole.log(lookup.get(\"js\"), tags.has(\"core\"), history().next().value);",
+    solution: "const lookup = new Map([[\"js\", 1]]);\nconst tags = new Set([\"core\"]);\nfunction* history() {  // generators: each yield produces one value and pauses until the iterator advances\n  yield \"open\";\n  yield \"edit\";\n}\nconsole.log(lookup.get(\"js\"), tags.has(\"core\"), history().next().value);",
     solutionExplanation: "The Map answers the key lookup, the Set answers membership, and the generator yields its first label open when the iterator is advanced. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
     expected: "1 true open",
   },

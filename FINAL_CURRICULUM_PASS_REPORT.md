@@ -1365,3 +1365,83 @@ every run, 125 chapters swept each time.
 | `.arena-audit.ts` | C++/Python/Java/HTML-CSS **0 authored-lesson problems**; JavaScript 11 pre-existing vocabulary flags (unchanged all series) |
 | `.arena-stats.ts` | 817 lessons, 1,675 examples, **105 authored lessons** |
 | `npm run build` | succeeds, **3,785.02 kB** (gzip 1,138.90 kB) |
+
+## Appendix O — JavaScript residuals: a real `switch` gap and the demonstrated-but-unnamed set (this commit)
+
+Appendix N left 113 flags as documented residuals. This round went back through the JavaScript half of
+that list and split it the same way the earlier rounds did, with one difference: before classifying
+anything, each flagged concept was checked against the **whole course**, not just its chapter.
+
+### The real gap: chapter 3 promised `if and else` and `switch`, and the course shipped neither
+
+`else` appeared twice in the entire JavaScript corpus (both in chapter 7), and `switch` appeared
+**nowhere in any of the 620 code strings** in the course. A control-flow chapter that never shows the
+second branch of an `if` and never shows a `switch` is a genuine curriculum hole, not a keyword problem,
+so chapter 3 gained an authored `learn` lesson:
+
+| Ch | Kind | Lesson | What it adds |
+| --- | --- | --- | --- |
+| 3 | learn | `if, else if, else, and switch` | an `else if` chain, a `switch` with grouped labels and `default`, a deliberate fall-through, and a guard clause |
+
+Four examples, each executed in the app's real Worker sandbox with the output recorded from that run,
+including the trailing space the fall-through example leaves in its accumulator (`alert log page alert `).
+The exercise asks for both constructs and its reference solution prints `cold mild hot` then
+`ok client other`.
+
+### The demonstrated-but-unnamed set
+
+| Ch | Concept | Where the name went |
+| --- | --- | --- |
+| 1 | statement boundaries | comment on the line whose semicolon ends the statement, in the semicolon-insertion example |
+| 2 | equality and coercion, operators | comments on `== 1`, `=== 1`, and `-0 === 0` |
+| 4 | hoisting and TDZ | comments on the hoisted function declaration and on the `let` binding that is read too early |
+| 5 | arrays as ordered collections, classes and accessors | comment on the position-based destructuring, plus a new executed example: a class with a constructor, a getter and a method (`true` / `b` / `true`) |
+| 6 | string methods | comment on the `trim().toLowerCase().replace()` chain |
+| 11 | linear search, accumulation, complexity vocabulary | comments on the scan, the running total, and the O(n) reading of the loop |
+| 12 | generators | comment on `function* history()` in the chapter 12 project solution |
+| 13 | pure functions, immutability, data flow | a new authored `learn` lesson with three executed examples: an impure function exposed by the shared array it writes to (`log.length` is 1), three non-mutating array operations, and a map/filter/reduce pipeline |
+| 17 | rendering from data | comment on the derived-view sample in the JavaScript sample bank |
+| 23 | advanced object behavior | comment on the hand-written iterator protocol |
+
+Two process notes, both caught before commit. The first generator comment landed on the chapter 23
+`Countdown` example instead of chapter 12's real generator, which the sweep showed immediately by still
+flagging chapter 12; the comment was moved to `function* history()`. And the lesson emitter produced two
+missing commas, which `npx tsc --noEmit` reported before any test ran — a reminder that a lesson that
+parses is the first honest check.
+
+### Measured state after this round
+
+| Check | Before | After |
+| --- | --- | --- |
+| JavaScript sweep flags | 31 (start of the series) → 24 (after Appendix M's sibling round) | **12** |
+| All five courses named-not-shown | 113 | **94** |
+| Authored lessons (corpus) | 105 | **107** |
+| Examples | 1,675 | **1,679** |
+| Tests / build | 69 / 3,785.02 kB | 69 / **3,810.63 kB** (gzip 1,146.29 kB) |
+
+### The 12 remaining JavaScript flags, classified
+
+- **Browser boundary** — chapter 1 browser Worker execution; chapter 7 form boundaries (the sandbox has
+  no DOM); chapter 17 batching and minimal DOM work and unnecessary re-rendering; chapter 20 memory leaks
+  and render batching; chapter 22 standards-aware enhancement; chapter 25 stateful browser UI, async
+  updates, accessible safe rendering. These belong with the HTML/CSS preview, not with a Worker that has
+  no DOM.
+- **Environment boundary** — chapter 18 configuration (no server process in this sandbox).
+- **Reasoning only** — chapter 8 debugging workflow, which is a human sequence of steps rather than a
+  construct the code can demonstrate.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing; `javascriptRuntime.test.ts` executed the new rows (the
+  chapter 3 lesson's four examples, starter and solution, the chapter 13 lesson's three examples, starter
+  and solution, the chapter 5 class example, and the chapter 12 project solution) in the real Worker
+  sandbox and matched every declared output.
+- `.arena-one.ts javascript 1,6,11,12,13,23` — the authored lessons are in place, including the two new
+  ones at chapters 3 and 13.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **94 named-not-shown, 0 with no trace**.
+- `.arena-audit.ts` — C++/Python/Java/HTML-CSS 0 problems; JavaScript's 11 pre-existing vocabulary flags
+  are unchanged.
+- `npm run build` — succeeds, 3,810.63 kB (gzip 1,146.29 kB).

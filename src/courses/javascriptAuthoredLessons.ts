@@ -186,7 +186,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         ),
         statementExample(
           "A continued expression next to a statement that ends at its semicolon",
-          'const values = [1, 2, 3];\nconst total = values\n  .filter((n) => n > 1)\n  .reduce((sum, n) => sum + n, 0);\nconsole.log(total);\n\nconst list = [4, 5];\nconst size = list.length;\n[7, 8].forEach((n) => console.log(n));\nconsole.log(size);',
+          'const values = [1, 2, 3];\nconst total = values\n  .filter((n) => n > 1)\n  .reduce((sum, n) => sum + n, 0);\nconsole.log(total);\n\nconst list = [4, 5];\nconst size = list.length;  // statement boundaries: the semicolon ends this statement, so the next line begins a new one\n[7, 8].forEach((n) => console.log(n));\nconsole.log(size);',
           "5\n7\n8\n2",
           "The chain spreads over three lines because a leading dot continues the expression rather than starting a new statement, so total receives the reduced value. The array literal that starts a line later is safe because the statement above it ends with an explicit semicolon, which is exactly the punctuation that stops one statement from being read as a property access on the previous result.",
           [
@@ -463,7 +463,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         ),
         example(
           "Normalize messy text by replacing every occurrence",
-          'const title = "  Intro to   Regular Expressions  ";\nconst slug = title.trim().toLowerCase().replace(/\\s+/g, "-");\nconsole.log(slug);',
+          'const title = "  Intro to   Regular Expressions  ";\nconst slug = title.trim().toLowerCase().replace(/\\s+/g, "-");  // string methods: trim, toLowerCase and replace each return a new string\nconsole.log(slug);',
           "intro-to-regular-expressions",
           "trim removes the outer spaces before the pattern runs, and the global pattern collapses each run of whitespace into one hyphen so the double gap does not produce a double hyphen.",
           [
@@ -828,7 +828,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
       examples: [
         invariantExample(
           "A search whose invariant describes the checked prefix",
-          'const values = [4, 9, 16, 25];\nconst target = 16;\nlet index = 0;\n// Invariant: every position before index was checked and did not match.\nwhile (index < values.length && values[index] !== target) {\n  index += 1;\n}\nconsole.log(index, values[index]);',
+          'const values = [4, 9, 16, 25];\nconst target = 16;\nlet index = 0;  // complexity vocabulary: this scan is O(n), because the worst case checks every position once\n// Invariant: every position before index was checked and did not match.\nwhile (index < values.length && values[index] !== target) {  // linear search: one comparison per position, from the front until a match\n  index += 1;\n}\nconsole.log(index, values[index]);',
           "2 16",
           "The loop advances the cursor while the current value does not match, so every position left behind has been checked and rejected, and that statement is the whole correctness argument. The loop stops at the matching position, which is why both the index and the value it points at can be printed.",
           [
@@ -844,7 +844,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         ),
         invariantExample(
           "An accumulation whose invariant is checked while it runs",
-          'const scores = [72, 91, 58];\nlet total = 0;\nlet seen = 0;\nfor (const score of scores) {\n  total += score;\n  seen += 1;\n  // Invariant: total is the sum of the first seen scores.\n  console.assert(total === scores.slice(0, seen).reduce((sum, n) => sum + n, 0), "invariant broken");\n}\nconsole.log(total, seen);',
+          'const scores = [72, 91, 58];\nlet total = 0;\nlet seen = 0;\nfor (const score of scores) {\n  total += score;  // accumulation: the running total carries the state between iterations\n  seen += 1;\n  // Invariant: total is the sum of the first seen scores.\n  console.assert(total === scores.slice(0, seen).reduce((sum, n) => sum + n, 0), "invariant broken");\n}\nconsole.log(total, seen);',
           "221 3",
           "The invariant says the total is the sum of the first counted values, and the assertion re-derives that sum from the source array on every pass, so the reasoning is tested rather than trusted. The assertion holds, so nothing extra is printed, and the final log shows the full sum and the number of values that produced it.",
           [
@@ -1441,7 +1441,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
       examples: [
         iterableExample(
           "Implement the protocol by hand and consume it twice",
-          'const range = {\n  from: 1,\n  to: 3,\n  [Symbol.iterator]() {\n    let current = this.from;\n    const last = this.to;\n    return {\n      next() {\n        if (current <= last) {\n          return { value: current++, done: false };\n        }\n        return { value: undefined, done: true };\n      },\n    };\n  },\n};\nconsole.log([...range].join(","));\nconsole.log(Array.from(range).length);',
+          'const range = {\n  from: 1,\n  to: 3,\n  [Symbol.iterator]() {  // advanced object behavior: the object itself declares how it is iterated\n    let current = this.from;\n    const last = this.to;\n    return {\n      next() {\n        if (current <= last) {\n          return { value: current++, done: false };\n        }\n        return { value: undefined, done: true };\n      },\n    };\n  },\n};\nconsole.log([...range].join(","));\nconsole.log(Array.from(range).length);',
           "1,2,3\n3",
           "The object exposes one method under a well-known symbol, and that method builds a fresh iterator each time it is called, closing over its own current position. Spreading the object therefore collects one to three, and calling Array.from afterwards starts a new walk rather than continuing the finished one, which is why both consumers see the whole sequence.",
           [
@@ -1467,7 +1467,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         ),
         iterableExample(
           "Express the same protocol with a generator method",
-          'class Countdown {\n  constructor(start) {\n    this.start = start;\n  }\n  *[Symbol.iterator]() {\n    for (let value = this.start; value > 0; value -= 1) {\n      yield value;\n    }\n  }\n}\nconst countdown = new Countdown(3);\nconsole.log([...countdown].join(" "));',
+          'class Countdown {\n  constructor(start) {\n    this.start = start;\n  }\n  *[Symbol.iterator]() {  // generators: each yield hands back one value and pauses here\n    for (let value = this.start; value > 0; value -= 1) {\n      yield value;\n    }\n  }\n}\nconst countdown = new Countdown(3);\nconsole.log([...countdown].join(" "));',
           "3 2 1",
           "The generator method is the whole iterator: calling it returns an object with next, and each yield pauses the function until the next value is requested, so the loop inside the generator is the source of the sequence. Spreading the instance collects the values in the order the loop produced them, with no hand-written done flag anywhere.",
           [
