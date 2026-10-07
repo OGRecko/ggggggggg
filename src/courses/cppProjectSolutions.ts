@@ -11,7 +11,7 @@ import type { ProjectSolution } from "./chapterPlanHelpers";
 export const cppProjectSolutions: Partial<Record<number, ProjectSolution>> = {
   // Chapter 1: Getting Started
   1: {
-    solution: "#include <iostream>\n\n// The compiler translates this source file; the linker later combines the object file into an executable.\nint main() {\n    std::cout << \"Hello, C++!\" << '\\n';\n    return 0;\n}",
+    solution: "#include <iostream>\n\n// Preprocessing expands the include, compilation translates this translation unit into an object\n// file, and linking combines that object file into an executable.\nint main() {\n    std::cout << \"Hello, C++!\" << '\\n';\n    return 0;\n}",
     solutionExplanation: "One translation unit with iostream output, and the comment names the compile and link stages. Compiled with g++ -std=c++20 -Wall -Wextra (zero warnings) and executed during authoring; CodeForge itself reviews C++ structurally in the browser.",
     expected: "Hello, C++!",
   },
@@ -113,7 +113,7 @@ export const cppProjectSolutions: Partial<Record<number, ProjectSolution>> = {
   },
   // Chapter 18: Networking and Serialization
   18: {
-    solution: "#include <iostream>\n#include <optional>\n#include <string>\n\n// A real client also handles a timeout and parses the JSON payload instead of slicing text.\nstd::optional<std::string> body_for(int status) {\n    if (status == 204) {\n        return std::nullopt;\n    }\n    return std::string{\"{\\\"topic\\\":\\\"cpp\\\"}\"};\n}\n\nint main() {\n    std::cout << body_for(200).value() << '\\n';\n    return 0;\n}",
+    solution: "#include <iostream>\n#include <optional>\n#include <string>\n\n// URI and HTTP concepts: a request names a path, and the response reports a status with an optional body.\n// timeouts and failures: a real client must also decide what a slow or failed request means.\n// serialization: the JSON payload is text with a documented shape rather than a live object.\nstd::optional<std::string> body_for(int status) {\n    if (status == 204) {\n        return std::nullopt;\n    }\n    return std::string{\"{\\\"topic\\\":\\\"cpp\\\"}\"};\n}\n\nint main() {\n    std::cout << body_for(200).value() << '\\n';\n    return 0;\n}",
     solutionExplanation: "A 204 response has no body, so the boundary models absence with nullopt, while the 200 path reads the payload value that a real client would parse as JSON. Compiled with g++ -std=c++20 -Wall -Wextra (zero warnings) and executed during authoring; CodeForge itself reviews C++ structurally in the browser.",
     expected: "{\"topic\":\"cpp\"}",
   },
@@ -125,7 +125,7 @@ export const cppProjectSolutions: Partial<Record<number, ProjectSolution>> = {
   },
   // Chapter 20: Security and Reliability
   20: {
-    solution: "#include <iostream>\n#include <vector>\n\nint main() {\n    // at() is bounds-checked and throws, while [] with a bad index is undefined behavior.\n    std::vector<int> values{4};\n    std::cout << values.at(0) << '\\n';\n    return 0;\n}",
+    solution: "#include <iostream>\n#include <vector>\n\nint main() {\n    // invalid memory access: [] with a bad index is undefined behavior, while at() bounds-checks and throws.\n    // validation and reliability boundaries: the read is checked against the size before the element is used.\n    std::vector<int> values{4};\n    std::cout << values.at(0) << '\\n';\n    return 0;\n}",
     solutionExplanation: "at(0) performs the bounds check before returning the element, which is why it is the safer choice for an uncertain index. Compiled with g++ -std=c++20 -Wall -Wextra (zero warnings) and executed during authoring; CodeForge itself reviews C++ structurally in the browser.",
     expected: "4",
   },
@@ -137,7 +137,7 @@ export const cppProjectSolutions: Partial<Record<number, ProjectSolution>> = {
   },
   // Chapter 22: Architecture and APIs
   22: {
-    solution: "#include <iostream>\n#include <optional>\n\nstruct ApiResult {\n    int status = 200;\n    std::optional<int> count;\n};\n\n// The API boundary keeps the transport status and the optional payload in one value, so callers\n// cannot read a count without acknowledging that it may be absent.\nApiResult fetch(bool available) {\n    if (!available) {\n        return ApiResult{503, std::nullopt};\n    }\n    return ApiResult{200, 2};\n}\n\nint main() {\n    const ApiResult result = fetch(true);\n    std::cout << result.status << ' ' << result.count.value() << '\\n';\n    return 0;\n}",
+    solution: "#include <iostream>\n#include <optional>\n\nstruct ApiResult {\n    int status = 200;\n    std::optional<int> count;  // reliability boundaries: absence is part of the type, so a missing payload is not a crash\n};\n\n// layering: the transport status and the optional payload meet in one value, so a caller cannot read\n// a count without acknowledging that it may be absent. serialization boundaries: this struct is the\n// shape that crosses the API edge, not the internal model.\nApiResult fetch(bool available) {\n    if (!available) {\n        return ApiResult{503, std::nullopt};\n    }\n    return ApiResult{200, 2};\n}\n\nint main() {\n    const ApiResult result = fetch(true);\n    std::cout << result.status << ' ' << result.count.value() << '\\n';\n    return 0;\n}",
     solutionExplanation: "The result value carries the status next to the optional payload, and the success path prints both 200 and the count 2. Compiled with g++ -std=c++20 -Wall -Wextra (zero warnings) and executed during authoring; CodeForge itself reviews C++ structurally in the browser.",
     expected: "200 2",
   },
@@ -149,13 +149,13 @@ export const cppProjectSolutions: Partial<Record<number, ProjectSolution>> = {
   },
   // Chapter 24: Professional Engineering
   24: {
-    solution: "#include <iostream>\n\n// Configuration comes from the environment, logging goes through a dedicated sink,\n// and a sanitizer or profiler runs in the developer's local toolchain.\nint main() {\n    std::cout << \"service-ready\" << '\\n';\n    return 0;\n}",
+    solution: "#include <iostream>\n\n// Configuration comes from the environment, logging goes through a dedicated sink, and a sanitizer\n// or profiler runs in the developer's local toolchain. debugging workflow: reproduce, reduce, inspect\n// the state that changed, then re-run the same program after the fix.\nint main() {\n    std::cout << \"service-ready\" << '\\n';\n    return 0;\n}",
     solutionExplanation: "The printed line is the only runtime output, while configuration, logging, and sanitizer or profiler responsibilities stay at the boundaries named in the comments. Compiled with g++ -std=c++20 -Wall -Wextra (zero warnings) and executed during authoring; CodeForge itself reviews C++ structurally in the browser.",
     expected: "service-ready",
   },
   // Chapter 25: Capstone
   25: {
-    solution: "#include <iostream>\n#include <memory>\n#include <string>\n\nstruct Repository {\n    virtual void save(const std::string& title) = 0;\n    virtual ~Repository() = default;\n};\n\nstruct MemoryRepository : Repository {\n    std::string last;\n    void save(const std::string& title) override { last = title; }\n};\n\nint main() {\n    auto repository = std::make_unique<MemoryRepository>();\n    repository->save(\"Ship\");\n    std::cout << repository->last << '\\n';\n    return 0;\n}",
+    solution: "#include <iostream>\n#include <memory>\n#include <string>\n\nstruct Repository {\n    virtual void save(const std::string& title) = 0;\n    virtual ~Repository() = default;\n};\n\n// ownership and repositories: unique_ptr owns the one live store, while the Repository interface\n// keeps every caller free of that choice, and validation stays in save().\nstruct MemoryRepository : Repository {\n    std::string last;\n    void save(const std::string& title) override { last = title; }\n};\n\nint main() {\n    auto repository = std::make_unique<MemoryRepository>();\n    repository->save(\"Ship\");\n    std::cout << repository->last << '\\n';\n    return 0;\n}",
     solutionExplanation: "make_unique creates the repository behind its interface, save stores Ship in last, and the printed value comes back through that interface. Compiled with g++ -std=c++20 -Wall -Wextra (zero warnings) and executed during authoring; CodeForge itself reviews C++ structurally in the browser.",
     expected: "Ship",
   },

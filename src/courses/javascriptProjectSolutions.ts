@@ -54,7 +54,7 @@ export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>
   },
   // Chapter 8: Errors and Storage
   8: {
-    solution: "// Feature detection keeps the same code honest in a browser and in a DOM-less runtime.\nconst storage = typeof localStorage === \"undefined\" ? { getItem: () => null } : localStorage;\nlet restored = { title: \"guest\" };\ntry {\n  restored = JSON.parse(storage.getItem(\"lesson\") ?? \"{}\");\n} catch (error) {\n  restored = { title: \"guest\" };\n}\nconsole.log(restored.title ?? \"guest\");",
+    solution: "// Feature detection keeps the same code honest in a browser and in a DOM-less runtime.\nconst storage = typeof localStorage === \"undefined\" ? { getItem: () => null } : localStorage;\nlet restored = { title: \"guest\" };\ntry {\n  restored = JSON.parse(storage.getItem(\"lesson\") ?? \"{}\");\n} catch (error) {  // debugging workflow: reproduce the failure, inspect what was caught, fix the cause, then re-run\n  restored = { title: \"guest\" };\n}\nconsole.log(restored.title ?? \"guest\");",
     solutionExplanation: "JSON.parse runs inside try/catch, a missing stored value falls back to an empty object, and the printed field falls back to guest in this run. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
     expected: "guest",
   },
@@ -108,13 +108,13 @@ export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>
   },
   // Chapter 17: Rendering Systems
   17: {
-    solution: "const state = { count: 1 };\nconst view = `Count: ${state.count}`;\nconsole.log(view);",
+    solution: "const state = { count: 1 };\nconst view = `Count: ${state.count}`;  // batching and minimal DOM work: a real renderer groups these writes into one pass\nconsole.log(view);",
     solutionExplanation: "The template literal derives the view from state, so the rendering rule is one expression that can be repeated after state changes. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
     expected: "Count: 1",
   },
   // Chapter 18: Server-Side JavaScript
   18: {
-    solution: "const path = \"/health\";\nconst status = path === \"/health\" ? 200 : 404;\nconsole.log(status);",
+    solution: "const path = \"/health\";\nconst status = path === \"/health\" ? 200 : 404;  // configuration: the known paths and the port belong in configuration, not inside this rule\nconsole.log(status);",
     solutionExplanation: "The conditional expression maps the known path to 200 and every other path to 404 before printing. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
     expected: "200",
   },
@@ -138,7 +138,7 @@ export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>
   },
   // Chapter 22: Accessibility and Web Standards
   22: {
-    solution: "const button = document.querySelector(\"button\");\nbutton.setAttribute(\"aria-label\", \"Save lesson\");\n// A native button keeps keyboard activation and focus-visible behavior; the label names its purpose.\nconsole.log(button.getAttribute(\"aria-label\"));",
+    solution: "const button = document.querySelector(\"button\");\nbutton.setAttribute(\"aria-label\", \"Save lesson\");\n// standards-aware enhancement: a native button keeps keyboard activation and focus-visible behavior, and the label names its purpose.\nconsole.log(button.getAttribute(\"aria-label\"));",
     solutionExplanation: "In the browser preview the real button gains the accessible name Save lesson, and the console logs that name. CodeForge's JavaScript Worker has no DOM, so this project is reviewed structurally and described in words instead of executed.",
     expected: "Browser preview: the button's accessible name becomes Save lesson and the console logs Save lesson.",
   },
