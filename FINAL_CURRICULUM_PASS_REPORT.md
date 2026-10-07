@@ -600,8 +600,108 @@ metadata problem.
 ### Verified state at this commit
 
 - `npx tsc --noEmit` — silent.
-- `npm test` — 8 files, 67 tests, all passing.
-- `npm run build` — succeeds, 3,392.61 kB (gzip 1,036.70 kB).
+- `npm test` — 8 files, 68 tests, all passing.
+- `npm run build` — succeeds, 3,477.50 kB (gzip 1,058.66 kB).
 - Every course, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
-- Python lesson kinds: 128 learn, 25 integration, 25 case-study, 25 challenge, 1 debug; all 25
-  chapters marked major.
+
+---
+
+## Appendix F — Python debugging labs
+
+Appendix E closed with one honest finding: **21 of the 25 Python chapters had no lesson whose
+activity was diagnosis and repair.** Chapters 1 (Read errors and inspect values), 2, 10, and 14
+already had debugging coverage; chapters 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 17, 18, 19, 20,
+21, 22, 23, 24, and 25 had none. This appendix answers that finding by authoring one debugging
+lab per missing chapter — real lessons with a broken program, its repair, and an exercise that
+requires the learner to write the repair — rather than by relabelling anything that already
+existed.
+
+### What each lab contains
+
+Every lab follows the same authored shape, and every field is written from the code the lesson
+ships:
+
+- a **broken program**, its **actual printed output**, and one reasoning note per code line;
+- a **repaired program** with its own output and one note per line;
+- an **exercise** that asks for the repair, with a starter, a shipped solution that prints the
+  declared result, three hints, and a named test case;
+- goals, three keyword notes, three recap points, and two decision-guide rows per lab.
+
+### The 21 defects
+
+| Ch | Chapter | Lab | Broken program | Repaired program |
+| --- | --- | --- | --- | --- |
+| 3 | Control the path | stop the search when the goal is met | `continue` keeps scanning | `break` exits on the first match |
+| 4 | Functions and Scope | a default value that is shared | `items=[]` remembers the last call | `items=None` sentinel + fresh list |
+| 5 | Collections I | changing a dictionary while reading it | `del` inside iteration → `RuntimeError` | collect keys first, then delete |
+| 6 | Strings and Text Processing | a pattern that matches too much | `re.search` accepts extra text | `re.fullmatch` anchors the rule |
+| 7 | Files and Exceptions | naming the exception correctly | `except ValueError` never runs | `except FileNotFoundError` returns the fallback |
+| 8 | Modules and Packages | an import that only exists inside a function | second helper raises `NameError` | module-level import shared by both |
+| 9 | Object-Oriented Programming I | an initializer that forgot self | `minutes = minutes` → `AttributeError` | `self.minutes = minutes` |
+| 11 | Algorithms I | removing from a list while iterating | adjacent invalid values skip one | comprehension builds the kept list |
+| 12 | Data Structures | a key that cannot be hashed | list key → `TypeError` | tuple key finds the record |
+| 13 | Functional Python | a generator that was already consumed | second pass returns `[]` | call the factory twice |
+| 15 | Type Hints and Maintainability | an annotation that was never enforced | `"3" * 11` prints `33` | `isinstance` guard rejects the text |
+| 16 | Networking and APIs | a URL built by joining text | space survives in the query | `urlencode` escapes the value |
+| 17 | Databases | a value pasted into SQL text | apostrophe breaks the statement | bound `?` parameter inserts the row |
+| 18 | Concurrency | a coroutine that was never awaited | result is a `coroutine` object | `await` produces the string |
+| 19 | Memory and Performance | a cache that ignored a changed setting | `lru_cache` returns the stale `6` | rate becomes an argument → `30` |
+| 20 | Security and Reliability | escaping that handled one character | quotes and `>` stay live | `escape` from `html` covers the rule |
+| 21 | Command-Line Applications | reading an option that was never declared | `args.mode` raises `AttributeError` | declare `--mode` with a default |
+| 22 | Web Application Foundations | markup built before validation | untrusted `<script>` becomes markup | validate, escape, then wrap |
+| 23 | Advanced Language Features | cleanup that was skipped on an exception | teardown never prints | `try/finally` around the `yield` |
+| 24 | Professional Engineering | a swallowed failure that resurfaced elsewhere | `None` fails two lines later | raise at the boundary with `from error` |
+| 25 | Capstone | a shared default list in a data model | `tasks: list = []` → `ValueError` | `field(default_factory=list)` |
+
+### Where the labs sit and why
+
+`buildChapter` in `src/courses/pythonAdvanced.ts` previously assembled a fixed array and appended
+the deep-dive gap material at a hardcoded order 8. It now builds one contiguous order list:
+slots 1-4 learn, slot 5 integration, slot 6 case study, slot 7 challenge, **slot 8 the debugging lab
+with `kind: "debug"`**, then the gap deep dives and the `pythonGapLessons` entries. Chapters 1-3 are
+assembled by `python.ts`, whose extension step now labels each extra lesson with the activity it
+actually is, so chapter 3 receives its lab the same way. No existing lesson lost an order or an id,
+and the UI already renders `kind: "debug"` as "Debug" (`src/App.tsx`).
+
+### Evidence
+
+The text and code in `src/courses/pythonDebugLabs.ts` (1,118 lines, 21 labs) are not asserted from
+memory:
+
+- Each lab's **broken program, repaired program, and exercise solution were executed with a local
+  CPython 3.11.2 interpreter**, and every printed result matched the output the lesson declares.
+  The labs dump their shipped examples and solutions from the built course object, so what was
+  executed is exactly what the app renders.
+- Two data defects were caught and corrected during that verification: chapter 11's first value
+  list let the broken filter skip nothing (`[3, -1, -2, 4, 5]` is used so the skip is observable),
+  and chapter 24's `load_port("8080").bit_length()` printed `13` because integers have that method,
+  so the fallback is stored in a variable first.
+- A prose-to-code check over the labs' goals, keyword notes, explanations, guides, and recaps found
+  every code-named construct present in the lesson's own code. Two documented exceptions: chapter
+  17 names `OperationalError`, which is the declared output of the broken program rather than a
+  line of it, and chapter 1's pre-existing debugging lesson says "escape characters" as English
+  prose.
+- `courseIntegrity.test.ts` gains one test that keeps this honest: every Python chapter must have
+  debugging coverage, the course must ship at least 21 `debug` labs, each lab must carry two
+  examples with one line note per code line and a solution with a declared expected output, and no
+  two labs may ship the same example code.
+
+### Measured state after this round
+
+| Course | Lessons | Python kinds | Missing debugging | Repetition findings |
+| --- | --- | --- | --- | --- |
+| Python | 225 (was 204) | 128 learn, 22 debug, 25 integration, 25 case-study, 25 challenge | **[] (was 21 chapters)** | 170 (all chapter-to-cumulative-checkpoint, unchanged) |
+| Java / JavaScript / C++ / HTML-CSS | unchanged | unchanged | [] | 0 |
+
+Every other educational dimension stays covered (`missingPrediction`, `missingBlankPage`,
+`missingEdgeCase` all empty), all 25 Python chapters remain `major`, and the one remaining
+pre-existing finding for Python is the by-design reuse of cumulative checkpoint questions.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 68 tests, all passing (67 before, plus the new debugging-coverage test).
+- `npm run build` — succeeds, 3,477.50 kB (gzip 1,058.66 kB).
+- All five courses, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
+- 21 shipped labs re-executed from the built course object on CPython 3.11.2 with 0 output
+  mismatches.

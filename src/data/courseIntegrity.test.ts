@@ -403,6 +403,38 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("keeps Python debugging coverage in authored labs that show a broken program and its repair", () => {
+    const python = courseById("python")!;
+    const summary = summarizeCourseQuality(python);
+    expect(summary.educationalCompleteness.chaptersMissingDebugging).toEqual([]);
+
+    const debugLabs = python.chapters.flatMap((chapter) => chapter.lessons).filter((lesson) => lesson.kind === "debug");
+    expect(debugLabs.length).toBeGreaterThanOrEqual(21);
+
+    const exampleCodes: string[] = [];
+    for (const lab of debugLabs) {
+      // A debugging lab must ship the failing program and the repaired program, each with one
+      // authored line note per code line, plus a solution and the expected output it produces.
+      expect(lab.examples.length).toBeGreaterThanOrEqual(2);
+      expect(lab.exercise.solution.trim().length).toBeGreaterThan(20);
+      expect(lab.exercise.testCases[0]?.expected.trim().length).toBeGreaterThan(0);
+      for (const example of lab.examples) {
+        expect(example.lines.length).toBe(example.code.split("\n").length);
+        expect(example.lines.every((line) => line.length > 30)).toBe(true);
+        exampleCodes.push(example.code);
+      }
+    }
+    // The labs authored for chapters 3-25 each guide the repair with three hints; the chapter-1
+    // debugging lesson predates them, so it is held only to the shared structural checks above.
+    const authoredDebugLabs = debugLabs.filter((lesson) => lesson.chapter >= 3);
+    expect(authoredDebugLabs.length).toBeGreaterThanOrEqual(21);
+    for (const lab of authoredDebugLabs) {
+      expect(lab.exercise.hints.length).toBeGreaterThanOrEqual(3);
+    }
+    // Authored labs describe different defects instead of reusing one example body.
+    expect(new Set(exampleCodes).size).toBe(exampleCodes.length);
+  });
+
   it("keeps default scaffold samples aligned with late-course chapter topics", () => {
     const java = courseById("java")!;
     const javaConcurrencyRead = java.chapters[15].lessons.find((lesson) => lesson.kind === "read");

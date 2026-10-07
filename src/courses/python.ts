@@ -1,6 +1,8 @@
-import type { Chapter, Course, Lesson } from "../data/types";
+import type { Chapter, Course, Lesson, LessonKind } from "../data/types";
+import type { LessonSeed } from "./pythonAdvanced";
 import { makeLesson, pythonAdvancedChapters } from "./pythonAdvanced";
 import { foundationDeepDives } from "./pythonFoundations";
+import { pythonDebugLabs } from "./pythonDebugLabs";
 import { pythonGapLessons } from "./pythonGaps";
 
 const helloWorld: Lesson = {
@@ -458,15 +460,22 @@ const withReadingCheck = (lesson: Lesson): Lesson => {
   };
 };
 
-const chaptersWithGapLessons: Chapter[] = chapters.map((chapter) => {
-  // Chapters 4-25 are assembled by the advanced builder, which already appends
-  // its own gap lessons. Only the foundational chapters 1-3 are extended here.
-  const extras = chapter.number <= 3 ? pythonGapLessons[chapter.number] ?? [] : [];
+const chaptersWithExtraLessons: Chapter[] = chapters.map((chapter) => {
+  // Chapters 4-25 are assembled by the advanced builder, which places its own debugging labs and
+  // gap lessons. Only the foundational chapters 1-3 receive their extra lessons here, and each one
+  // is labelled with the activity it actually is.
+  const extras: { seed: LessonSeed; kind: LessonKind }[] =
+    chapter.number <= 3
+      ? [
+          ...(pythonDebugLabs[chapter.number] ? [{ seed: pythonDebugLabs[chapter.number], kind: "debug" as LessonKind }] : []),
+          ...(pythonGapLessons[chapter.number] ?? []).map((seed) => ({ seed, kind: "learn" as LessonKind })),
+        ]
+      : [];
   if (!extras.length) return chapter;
   const startOrder = chapter.lessons.length + 1;
   return {
     ...chapter,
-    lessons: [...chapter.lessons, ...extras.map((seed, index) => makeLesson(chapter.number, seed, startOrder + index, "learn"))],
+    lessons: [...chapter.lessons, ...extras.map((entry, index) => makeLesson(chapter.number, entry.seed, startOrder + index, entry.kind))],
   };
 });
 
@@ -477,5 +486,5 @@ export const pythonCourse: Course = {
   accent: "#5b6fe8",
   icon: "Py",
   description: "Build from your first output to production-ready Python with deliberate practice.",
-  chapters: chaptersWithGapLessons.map((chapter) => ({ ...chapter, lessons: chapter.lessons.map(withReadingCheck) })),
+  chapters: chaptersWithExtraLessons.map((chapter) => ({ ...chapter, lessons: chapter.lessons.map(withReadingCheck) })),
 };

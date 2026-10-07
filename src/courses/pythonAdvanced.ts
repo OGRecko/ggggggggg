@@ -1,4 +1,5 @@
 import type { Chapter, ChapterTest, Example, Exercise, Lesson, LessonKind } from "../data/types";
+import { pythonDebugLabs } from "./pythonDebugLabs";
 import { pythonGapLessons } from "./pythonGaps";
 
 type ExampleSeed = {
@@ -100,13 +101,29 @@ let challengeLessons: Record<number, LessonSeed> = {};
 let gapLessons: Record<number, LessonSeed> = {};
 
 function buildChapter(seed: ChapterSeed): Chapter {
+  // Slots 1-4 are the authored learn lessons, slot 5 the integration workflow, slot 6 the case
+  // study, and slot 7 the challenge. Slot 8 belongs to the authored debugging lab where the
+  // chapter has one, so the activity a learner meets is named by the slot that built it. The
+  // deep-dive gap material then continues after the lab, which keeps every order contiguous.
+  const lessons: Lesson[] = [
+    makeLesson(seed.number, seed.lesson, 1, "learn"),
+    makeLesson(seed.number, masteryLessons[seed.number], 2, "learn"),
+    makeLesson(seed.number, appliedLessons[seed.number], 3, "learn"),
+    makeLesson(seed.number, implementationLessons[seed.number], 4, "learn"),
+    makeLesson(seed.number, integrationLessons[seed.number], 5, "integration"),
+    makeLesson(seed.number, caseStudyLessons[seed.number], 6, "case-study"),
+    makeLesson(seed.number, challengeLessons[seed.number], 7, "challenge"),
+  ];
+  let order = 8;
+  if (pythonDebugLabs[seed.number]) lessons.push(makeLesson(seed.number, pythonDebugLabs[seed.number], order++, "debug"));
+  if (gapLessons[seed.number]) lessons.push(makeLesson(seed.number, gapLessons[seed.number], order++, "learn"));
+  for (const gapLesson of pythonGapLessons[seed.number] ?? []) lessons.push(makeLesson(seed.number, gapLesson, order++, "learn"));
   return {
     number: seed.number,
     title: seed.title,
     description: seed.description,
     major: true,
-    lessons: [makeLesson(seed.number, seed.lesson, 1, "learn"), makeLesson(seed.number, masteryLessons[seed.number], 2, "learn"), makeLesson(seed.number, appliedLessons[seed.number], 3, "learn"), makeLesson(seed.number, implementationLessons[seed.number], 4, "learn"), makeLesson(seed.number, integrationLessons[seed.number], 5, "integration"), makeLesson(seed.number, caseStudyLessons[seed.number], 6, "case-study"), makeLesson(seed.number, challengeLessons[seed.number], 7, "challenge"), ...(gapLessons[seed.number] ? [makeLesson(seed.number, gapLessons[seed.number], 8)] : []),
-      ...(pythonGapLessons[seed.number] ?? []).map((lesson, index) => makeLesson(seed.number, lesson, (gapLessons[seed.number] ? 9 : 8) + index, "learn"))],
+    lessons,
     project: seed.project,
     test: seed.test,
     cumulativeTest: seed.number % 5 === 0 ? cumulativeQuestions(seed.number) : undefined,
