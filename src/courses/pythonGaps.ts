@@ -260,6 +260,21 @@ const gapLessonRoundOne: Record<number, LessonSeed[]> = {
             "Line 7: The call passes a real member, so the function returns locked for a published lesson.",
           ],
         },
+        {
+          title: "See a misspelled member fail",
+          code: 'from enum import Enum\nclass Status(Enum):\n    DRAFT = \"draft\"\ntry:\n    Status.DRAF\nexcept AttributeError as error:\n    print(type(error).__name__)',
+          output: "AttributeError",
+          explanation: "A misspelled enum member raises AttributeError at the point of use, so a typo becomes a loud failure instead of a comparison that silently never matches. Printing the exception type keeps the evidence stable across Python versions.",
+          reasons: [
+            "Line 1: the import makes Enum available to the class below.",
+            "Line 2: the class declares the closed set of names this example reads from.",
+            "Line 3: one member is enough to show what a misspelled lookup does.",
+            "Line 4: the lookup is wrapped because the failure is the point of the example.",
+            "Line 5: DRAF is not a declared member, so the attribute lookup fails immediately rather than producing a value.",
+            "Line 6: AttributeError is the exact error Python raises for an unknown member.",
+            "Line 7: printing the type name proves the failure is the documented loud one, not a silent no-match.",
+          ],
+        },
       ],
       exercise: {
         prompt: "Define Priority(Enum) with LOW = 1 and HIGH = 2. Print Priority.HIGH.name and then Priority.LOW.value.",
@@ -426,6 +441,22 @@ const gapLessonRoundOne: Record<number, LessonSeed[]> = {
             "Line 8: The weak reference now returns None, which is the signal that the target has been collected.",
           ],
         },
+        {
+          title: "See the missing weak-reference slot fail",
+          code: 'import weakref\nclass Locked:\n    __slots__ = (\"value\",)\nitem = Locked()\ntry:\n    weakref.ref(item)\nexcept TypeError as error:\n    print(type(error).__name__)',
+          output: "TypeError",
+          explanation: "Declaring __slots__ without \"__weakref__\" removes the slot that weak references need, so the class cannot be weakly referenced. The failure is a TypeError raised at the call, and adding \"__weakref__\" to the slot list is the fix the keyword notes describe.",
+          reasons: [
+            "Line 1: the import is what allows the example to ask for a weak reference at all.",
+            "Line 2: this class declares slots without the weak-reference slot, which is the decision under test.",
+            "Line 3: the slot list names one attribute and deliberately omits \"__weakref__\".",
+            "Line 4: constructing the instance succeeds, because slots do not change ordinary creation.",
+            "Line 5: the call that needs the missing slot is wrapped because the failure is expected here.",
+            "Line 6: asking for a weak reference now raises TypeError, which is the documented result for a class without the slot.",
+            "Line 7: catching that type keeps the program running and lets the example report the failure deliberately.",
+            "Line 8: printing the type name proves the failure is the TypeError the notes named.",
+          ],
+        },
       ],
       exercise: {
         prompt: "Define Node with __slots__ = (\"value\", \"__weakref__\") and an initializer storing value. Create a node with \"task\", take a weak reference, delete the strong name, and print whether the weak reference is now None.",
@@ -482,8 +513,8 @@ const gapLessonRoundOne: Record<number, LessonSeed[]> = {
         },
         {
           title: "Run a program and read the captured result",
-          code: 'import subprocess\nimport sys\n\nresult = subprocess.run(\n    [sys.executable, "-c", "print(6 * 7)"],\n    capture_output=True,\n    text=True,\n)\nprint(result.returncode)\nprint(result.stdout.strip())',
-          output: "0\n42",
+          code: 'import subprocess\nimport sys\n\nresult = subprocess.run(\n    [sys.executable, "-c", "print(6 * 7)"],\n    capture_output=True,\n    text=True,\n)\nprint(result.returncode)\nprint(result.stdout.strip())\nprint(type(result).__name__)',
+          output: "0\n42\nCompletedProcess",
           explanation: "This example was executed with a real CPython interpreter on a real machine while authoring the lesson, which is where its output comes from; the browser worker cannot start operating-system processes, so the sandbox shows the code for reading rather than producing this result itself. The argument list names the interpreter and one program to run, capture_output with text records the child process output as text, and the result object carries both the exit status and the captured text, which is why the printed status is 0 and the printed line is the value the child computed.",
           reasons: [
             "The subprocess import is what makes running another program possible at all.",
@@ -496,6 +527,7 @@ const gapLessonRoundOne: Record<number, LessonSeed[]> = {
             "The closing parenthesis ends the call, and the returned object describes the finished child process.",
             "returncode is 0 here, which is the conventional exit status for success.",
             "stdout holds what the child printed, and strip removes the trailing newline that came with it.",
+            "type(result).__name__ names the class of the returned object, which is CompletedProcess, the documented record of a finished child process.",
           ],
         },
         {
@@ -571,6 +603,20 @@ const gapLessonRoundTwo: Record<number, LessonSeed[]> = {
             "Line 1: The import brings in Template, which understands $name style placeholders.",
             "Line 2: The template stores the message once with two placeholders, so the wording lives in a single place instead of being rebuilt at every call site.",
             "Line 3: substitute walks the placeholders, inserts Ada and 2, and returns the completed text. Because substitute is strict, a missing name is reported as an error rather than silently skipped.",
+          ],
+        },
+        {
+          title: "See a missing placeholder fail",
+          code: 'from string import Template\ntemplate = Template(\"Hello, $name. You have $count new lessons.\")\ntry:\n    print(template.substitute(name=\"Ada\"))\nexcept KeyError as error:\n    print(\"missing\", error)',
+          output: "missing 'count'",
+          explanation: "substitute requires every placeholder, so omitting count raises KeyError instead of leaving a half-filled message. safe_substitute is the alternative when partial data is expected, which is the trade-off the keyword notes describe.",
+          reasons: [
+            "Line 1: the import brings in the template class.",
+            "Line 2: the template declares two placeholders, name and count.",
+            "Line 3: the substitution is wrapped because it is expected to fail without count.",
+            "Line 4: only name is supplied, so substitute refuses to produce a partial message.",
+            "Line 5: a missing value is reported as KeyError, which is what makes substitute the strict choice.",
+            "Line 6: the handler prints the missing key rather than hiding the problem.",
           ],
         },
       ],
@@ -1054,7 +1100,7 @@ const gapLessonRoundTwo: Record<number, LessonSeed[]> = {
       learningGoals: ["Suppress one specific exception", "Manage several context managers with ExitStack", "Decide when suppressing is honest"],
       explanation: "Some failures are expected and carry no useful information: a probe file that is simply absent, a cache key that was never stored. contextlib.suppress(SomeError) turns that one exception into a no-op for the indented block, while every other exception still propagates, which is what keeps the silence honest. ExitStack manages a variable number of context managers: each enter_context call registers another resource, and all of them are closed in reverse order when the block ends. Use suppress for a specific, understood failure with a defined next step, never as a way to hide an error whose cause is still unknown.",
       keywordNotes: [
-        "contextlib.suppress(ExpectedError) ignores that one exception type inside its block and lets every other type propagate.",
+        "contextlib.suppress(KeyError) ignores that one exception type inside its block and lets every other type propagate.",
         "ExitStack.enter_context(manager) registers context managers dynamically and unwinds them all in reverse order.",
         "Suppressing is honest when the failure is understood and the code has a defined behavior for it.",
       ],

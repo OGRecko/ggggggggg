@@ -76,6 +76,7 @@ const debugging: Lesson = {
   examples: [
     example("Reveal hidden whitespace", 'name = "Ada\\n"\nprint(name)\nprint(repr(name))', "Ada\n\n'Ada\\n'", "The normal print moves to a new line because the string contains a newline character. repr exposes that character explicitly."),
     example("Check a value before calculating", 'value = "5"\nprint(type(value))\nprint(int(value) + 1)', "<class 'str'>\n6", "type proves the initial value is text. int then converts compatible numeric text before arithmetic."),
+    example("Read a missing name", 'try:\n    print(total)\nexcept NameError as error:\n    print(error)', "name 'total' is not defined", "The error text names exactly what Python could not find, which is the first piece of evidence to read. Without the except block the same NameError would stop the program at that line."),
   ],
   exercise: { prompt: "Store text = " + '"Python"' + " and print repr(text).", starterCode: "# Inspect the exact string representation\n", solution: 'text = "Python"\nprint(repr(text))', solutionExplanation: "repr returns the quoted developer representation of the string, making its boundaries visible.", testCases: [{ label: "String representation", expected: "'Python'" }], hints: ["Store the string in text first.", "Call repr(text) inside print."] },
   recap: ["Errors and values are evidence, not a judgment.", "repr reveals characters that normal print may hide.", "Inspect types before mixing values in a calculation."],

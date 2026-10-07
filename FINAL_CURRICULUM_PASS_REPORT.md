@@ -444,3 +444,93 @@ plans and the shipped code, and none is a real gap:
   cleanly and the single exception is the Gradle build-file sketch, which is
   deliberately not Java source. The three new lessons are reviewed structurally and
   their outputs hand-derived, because no JDK exists here.
+
+## Appendix D — Claim-level pass (Python, Java, JavaScript, C++, HTML/CSS)
+
+Appendices A–C closed content gaps and re-measured the corpora. This appendix records a
+finer pass over one remaining question per lesson: **does the lesson's own prose promise a
+construct and then not show it?**
+
+### Method
+
+An untracked helper (`.arena-trace-code.ts`) extracts API-shaped tokens from every lesson's
+own words — learning goals, keyword notes, recap lines, decision-guide rows, the reading
+check with its choices and explanation, and the exercise prompt with its hints — and checks
+each token against the code that lesson displays (examples, declared outputs, starter code,
+solution) and then against the rest of its chapter. Flags are triaged by hand with one rule:
+a token named in a **learning goal** must be shown by the lesson; a token used as a contrast
+("instead of `invert()`"), a pitfall warning, a distractor option in a quiz, or a statement
+about code the reader writes is prose, not a code claim.
+
+### Python (CPython 3.11.2, every new example executed)
+
+- **9-4** now shows a handwritten `__eq__` (`Write your own equality rule`) because the goal
+  names the method; output `True` / `False`.
+- **10-1** now shows `super().__init__(name)` in a subclass initializer
+  (`Call the parent initializer`); output `Ada Python`.
+- **23-1**'s decorator example applies `functools.wraps` and prints `greeting.__name__`, so
+  the keyword note about preserved metadata is demonstrated; output `HELLO` / `greeting`.
+- **1-4** (`NameError`), **4-3** (`RecursionError`), **6-8** (`KeyError`), **10-9**
+  (`AttributeError`), **19-8** (`TypeError`) each gained a small *executed* example whose
+  declared output matches the interpreter byte for byte. The error examples print the
+  exception type name rather than a version-specific message, so the evidence stays true in
+  the browser runtime as well as on CPython.
+- **13-2** already demonstrated `functools.wraps`; no change was needed there.
+- Deliberately untouched, with reasons: **9-1** (`CapWords` is a naming convention the code
+  follows), **11-7** (`IndexError` is the rationale for an explicit empty-list contract),
+  **14-8** (`breakpoint()` and `coverage.py` are named as tools; the lesson keeps its honest
+  browser boundary), **14-1** and **21-6** (the token is shown elsewhere in the same chapter).
+
+### Java (on-device structural review; no JDK exists here)
+
+- **13-8** now contrasts a pipeline with no terminal operation against a real terminal
+  (`forEach`) — the "silent no-op" the lesson warns about is visible.
+- **13-3** gained an `orElseThrow` example; **16-6**'s capitalization text now matches the
+  code; **20-6**'s lab declares its executor as `ExecutorService`.
+- **8-1 / 8-2** promised `AutoCloseable` with nothing in the chapter showing it; the authored
+  chapter-8 design lesson (`java-8-7`, Appendix on the AutoCloseable lesson) now demonstrates
+  the interface, `close()`, and the exception path.
+- Re-measured with `java-parser`: **651 rows → 650 parsed, 0 genuine parse failures**, the one
+  exception being the Gradle build-file sketch, which is deliberately not Java source.
+- Remaining flags are prose, not code claims: **10-7** (`IndexOutOfBoundsException` in a
+  decision-guide contrast) and **15-7** (`NullPointerException` as a distractor option).
+
+### JavaScript (Node replica of the Worker semantics)
+
+- **6-6** (`lastIndex`), **7-1** (`innerHTML` read-back), **15-8**
+  (`AbortController`/`AbortError`), **21-1** (escape-versus-markup) landed in the previous
+  round; **21-5**'s second hint was reworded because it pointed at a DOM construct its own
+  solution never uses.
+- Corpus audit re-run: **620 rows, 532 exact matches, 0 mismatches, 43 deliberate-error rows,
+  45 browser-boundary rows** (6 of those name a transcript that is a decision, not an output).
+- Remaining flags are contrast mentions (6-6 `startsWith`, 7-5 `innerHTML`) or DOM-bound
+  lessons that cannot run in a Worker.
+
+### C++ (offline compile evidence, g++ 12.2.0, `-std=c++20 -Wall -Wextra -Werror`)
+
+- **10-6** prints the owning vector's `size()` beside `ranges::distance` and uses
+  `*values.begin()`; **12-5 / 12-6**'s hint no longer promises `at()`; **25-6**'s lab names
+  `std::unique_ptr<MemoryRepository>` — the base-typed variant genuinely fails to compile, so
+  the derived type is the honest one to show.
+
+### HTML/CSS (parse5 + postcss)
+
+- **12-7** gained a `showModal()` example, so the modal path is shown and not only described.
+- `invert()` remains a decision-guide contrast row ("instead of `filter: invert()`") and sits
+  in no code line; **7-5 / 7-6**'s `div.toolbar` is shown elsewhere in the chapter.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 67 tests, all passing.
+- `npm run build` — succeeds, 3,379.65 kB (gzip 1,032.33 kB).
+- Every course, 25 chapters each, 0 failing lesson exercises and 0 failing chapter projects.
+- HTML/CSS: 600 code strings → 553 HTML trees and 260 CSS blocks parsed with real parsers,
+  0 parse failures, 0 structure mismatches, 0 graded rows escaping verification.
+- JavaScript: 620 rows → 0 mismatches, 43 deliberate-error rows, 45 browser-only rows.
+- Java: 651 rows → 650 parsed cleanly by `java-parser`; 0 genuine parse failures.
+- C++: 622 code strings; the five snippets changed in this pass were compiled offline and
+  match their declared output.
+- Claim trace: 48 lessons still carry a flagged token, and every one of them is on the
+  documented list above — goals that were filled, or prose that deliberately contrasts,
+  warns about, or quizzes a construct the lesson does not need to run.
