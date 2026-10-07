@@ -1294,3 +1294,74 @@ code strings (not beside them) and that every example still has one note per cod
 - `npm run build` — succeeds, 3,785.02 kB (gzip 1,138.90 kB).
 - Also corrected in Appendix L: the JavaScript round's example total is 1,675 (appendices describe the
   same corpus; the earlier 1,691 figure double-counted overridden scaffold examples).
+
+## Appendix N — The code-level concept sweep, consolidated (head `b92ef96`)
+
+Appendices J–M were four rounds of one question asked of every course in turn: **does the shipped code
+actually demonstrate the concepts the lessons promise, or does the prose only name them?** This appendix
+consolidates the series so a reader can see the whole result in one place.
+
+### Method, identical in all four rounds
+
+1. Dump every code string the course ships (lesson examples, notes, lesson starter/solution, chapter
+   project starters/solutions, plus authored-override libraries) — 2,400+ strings in total across rounds.
+2. Probe each dumped string for the constructs the lesson metadata promises (`quality.coveredConcepts`)
+   and for the words the prose uses.
+3. Read every flagged chapter before classifying the flag as:
+   - **real code gap** → author a lesson that shows the construct (with line-numbered notes, an exercise
+     whose solution passes its own checker, a reading check, a decision guide);
+   - **demonstrated but unnamed** → the construct is already in the code, so add the concept name to the
+     code as a comment and re-verify the snippet (comments must land inside code strings, and the
+     line-note parity invariant must hold);
+   - **boundary or reasoning** → record it honestly (browser/environment boundary or reasoning that
+     legitimately belongs in prose).
+4. Verify with the app's own batteries and re-measure.
+
+### Result per course
+
+| Course | Flags before → after | Authored lessons added by the round | Evidence standard applied |
+| --- | --- | --- | --- |
+| C++ | 47 → **38** | 5 lessons + 1 example + 9 naming comments | compiled and run with g++ 12.2 `-Wall -Wextra`: 142 files, 0 warnings, 100 programs ran, 100/100 declared outputs matched |
+| Java | 42 → **21** | 10 lessons | structural only — no JVM obtainable, so every declared output was derived against language/library contracts and its arithmetic recomputed outside Java |
+| JavaScript | 47 → **31** | 8 lessons + 7 naming comments | every new output recorded from the app's real Worker sandbox; `javascriptRuntime.test.ts` executes the rows and byte-matches them |
+| HTML/CSS | 39 → **23** | 7 lessons + 6 naming comments | sandboxed preview plus structural checker; no screenshot, Lighthouse, Core Web Vitals or assistive-technology claim |
+| Python | not swept | — | the sweep reads `quality.coveredConcepts`, which Python's hand-written lessons do not set, so the sweep reports 0 for Python and **cannot judge it**; Python was audited claim-by-claim in Appendices B–I instead |
+
+All five courses: **218 → 166 → 145 → 129 → 113** named-not-shown concepts, 0 with no trace at all in
+every run, 125 chapters swept each time.
+
+### Corpus state at this commit
+
+- 817 lessons, 1,675 examples, **105 authored lessons** (Python 0 by design — its courses are hand-written
+  rather than factory-backed, Java 32, JavaScript 24, C++ 25, HTML/CSS 24), 125 chapters across five
+  courses, 25 chapters per course.
+- Two defects were caught by the batteries during the series rather than after it: a Java `new String`
+  comparison in the chapter 7 exercise, and an HTML/CSS checker pattern that could only have been
+  satisfied by a comment (`exerciseCheck.ts` strips comments). Both were fixed in the lesson, never in the
+  test.
+
+### What remains, stated precisely
+
+- **113 named-not-shown flags remain** and each is classified in Appendices J–M as demonstrated-but-unnamed
+  (concept words absent while the construct is in the code), browser/environment boundary, or reasoning-only.
+  They are documented residuals, not unfilled gaps: the sweep found **no concept with no trace at all** in
+  any run.
+- **Still partial, unchanged by this series:** Java and C++ execution limits (no JVM; C++ is compiled and
+  run outside the app, which validates the snippets but does not make the app execute C++), HTML/CSS
+  measurement limits (no real network of assets, no layout metrics, no assistive-technology audit), and the
+  sweep's blindness to Python noted above.
+- **No claim in this report rests on a fabricated run.** Every execution figure traces to `npm test`,
+  `g++`, the Worker sandbox, or a structural checker, and `FINAL_CURRICULUM_PASS_REPORT.md` records which
+  one for each figure.
+
+### Final verification battery at `b92ef96`
+
+| Check | Result |
+| --- | --- |
+| `npx tsc --noEmit` | silent |
+| `npm test` | 8 files, **69/69 passing** |
+| `.arena-dump-verify.ts` all five courses | 25 chapters each, **0 failing lesson exercises, 0 failing chapter projects** |
+| `.arena-code-sweep.ts -- all` | 125 chapters, **113 named-not-shown, 0 with no trace** |
+| `.arena-audit.ts` | C++/Python/Java/HTML-CSS **0 authored-lesson problems**; JavaScript 11 pre-existing vocabulary flags (unchanged all series) |
+| `.arena-stats.ts` | 817 lessons, 1,675 examples, **105 authored lessons** |
+| `npm run build` | succeeds, **3,785.02 kB** (gzip 1,138.90 kB) |
