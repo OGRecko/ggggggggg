@@ -1445,3 +1445,94 @@ parses is the first honest check.
 - `.arena-audit.ts` — C++/Python/Java/HTML-CSS 0 problems; JavaScript's 11 pre-existing vocabulary flags
   are unchanged.
 - `npm run build` — succeeds, 3,810.63 kB (gzip 1,146.29 kB).
+
+## Appendix P — C++ residuals: `else`, `switch`, abstract classes, and binary search (this commit)
+
+The C++ half of the residual list was re-read the same way the JavaScript half was, checking each flagged
+concept against **all 626 code strings of the course** rather than only its own chapter. Three of the flags
+were genuine holes.
+
+### The real gaps
+
+| Ch | Kind | Lesson / example | Zero-hit constructs it closes |
+| --- | --- | --- | --- |
+| 3 | learn | `else, switch, and deliberate fall-through` | `else` and `switch` were **absent from the entire C++ corpus**; the chapter promised both |
+| 8 | read | `Abstract classes, inheritance, and composition` | no pure virtual function, no `public` base clause, and no composition example anywhere |
+| 11 | example | a binary search through `std::lower_bound` / `std::binary_search`, added to the authored sorting lesson | `binary_search`, `lower_bound` and `upper_bound` appeared nowhere, while chapter 11 promises linear and binary search |
+
+The chapter 3 lesson shows a chain with `else if` and `else`, a `switch` with grouped `case` labels and a
+`default`, a deliberate fall-through marked with `[[fallthrough]]` instead of a silent missing `break`, and a
+guard clause. The chapter 8 lesson pairs an abstract base (pure virtual functions, virtual destructor) with
+a composition example so the two design answers sit side by side. Both include an exercise whose reference
+solution was compiled and run.
+
+### Naming, where the construct already existed
+
+Two chapter plans carried **full sentences inside their concept lists**, which the sweep correctly refused
+to match against code:
+
+| Where | Was | Now |
+| --- | --- | --- |
+| ch5 deep-dive keywords | `T value receives an independent value inside the function.` | `value parameters and object lifetime` |
+| ch20 deep-dive keywords | `A critical section is the small region that must not interleave.` | `critical sections` |
+
+The names then went into the code that already demonstrated them: `const reference parameters` and
+`mutable reference parameters` on the two signatures of the chapter 5 lab, and `critical sections` on the
+locked read-modify-write of the chapter 20 lab (both the normal and the edge program, which are the same
+text).
+
+### Two defects the batteries caught before commit
+
+1. The chapter 8 lesson shipped with **one example**, and `courseIntegrity.test.ts` requires at least two
+   for every lesson in the authored chapters. A composition example was written, compiled with
+   `g++ -std=c++20 -Wall -Wextra` and added, which also made the lesson better: the two answers to the same
+   design question now sit next to each other.
+2. A comment patch on the chapter 5 lab **swallowed the newline escape** and would have shipped as
+   `void shout(const std::string& text) {\  // …` — invalid C++ inside a lesson. The runtime dump (not the
+   raw file) is what exposed it; the dump was re-read and compiled before the fix was believed. The lesson
+   was repaired and recompiled.
+
+### Evidence
+
+- Every program this round added or touched was compiled and run with
+  `g++ 12.2.0 -std=c++20 -Wall -Wextra`: the four chapter 3 examples, the chapter 8 abstract-class and
+  composition examples, the chapter 11 binary-search example, both exercise reference solutions, and the
+  chapter 5 lab with its new comments — **0 warnings, declared outputs matched** (`distinction pass retry`,
+  `success missing unknown`, `alert log page alert `, `90 100 0`, `square 9`, `120`, `found 8 at 3` / `0`,
+  `cold mild hot` / `ok client other`, `2`, and the chapter 5 lab).
+- One program of the module legitimately does not compile yet: the chapter 8 exercise **starter**, whose
+  `Bike` type is a scaffold for the learner to fill in. That is normal for a build-from-scaffold exercise
+  and is stated here rather than hidden.
+
+### Measured state
+
+| Check | Before | After |
+| --- | --- | --- |
+| C++ sweep flags | 38 | **33** |
+| All five courses named-not-shown | 94 | **89** |
+| Authored lessons (corpus) | 107 | **109** |
+| C++ examples | 302 (56 authored) | **305 (63 authored)** |
+| Tests / build | 69 / 3,810.63 kB | 69 / **3,838.00 kB** (gzip 1,153.23 kB) |
+
+### The 33 remaining C++ flags, classified
+
+- **Demonstrated but unnamed, naming pass still to do** — ch2 built-in types and conversions, ch5 iteration
+  and indexing, ch6 dangling lifetime bugs, ch7 constructors/destructors, resource ownership and special
+  member rules, ch10 iterators and comparators, ch11 sorting reasoning and complexity, ch12
+  operation-driven choice, ch13 `unique_ptr`, ch16 races and deadlocks, ch21 dependencies, ch22 value
+  objects and layering, ch25 ownership, repositories and STL-backed architecture.
+- **Environment boundary** — ch1 preprocessing/compilation and translation units/linking (no toolchain in
+  the browser, and the chapter says so), ch18 URI/HTTP and serialization (no network client here),
+  ch24 debugging workflow (human sequence, not a construct).
+- **Reasoning or policy** — ch20 invalid memory access, validation and reliability boundaries.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **69 tests, all passing**, including the integrity check that every authored lesson
+  in the checked chapters has at least two examples, one note per code line, and a checker its own
+  reference solution satisfies.
+- `.arena-one.ts cpp 3,8` — both new lessons present and authored.
+- `.arena-dump-verify.ts -- cpp` — 25 chapters, 0 failing lesson exercises, 0 failing chapter projects.
+- `.arena-code-sweep.ts -- all` — 125 chapters, **89 named-not-shown, 0 with no trace**.
+- `npm run build` — succeeds, 3,838.00 kB (gzip 1,153.23 kB).
