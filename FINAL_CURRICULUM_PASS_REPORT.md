@@ -346,3 +346,101 @@ every lesson in the chapter, so a chapter claims its topics six times over. The 
 finds concepts with no trace at all; the teach-probe finds constructs that appear only in
 prose; and now the interpreter audit finds code that runs differently from what it claims. Each
 one found defects the previous could not see, and the Python corpus is clean under all three.
+
+---
+
+## Appendix C — Closing the claim gaps in C++, Java, and JavaScript (commit `46a6e1a`)
+
+Appendix B closed the Python corpus. This appendix records the same three-in-one
+treatment — plan-versus-code sweep, teach-probe, and a real execution audit where a
+real runtime exists — applied to the other four courses, and exactly which flags
+were real gaps and which were artifacts.
+
+### C++: four authored lessons, every program compiled and run here
+
+The teach-probe flagged ideas the chapter plans named but no shipped string showed.
+Where the plan claimed a construct, the lesson was authored and then compiled:
+
+| Chapter | Lesson | Kind | What the code shows | Compiled output |
+| --- | --- | --- | --- | --- |
+| 9 | Concepts and constraints that name a requirement | compare | a `concept` with a requires-expression and a trailing type requirement, a requires-clause constraining an overload, `static_assert` over library concepts | `Constraining templates`; `42`; `constraints checked before the program runs` |
+| 15 | Structured bindings and pair/tuple returns | compare | a map loop that names key and value, a tuple return unpacked by the caller, a copy binding beside a reference binding that writes through | `build 40` / `read 20`; `loops 3 true`; `3 4` / `1 4` / `4` |
+| 15 | `std::variant` as a closed set of alternatives | integration | holding a variant, `holds_alternative`, `get_if`, a visitor with one overload per alternative, the `bad_variant_access` path | `1` / `ready`; `number 7` / `text ready`; `wrong alternative` |
+| 23 | Composing constraints and visiting a variant | integration | a composed concept, three overloads resolved by subsumption, a visitor forwarding both alternatives to one constrained function | `constraints 11`; `generic` / `integral` / `signed integral`; `Chapter 7` |
+
+All sixteen programs were built with `g++ 12.2.0 -std=c++20 -Wall -Wextra -Werror`
+at zero warnings and their stdout compared byte for byte.
+
+### C++: the whole corpus, compiled and run offline
+
+Every C++ string the course ships was dumped (622 rows) and compiled with the same
+flags, stderr merged into stdout so nothing could hide:
+
+| Bucket | Rows | Meaning |
+| --- | --- | --- |
+| compiles and matches | 422 | builds clean and prints exactly the declared output |
+| starter declaring the exercise target | 102 | 85 target not yet met, 17 partly met — scaffolds are supposed to fail their own target |
+| intentional compile error | 44 | 22 repair starters plus 22 deliberately broken `broken version` examples that fail on `std::cot` |
+| fragment | 29 | instruction-level snippets with no `int main` |
+| chapter project | 25 | reviewed by required constructs, no declared output |
+| mismatch | 0 | |
+
+One genuine defect surfaced along the way: the Chapter 15 variant exercise declared
+two expectations while its solution prints `43\n5`, so the row was corrected to a
+single case. The Chapter 24 rows first looked like 25 mismatches and were not: that
+lesson writes `config-loaded` to `std::cerr` by design, and a stdout-only capture
+simply could not see it. The audit now captures both streams, and the lesson was
+left alone.
+
+### Java: three authored lessons for concepts the plans named without showing
+
+| Chapter | Lesson | Kind | Closes |
+| --- | --- | --- | --- |
+| 13 | Optional and transformations without side effects | compare | `Optional for absence` (0 hits for `Optional<`) and the chapter's untraced "pure transformations" |
+| 16 | `CompletableFuture` without guessing at timing | integration | `CompletableFuture`, named in the chapter focus but present only in prose |
+| 18 | The JDBC connection flow, reviewed rather than run | design | all four concepts the Databases plan promises: `JDBC connection flow`, `prepared statements`, `transactions`, `resource management` |
+
+There is no JDK, no JDBC driver, and no database server in this sandbox. Each lesson
+states that boundary in its own text; every expected value was derived by reading the
+code line by line; and the only declared outputs are lines that follow from the code
+text itself — the SQL string and how many parameters it expects — never from a query,
+a row, or a commit. The three lessons also fixed a measurement bug of their own: the
+exercise `testCases` had split one program's output across two cases, which the audit
+reads as the row's declared output.
+
+### What the remaining probe flags actually are
+
+The teach-probe still prints flags for every course. Each one was checked against the
+plans and the shipped code, and none is a real gap:
+
+- **Python** — `threading` and `itertools` are regex false positives: the shipped code
+  imports them with `from threading import Lock` and `from itertools import chain,
+  islice`. `async for`, `async with`, `__aiter__`, `__anext__`, and `metaclass` appear
+  nowhere in the assembled course, and no chapter plan names them, so nothing is owed.
+  Chapter 23 does teach descriptors for real: `__get__`, `__set__`, `__set_name__` are
+  shown in code, with the honest note that a property is usually clearer for one field.
+- **Java** — `enums` and `custom exceptions` are detected by the probe but named by no
+  plan and no lesson claim, so they are not owed.
+- **JavaScript** — custom `Error` classes, `structuredClone`, `queueMicrotask`/timers,
+  and the labels-and-break note are neither planned nor claimed; the labels note appears
+  in prose only because it is a caution, not a lesson.
+- **C++** — do-while, iostream formatting, variadic templates, and `enum class` are
+  unclaimed by any plan or lesson.
+- **HTML/CSS** — `clip-path` is unclaimed, and the Chapter 8 "gaps" flag is the plural
+  English word in a plan sentence with no construct behind it.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 67 tests, all passing.
+- `npm run build` — succeeds, 3,348.52 kB (gzip 1,024.27 kB).
+- Gap sweep across all 125 chapters — 1 remaining flag, the HTML/CSS plural-word
+  artifact above.
+- Every course, 25 chapters each: 0 failing lesson exercises, 0 failing chapter
+  projects under the structural checkers.
+- C++: 622 code strings compiled offline, 0 mismatches (the four new lessons are
+  inside that count).
+- Java: the current 645 code strings were re-parsed with `java-parser`: 644 parse
+  cleanly and the single exception is the Gradle build-file sketch, which is
+  deliberately not Java source. The three new lessons are reviewed structurally and
+  their outputs hand-derived, because no JDK exists here.
