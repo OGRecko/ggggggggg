@@ -986,3 +986,115 @@ declared a gap or a documentable residual.
 - `npm run build` — succeeds, 3,529.72 kB (gzip 1,072.39 kB).
 - Every new C++ example, starter and solution of the six touched chapters compiled with
   `-Wall -Wextra` with zero warnings; 100 run outputs matched their declared outputs exactly.
+
+## Appendix K — Code-level concept sweep: the Java half (this commit)
+
+Appendix J closed the C++ half of the sweep. This appendix does the same reading for Java, where the
+sweep started at 42 named-not-shown concepts over 25 chapters.
+
+### Method
+
+The same two corpora as Appendix J (code versus prose, trailing-`s` normalization), followed by a
+construct probe that asks a harder question than the sweep: does this construct appear **anywhere** in
+the course's code? `.arena-dump-code.ts -- java` writes all 651 Java code strings to JSON, and a probe
+table counts each construct across every lesson, exercise, and project. A construct with zero hits is a
+real gap; a construct with hits whose *word* is missing from the code is a token miss, and the two were
+kept apart before anything was written.
+
+### What the probes found
+
+Zero occurrences anywhere in the course's Java code, each one promised by a chapter plan:
+
+| Construct | Hits before | Chapter that promised it |
+| --- | --- | --- |
+| `Comparable` | 0 | 6 sorting with Comparator |
+| `hashCode()` override | 0 | 9 equals hashCode toString |
+| `abstract class` | 0 | 9 inheritance and composition |
+| `extends` (any class inheritance) | 0 | 9 inheritance and composition, polymorphism |
+| `PriorityQueue` | 0 | 12 priority-driven selection |
+| `new Thread` / `implements Runnable` | 0 | 16 races, deadlocks, visibility |
+| `volatile` | 0 | 16 visibility |
+| `BigDecimal`, `Random`, `Math.*`, `enum`, varargs, `instanceof`, `yield` | 0 | unscheduled gaps recorded below |
+| bounded type parameters, wildcards, a generic method | 0 | 10 generic types, bounded parameters, wildcards and PECS |
+| `switch` anywhere in chapter 3, `else` anywhere in chapter 3 | 0 | 3 if and else branches, switch expressions |
+| `.equals(` or `==` anywhere in chapter 7 | 0 | 7 equals vs == |
+| search code anywhere in chapter 11 | 0 | 11 linear search, binary search prerequisites |
+
+The `extends` result was the largest single find: an object-oriented course that shipped interfaces and
+`implements` 79 times but never once declared a class inheritance relationship.
+
+### What was added
+
+Ten authored Java lessons, each with two or three examples carrying one explanation per line, a reading
+check, a decision guide, an exercise and a patterns checker:
+
+| Chapter | Kind | Lesson | Code that now demonstrates it | Declared output |
+| --- | --- | --- | --- | --- |
+| 3 | compare | else-if chains compared with switch expressions | range chain versus `switch (score / 10)` with arrow labels and `default` | `high/mid/low` both ways |
+| 4 | learn | Recursion: a method that calls a smaller version of itself | `factorial`, unwinding `countdown`, plus an overloaded `label` pair | `120`, `3/2/1/done`, `text loops/count 3` |
+| 6 | read | Sorting with Comparable and Comparator | `implements Comparable<Lesson>`, `Collections.sort`, `Comparator.comparing(...).reversed()` | `arrays/loops`, `[arrays, loops, if]` |
+| 7 | learn | Comparing strings: equals, literals, and `==` | interned literals, `new String`, `equals`, `equalsIgnoreCase`, `compareTo` | `true/false/true`, `true/false/false` |
+| 9 | compare | equals, hashCode, and toString: the identity contract | hand-written trio with `Objects.hash`, then the record that generates all three | `true/true/Lesson(loops)` and `Lesson[title=loops]` |
+| 9 | design | Inheritance, overriding, and when composition is the better tool | abstract base, `extends`, `@Override`, polymorphic dispatch, then a has-a Formatter field | `says meow/says beep`, `[loops]` |
+| 10 | read | Bounded type parameters and wildcards | `<T extends Comparable<T>>`, `List<? extends Number>`, `List<? super Integer>`, and an erasure check | `9/loops`, `6.0/[3, 4]/7.0`, `true` |
+| 11 | learn | Linear search, and what binary search needs first | scanned `linearIndexOf` returning -1, halving `binaryIndexOf` with two bounds | `1/-1`, `2/-1` |
+| 12 | read | PriorityQueue: serving the highest-priority item first | `add`/`peek`/`poll` drain, then a comparator that reverses length order | `1/1/3/5`, `arrays/loops/if` |
+| 16 | read | Visibility between threads and starting one explicitly | `new Thread(...)`, `start`, `join`, a `volatile` field, and a `Runnable` exercise | `worker/main`, `true` |
+| 23 | learn | Pattern matching for instanceof | two `instanceof` bindings, a `List<?>` pattern, and a switch expression with `yield` | `text of length 5/number 42/other`, `low/high 8` |
+
+Concepts whose code already demonstrated them but whose word never appeared in the code — recursion,
+local scope, method overloads, generic types, bounded parameters, wildcards, type erasure, visibility,
+inheritance, composition, polymorphism, method overloads — are now named by a one-line inline comment on
+the statement that does the work, with the line note explaining the same behaviour in a full sentence.
+
+### Verification, and its honest boundary
+
+- There is no JDK in this sandbox (`javac` absent; the Debian mirror and Adoptium both unreachable from
+  here), so nothing in this round claims execution. The library header was corrected to say what is
+  actually true rather than that the code is "validated against a real Java grammar parser".
+- The editor's Java grammar (Lezer, via `@codemirror/lang-java`) was tested directly and is Java 8 level:
+  it reports syntax errors for records, sealed types, switch expressions, and even `synchronized` and
+  `default` methods. `.arena-javaparse.ts` therefore is documented as a hint about grammar age, never as
+  evidence that Java code is correct or broken.
+- Every declared output was re-derived independently: the arithmetic, range, ordering, and search results
+  were recomputed with a separate implementation outside Java, and the Java-specific claims (literal
+  interning, `Objects.hash` over one field, record `toString` format, hash-based lookup, the visibility
+  edge that `join` establishes, `List.of` erasure) rest on the language and library contracts rather than
+  on a run.
+- The app's own integrity test still enforces what it can: one note per code line, checker patterns on
+  every authored exercise in the guarded chapters, unique titles per chapter, and non-empty verification
+  metadata for every lesson.
+
+### Sweep result
+
+| Scope | Before | After |
+| --- | --- | --- |
+| Java named-not-shown | 42 | **21** |
+| All five courses named-not-shown | 166 | **145** |
+| Concepts with no trace at all | 0 | **0** |
+
+Remaining Java items fall into two documented classes. First, concepts that the code demonstrates but
+never names, verified by probe: casts `(int)` in chapter 2, `private` fields in chapter 5, `->` and `::`
+in chapter 13, `assert` in chapter 14, `try (` in chapter 18, allocation in chapter 19 and validation
+methods in chapter 20. Second, concepts that have no honest code form here: Big-O vocabulary, mocking and
+debugging workflow, sealed classes (demonstrated in chapter 23's lesson rather than chapter 15's own
+lessons), route handling / JSON responses / service layering (no server exists in this environment), and
+architecture boundaries and integration in the capstone chapters.
+
+### Measured state after this round
+
+| Check | Before | After |
+| --- | --- | --- |
+| Java authored lessons | 21 in 13 chapters | **32 in 18 chapters** |
+| Java zero-hit promised constructs | 23 | the shipped constructs above; `enum`, varargs, `BigDecimal`, `Random`, `Math.*` remain scheduled |
+| Corpus totality | 817 lessons / 1,672 examples | 817 / 1,675 (90 authored lessons) |
+| Tests / build | 69 / 3,529.72 kB | 69 / **3,647.02 kB** (gzip 1,101.35 kB) |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, 69 tests, all passing.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects (every new checker passes on its own reference solution).
+- `npm run build` — succeeds, 3,647.02 kB (gzip 1,101.35 kB).
+- All declared outputs recomputed independently; no execution claimed for Java.
