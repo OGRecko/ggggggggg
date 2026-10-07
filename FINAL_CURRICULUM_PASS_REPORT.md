@@ -519,6 +519,22 @@ about code the reader writes is prose, not a code claim.
 - `invert()` remains a decision-guide contrast row ("instead of `filter: invert()`") and sits
   in no code line; **7-5 / 7-6**'s `div.toolbar` is shown elsewhere in the chapter.
 
+### Flags that a sibling lesson shows (chapter-wide evidence)
+
+The trace has two lenses: the lesson's own code, and its chapter's code. Tokens that no single
+lesson repeats but that a neighbouring lesson demonstrates are kept as chapter evidence rather
+than as gaps, and they are listed here so the count is auditable:
+
+- **Java** — `ArrayList` and `HashMap` (6-7, shown by the collections lessons), `AutoCloseable`
+  (8-1 / 8-2, shown by the 8-7 design lesson), `PreparedStatement` (18-1 / 18-2 / 18-4 / 18-5,
+  shown by the JDBC lesson's typed statements).
+- **JavaScript** — `localStorage` (8-x), `WeakMap` / `WeakSet` (12-x), `AbortController`
+  (15-x), `ArrayBuffer` (20-x), `innerHTML` / `textContent` (7-5, 21-2/21-3/21-4).
+- **C++** — `std::array` (5-1 / 5-2 / 5-4, shown by the 5-5 lab), `end()` and `std::get`
+  (10-6, 15-2, shown elsewhere in their chapters).
+- **HTML/CSS** — `div.toolbar` (7-5 / 7-6).
+- **Python** — `AssertionError` (14-1) and `sys.argv` (21-6).
+
 ### Verified state at this commit
 
 - `npx tsc --noEmit` — silent.
