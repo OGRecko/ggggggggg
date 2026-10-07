@@ -1875,3 +1875,78 @@ source, outside the test file, and **11/11 reproduced their declared output byte
 - `.arena-audit.ts` — C++, Python, Java, HTML/CSS 0; JavaScript 11, explained above.
 - `.arena-stats.ts` — 125 chapters, 817 lessons, 115 authored lessons, 1,683 examples.
 - `npm run build` — succeeds, 3,896.91 kB (gzip 1,169.32 kB).
+
+## Appendix V — The last 29 flags: five lessons, a naming pass, and a defect the audit found (this commit)
+
+Appendix U left 29 flags that had been classified as environment, reasoning, or browser boundaries. Reading
+each one against its own chapter's code showed that several had real anchors that could be named on the code
+that already demonstrated them, and that four topics genuinely needed material.
+
+### A defect the round found first
+
+Re-checking the Java corpus after the previous round turned up a shipped problem: **seven Java programs were
+syntactically broken by the naming comments added in that round**. A comment placed in the middle of an
+expression swallows the rest of the line, so `…map(String::toUpperCase  // …).orElse("none")…` and
+`…+ (int) average  // …);` were invalid Java. The same pass found **twenty comments duplicated verbatim**
+(an earlier patcher had run twice), and a chapter 15 example whose closing brace had been written as a
+bracket. All were repaired, and the check that found them is now part of the process: strip every `//`
+comment from a program and verify that parentheses and braces still balance. **Java, C++, and JavaScript each
+report 0 unbalanced programs after that check.** The tests were not touched to make any of this pass.
+
+### Naming pass, on code that already demonstrates the concept
+
+| Course | Concepts named | Where |
+| --- | --- | --- |
+| C++ | preprocessing and compilation, translation units and linking, URI and HTTP, timeouts and failures, serialization, invalid memory access, validation, reliability boundaries, layering, serialization boundaries, debugging workflow, ownership and repositories | the six edited project programs |
+| JavaScript | browser Worker execution, memory leaks and large collection cost, debugging workflow, batching and minimal DOM work, configuration, standards-aware enhancement | the sample bank and four project programs |
+| Java | architecture boundaries, multi-file applications, architecture integration | the chapter 24 and 25 solutions |
+
+The six edited C++ programs were **recompiled with g++ 12.2.0 `-std=c++20 -Wall -Wextra`: 6/6 compiled with
+zero warnings, 6/6 printed their declared output.** The JavaScript edits need no separate evidence: the
+runtime contract test executes every sample, starter, solution, and project on each run, and it passes.
+
+### Five authored lessons
+
+| Course | Ch | Kind | Lesson | Closes |
+| --- | --- | --- | --- | --- |
+| JavaScript | 7 | read | *Forms: the submit boundary and the values it carries* | form boundaries |
+| JavaScript | 20 | compare | *What keeps a long-lived page growing* | memory leaks, large collection cost, render batching |
+| JavaScript | 25 | integration | *A stateful board: asynchronous updates and rendering that is safe by construction* | stateful browser UI, async updates, accessible safe rendering |
+| Java | 14 | debug | *Test doubles by hand, and a debugging workflow that narrows the cause* | mocking concepts, debugging workflow |
+| Java | 22 | design | *Service layering: the domain, the store, and the transport edge* | service layering |
+
+The JavaScript lessons mix both kinds of evidence honestly. Their executable programs — a bounded cache, a
+scan counted next to a `Set` lookup, an asynchronous update whose rejection returns before the `await`, and
+the exercise solutions — run in the shipped Worker and their outputs were recorded from it; the
+browser-boundary programs (a form submission and a batched render) are labelled as previews, and the course's
+runtime test confirms they are declared that way rather than presented as console transcripts. The Java
+lessons carry no JDK and say so; **all six printed values were recomputed by hand outside Java** (`2` and
+`welcome Ada`; `length 3` and `total 10`; `201` and `400`; `created` and `invalid`; `morning` and `evening`).
+
+### Final measured state
+
+| Check | Before this round | After |
+| --- | --- | --- |
+| Named-not-shown flags, all five courses | 29 | **0** |
+| Named-not-shown flags, Java | 5 | **0** |
+| Named-not-shown flags, C++ | 12 | **0** |
+| Named-not-shown flags, JavaScript | 12 | **0** |
+| Named-not-shown flags, HTML/CSS and Python | 0 | **0** |
+| Programs with unbalanced delimiters (Java/C++/JS) | 7 | **0** |
+| Authored lessons | 115 | **120** |
+| Examples / authored examples | 1,683 / 267 | 1,684 / 278 |
+| Tests / build | 69 / 3,896.91 kB | 69 / **3,943.70 kB** (gzip 1,182.00 kB) |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **69 tests, all passing**, including the Worker contract that executes every
+  JavaScript sample, starter, solution, and project.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **0 named-not-shown, 0 with no trace**
+  (218 at the start of the series).
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects.
+- `.arena-audit.ts` — C++, Python, Java, HTML/CSS 0; JavaScript 11, the pattern-criterion flag explained in
+  Appendix U (its exercises are graded by real execution, and each solution reproduces its declared output).
+- Balanced-delimiter audit after comment stripping — Java, C++, JavaScript 0.
+- `npm run build` — succeeds, 3,943.70 kB (gzip 1,182.00 kB).
