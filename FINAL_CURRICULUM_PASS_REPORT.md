@@ -2658,3 +2658,44 @@ survived the reset intact. Nothing was lost and no work was redone.
 ### 5. Files changed in this round
 
 New: `src/app.flows.test.tsx`. Changed: this appendix.
+
+## Appendix AC — what the app says when practice goes wrong, and the last export scope
+
+Appendix AA proved the Worker protocol; this appendix proves the *branches* that follow a result —
+the error messages, the line marker, the on-device pass text, the store's `viewed`/`practiced`
+writes — and closes the one export scope that was still untested. New file
+`src/app.outcomes.test.tsx` (7 tests) plus one test in `src/app.export.test.tsx`.
+
+### 1. Claims and the test that stands behind them
+
+| Claim about the app | Evidence |
+| --- | --- |
+| A sandbox syntax error is shown as `SYNTAX ERROR` with the sandbox's own text verbatim, and does not unlock the lesson | `app.outcomes.test.tsx` |
+| A sandbox runtime error is shown as `RUNTIME ERROR`, the blamed line is marked in the editor with the editor's own class, and a failed Check adds "Fix the highlighted line and try again." | `app.outcomes.test.tsx` (reads `.cm-error-line`'s text) |
+| A wrong answer names the failing case: `LOGIC ERROR on <label>. Expected "…" but received "…". Review highlighted line N.` — with the label and both texts taken from the lesson's own test case | `app.outcomes.test.tsx` |
+| The app stops at the **first** failing case rather than continuing through the rest | `app.outcomes.test.tsx` (counts the worker calls) |
+| A structure-checked exercise passes with the text that says exactly what happened ("This is not a compiler or runtime execution result"), starts no worker at all, and records completion | `app.outcomes.test.tsx` |
+| A JavaScript run posts the same protocol with **no** input field | `app.outcomes.test.tsx` |
+| Opening a lesson records `lessonStates[id].viewed` but not `practiced`; touching the practice (Reset) records `practiced` and stores the starter code | `app.outcomes.test.tsx` |
+| Chapter scope exports exactly that chapter: the chapter heading is present, the following and final chapters are absent, and the document is less than half the size of the whole-course guide | `app.export.test.tsx` |
+
+### 2. One trap worth recording
+
+The first version of these tests waited for `/syntax error/i` over the whole document and failed *for
+the wrong reason*: lesson prose legitimately mentions `SyntaxError: unterminated string literal` in its
+common-mistakes blocks, so the wait resolved against the teaching text before the app had answered.
+Every wait in the file is now scoped to the feedback banner (`.check-feedback`), which is the app's own
+verdict rather than the page's text. The app was correct throughout; the test was reading the wrong
+element.
+
+### 3. Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — **18 files, 111 tests, all passing** (17 files / 103 before this appendix).
+- `npm run build` — succeeds, `dist/index.html` 3,946.80 kB (gzip 1,182.82 kB).
+- `src/courses/` is still untouched: the Appendix Z battery continues to describe the corpus exactly.
+
+### 4. Files changed in this round
+
+New: `src/app.outcomes.test.tsx`. Changed: `src/app.export.test.tsx` (the chapter-scope test) and this
+appendix.
