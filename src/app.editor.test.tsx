@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import App from "./App";
 import { courseById } from "./courses/catalog";
-import { clearProgress, defaultProgress, saveProgress } from "./utils/storage";
+import { clearProgress, defaultProgress, loadProgress, saveProgress } from "./utils/storage";
 
 beforeEach(() => {
   clearProgress();
@@ -32,6 +32,29 @@ describe("the real editor and the preview boundary", () => {
     const view = render(<App />);
     expect(view.container.querySelector(".cm-editor"), "the real CodeMirror editor should mount").toBeTruthy();
     expect(view.container.querySelector(".cm-content")?.textContent ?? "").toContain("a saved line that only exists in storage");
+  });
+
+  it("writes what the symbol bar inserts, and Reset restores the starter", () => {
+    const course = courseById("python")!;
+    const chapter = course.chapters[0];
+    const lesson = chapter.lessons[0];
+    window.history.pushState({}, "", `/${course.id}/chapter-${chapter.number}/lesson-${lesson.order}`);
+    const view = render(<App />);
+    // CodeMirror renders one element per document line; an empty last line renders as nothing, so the
+    // document is reconstructed by joining the lines rather than read from textContent.
+    const editorText = () => Array.from(view.container.querySelectorAll(".cm-line")).map((line) => line.textContent ?? "").join("\n");
+
+    // The shipped starter carries no parenthesis, so an inserted one is unmistakable.
+    expect(lesson.exercise.starterCode).not.toContain("(");
+    expect(editorText()).toBe(lesson.exercise.starterCode);
+
+    fireEvent.click(screen.getByRole("button", { name: "Insert (" }));
+    expect(editorText(), "the symbol reaches the real CodeMirror document").toContain("(");
+    expect(loadProgress().code[lesson.id], "the editor's change listener stores it immediately").toContain("(");
+
+    fireEvent.click(screen.getByRole("button", { name: /reset/i }));
+    expect(editorText(), "the editor follows the value back to the starter").toBe(lesson.exercise.starterCode);
+    expect(loadProgress().code[lesson.id]).toBe(lesson.exercise.starterCode);
   });
 
   it("renders learner HTML/CSS only inside a sandboxed iframe, without same-origin access", async () => {

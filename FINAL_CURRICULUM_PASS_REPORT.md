@@ -2889,3 +2889,126 @@ a DOM presence check, not an accessibility verdict. No package CDN: the 25 `sqli
 documented boundary. No C++ compiler inside the product: the g++ evidence lives in this report, not in
 the app's language about itself. No fabricated execution anywhere: every number above came from a tool
 that ran, and the four mistakes I made along the way are recorded in their appendices.
+
+## Appendix AG — coverage-led gap closing, and the branches the corpus cannot reach
+
+Appendices AA–AD chose their targets by reading the app. This round chose them by measuring it:
+`npm run test:coverage` produced a statement-level list of what the suite never executed, and every
+reachable item on that list is now covered. `All files` went from **92.93 % → 97.21 % of statements**;
+`App.tsx` from **90.82 % → 98.38 %**; `src/utils/exerciseCheck.ts` and `src/utils/exportTargets.ts` are
+now at **100 % of statements**. The fifteen statements still uncovered are provably unreachable from
+the shipped corpus, and that is measured rather than asserted (below).
+
+### 1. Before and after
+
+| File | Statements before | Statements after | Functions after |
+| --- | --- | --- | --- |
+| All files | 92.93 % | **97.21 %** | 98.88 % |
+| `src/App.tsx` | 90.82 % | **98.38 %** (547/556) | 99.47 % |
+| `src/components/CodeEditor.tsx` | 74 % | **92 %** (46/50), **100 % of lines and functions** | 100 % |
+| `src/utils/exerciseCheck.ts` | 81.03 % | **100 %** (58/58) | 100 % |
+| `src/utils/exportTargets.ts` | 94.73 % | **100 %** (19/19) | 100 % |
+
+Suite: **19 files / 114 tests → 20 files / 135 tests**, all passing.
+
+### 2. What the new tests cover
+
+New file `src/app.navigation.test.tsx` (9 tests) walks every control that moves a learner between pages,
+each assertion reading a marker the destination owns: the header's colour-theme button, the home page's
+course cards, the course overview's next-step link, its back link and its export button, the sidebar's
+course, chapter and lesson links (including a locked lesson that must **not** open and the current
+lesson's own link as a no-op), the lesson page's chapter eyebrow, its Previous button, its Next button
+in both states (disabled before the practice passes, working after), the locked view's escape button,
+the chapter page's back link, the 404 page's return button, the progress page's language rows, and the
+settings page's reading-font and spacing choices (asserted on `<html data-font>`/`data-spacing` and in
+the stored record).
+
+Added for the project editor: editing a chapter project stores code **without** marking the project
+complete, which is the one path in `ChapterProject`'s progress wrapper that had never run.
+
+`src/app.editor.test.tsx` gained the real editor's write path: inserting from the symbol bar reaches
+CodeMirror's document **and** is stored immediately by the editor's change listener, and Reset then
+pulls the document back to the starter.
+
+`src/app.export.test.tsx` gained the export rows for chapter projects (prompt and the learner's saved
+project code) and for the cumulative checkpoint score, read from the produced PDF bytes.
+
+Unit level: four cases in `src/utils/exerciseCheck.test.ts` for the alternative-group branches (an empty
+group, an empty pattern inside a group, an invalid regex inside a group) and for empty/invalid
+*forbidden* patterns — where the test now also records the real contract: a misconfigured pattern list
+can never be graded as a pass. One case in `src/utils/exportTargets.test.ts` for unknown chapter and
+lesson ids.
+
+### 3. The fifteen statements that remain, and why they cannot run
+
+New tracked tool `.arena-reachability.ts` (usage: `npx vite-node .arena-reachability.ts`) measures
+whether the states behind the app's defensive branches exist in the shipped corpus. Result at this
+commit — every one of them is zero:
+
+```
+    0  chapters with available === false (the 'In production' view)
+    0  chapters without a project (the null project branch)
+    0  chapters without a test
+    0  courses with zero lessons (the 'Planned' progress row)
+    0  exercises with checker.mode 'html' outside htmlcss
+    0  lessons with readingCheck undefined (the generated reading check)
+    0  lessons with an empty examples array
+    0  exercise checkers whose pattern list is invalid or empty (the misconfigured message)
+
+817 lessons, 547 of them with a structure checker, across 5 courses
+```
+
+That accounts for the uncovered statements one by one:
+
+| Uncovered statement | Why it cannot run |
+| --- | --- |
+| `App.tsx` 80 — the html-mode verification labels | Only the HTML/CSS course sets `checker.mode === "html"`, and that course returns earlier in the same function |
+| `App.tsx` 229–230 — `generatedReadingCheck` | All 817 lessons carry a reading check, so the `??` fallback never fires |
+| `App.tsx` 279 — `if (!checker) return null` | `staticCheck` is only called from inside `if (exercise.checker)` |
+| `App.tsx` 282–284 — the "check is misconfigured" message | No shipped checker has an invalid or empty pattern (measured; dump-verify also reports 0 failing exercises in all five courses) |
+| `App.tsx` 336 — the "mapped but not authored" chapter view | No chapter has `available === false` |
+| `App.tsx` 348 — `if (!chapter.project) return null` | Every chapter has a project |
+| `CodeEditor.tsx` 37, 78, 85, 94 — four `return;` guards | Each guards a state that cannot occur: the host ref is attached before the editor is built, both effects run after it exists, and no caller passes `disabled` |
+
+None of these is deleted: they are the app's defensive handling for corpus shapes the project once had
+and could have again, and the report says what they are rather than hiding them behind a coverage
+number.
+
+### 4. Corrections to my own work
+
+Six assumptions of mine were wrong and were corrected by measurement, none of them app defects:
+
+1. I expected a chapter page to have lesson editors as well as the project's; a chapter page's **only**
+   editor is the project's — lessons are links there.
+2. I expected the sidebar to list one chapter's lessons; it lists the **whole course** (225 entries).
+3. I placed "Finish chapter" on the last lesson of a chapter; the lesson sequence is course-wide, so the
+   link belongs to the final lesson of the **course**.
+4. I asserted the PDF contains a whole project prompt on one line; jsPDF wraps long strings into
+   separate text runs, so the assertion now uses the leading words that provably fit one line.
+5. I compared the editor's document to the starter with `textContent`; CodeMirror renders an empty final
+   line as nothing, so the document is now reconstructed from its line elements (which reproduces the
+   trailing newline exactly).
+6. I expected a misconfigured pattern list to still "pass" when the required patterns matched. It does
+   not: `passed` is false whenever any pattern is invalid or empty, which is the right contract and is
+   what the test now records.
+
+A workspace reset also hit at the start of this round (the third this session): the checkout reverted
+to `f5abbf2` while the remote still held `5be421d`, with `node_modules` gone. The documented recovery
+(`git fetch origin`, `git reset --mixed origin/arena/1b23fec7-ggggggggg`, `npm ci`) restored everything
+and no work was lost or redone.
+
+### 5. Verified state at this commit
+
+- `npx tsc --noEmit` — silent, also with `--noUnusedLocals --noUnusedParameters`.
+- `npm test` — **20 files, 135 tests, all passing**; `npm run test:coverage` — 97.21 % of statements.
+- `npm run build` — `dist/index.html` 3,946.80 kB (gzip 1,182.82 kB), SHA-256 `4c3cf120e4b55cb9…`
+  unchanged; no source change was needed for it.
+- The curriculum is untouched: `git diff 2495ba2..HEAD -- src/courses/` is still empty, so the
+  Appendix Z and AF batteries continue to describe the corpus exactly.
+
+### 6. Files changed in this round
+
+New: `src/app.navigation.test.tsx`, `.arena-reachability.ts`. Changed: `src/app.editor.test.tsx`,
+`src/app.export.test.tsx`, `src/app.flows.test.tsx` (six shell-branch tests),
+`src/utils/exerciseCheck.test.ts` (four unit cases), `src/utils/exportTargets.test.ts` (one unit case),
+and this appendix. No source file under `src/` outside tests was modified.

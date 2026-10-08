@@ -35,6 +35,13 @@ describe("export target selection", () => {
     }
   });
 
+  it("returns nothing when the chapter or lesson id does not exist", () => {
+    const course = courseById("python")!;
+    expect(resolveExportTargets(course, "lesson", 1, "python-999-9"), "an unknown lesson id").toEqual([]);
+    expect(resolveExportTargets(course, "chapter", 999, ""), "an unknown chapter number").toEqual([]);
+    expect(lessonsForChapter(course, 999), "an unknown chapter has no lessons").toEqual([]);
+  });
+
   it("does not leak another chapter into a lesson export", () => {
     const cpp = courseById("cpp")!;
     const lesson = cpp.chapters[9].lessons[0];

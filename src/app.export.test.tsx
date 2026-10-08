@@ -87,6 +87,36 @@ describe("CodeForge export surface", () => {
     expect(raw, "one lesson only, so the next chapter is absent").not.toContain(`Chapter ${chapter.number + 1}:`);
   });
 
+  it("carries chapter projects and checkpoint scores into the guide", async () => {
+    const course = courseById("python")!;
+    const chapter = course.chapters.find((candidate) => candidate.cumulativeTest)!;
+    const projectCode = "# my saved project code, only in storage";
+    saveProgress({
+      ...defaultProgress,
+      code: { [`${course.id}-chapter-${chapter.number}-project`]: projectCode },
+      testScores: {
+        [`${course.id}-chapter-${chapter.number}-test`]: 2,
+        [`${course.id}-chapter-${chapter.number}-cumulative`]: chapter.cumulativeTest!.length,
+      },
+    });
+    window.history.pushState({}, "", "/export");
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+    await screen.findByText(/study guide has downloaded/i);
+    await waitFor(() => expect(existsSync(resolve(COURSE_PDF))).toBe(true));
+
+    const { raw } = read(COURSE_PDF);
+    // jsPDF wraps long strings into several text runs, so the assertions use the leading words that
+    // provably fit on one line, plus every short literal the generator writes verbatim.
+    const prompt = chapter.project!.prompt;
+    const promptHead = `Project prompt: ${prompt.split(/\s+/).slice(0, 3).join(" ")}`;
+    expect(raw, `the project's prompt is written: ${promptHead}`).toContain(promptHead);
+    expect(raw, "the learner's saved project code travels with it").toContain("my saved project code, only in storage");
+    expect(raw, "the chapter test score is reported").toContain(`score: 2/${chapter.test!.length}`);
+    expect(raw, "and so is the checkpoint under its own heading").toContain(`cumulative checkpoint score: ${chapter.cumulativeTest!.length}/${chapter.cumulativeTest!.length}`);
+  });
+
   it("exports a chapter whose contents are the course's contents minus the other chapters", async () => {
     const course = courseById("python")!;
     const chapter = course.chapters[2];

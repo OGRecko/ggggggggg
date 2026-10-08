@@ -32,6 +32,34 @@ describe("exercise structure checking", () => {
     expect(result.emptyPatterns).toContain("");
   });
 
+  it("reports an empty pattern inside an alternative group", () => {
+    const result = checkRequiredPatterns('console.log("ok")', { mode: "patterns", requiredPatterns: [], requiredOneOf: [[""]] });
+    expect(result.passed).toBe(false);
+    expect(result.emptyPatterns).toContain("");
+  });
+
+  it("reports an empty alternative group as a missing requirement", () => {
+    const result = checkRequiredPatterns('console.log("ok")', { mode: "patterns", requiredPatterns: [], requiredOneOf: [[]] });
+    expect(result.passed).toBe(false);
+    expect(result.emptyPatterns).toContain("<empty alternative group>");
+    expect(result.missing).toContain("one valid alternative pattern");
+  });
+
+  it("reports an invalid regex inside an alternative group instead of throwing", () => {
+    const result = checkRequiredPatterns('console.log("ok")', { mode: "patterns", requiredPatterns: [], requiredOneOf: [["console("]] });
+    expect(result.passed).toBe(false);
+    expect(result.invalidPatterns).toContain("console(");
+  });
+
+  it("reports empty and invalid forbidden patterns instead of throwing, and refuses to pass", () => {
+    const result = checkRequiredPatterns('console.log("ok")', { mode: "patterns", requiredPatterns: ["console"], forbiddenPatterns: ["", "console("] });
+    expect(result.emptyPatterns).toContain("");
+    expect(result.invalidPatterns).toContain("console(");
+    // A misconfigured list can never be graded as a pass: the learner must not be told a broken
+    // check succeeded.
+    expect(result.passed).toBe(false);
+  });
+
   it("accepts one valid alternative from a requiredOneOf group", () => {
     const result = checkRequiredPatterns('const value = 1;', { mode: "patterns", requiredPatterns: [], requiredOneOf: [["let\\s+value", "const\\s+value"]] });
     expect(result.passed).toBe(true);

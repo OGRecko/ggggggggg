@@ -276,6 +276,83 @@ describe("page surfaces", () => {
     expect(within(untouched).getByText(`0 / ${allLessons(courseById("cpp")!).length} live exercises passed`)).toBeTruthy();
   });
 
+  it("navigates from every header link and closes the mobile menu on a jump", () => {
+    const view = render(<App />);
+    const nav = view.container.querySelector("nav.top-nav") as HTMLElement;
+    fireEvent.click(screen.getByRole("button", { name: /toggle navigation/i }));
+    expect(nav.className).toContain("is-open");
+
+    const destinations: Array<[RegExp, string, string]> = [
+      [/^my progress$/i, "/progress", "My progress"],
+      [/^coverage audit$/i, "/audit", "Coverage audit"],
+      [/^export pdf$/i, "/export", "Export PDF"],
+      [/^settings$/i, "/settings", "Preferences"],
+      [/^home$/i, "/", "How learning works"],
+    ];
+    for (const [name, path, marker] of destinations) {
+      fireEvent.click(within(nav).getByRole("link", { name }));
+      expect(window.location.pathname, `header link ${String(name)} navigates`).toBe(path);
+      expect(view.container.textContent, `header link ${String(name)} renders its page`).toContain(marker);
+      expect(nav.className, "a jump closes the menu").not.toContain("is-open");
+    }
+
+    // Clicking a link for the page you are already on is a no-op, not an error.
+    fireEvent.click(within(nav).getByRole("link", { name: /^home$/i }));
+    expect(window.location.pathname).toBe("/");
+    fireEvent.click(screen.getByRole("link", { name: /codeforge home/i }));
+    expect(window.location.pathname, "the brand behaves the same way").toBe("/");
+  });
+
+  it("answers an unknown course path with the 404 page", () => {
+    route("/ruby");
+    const view = render(<App />);
+    expect(view.container.textContent).toContain("That learning path is not here");
+    expect(view.container.textContent, "no half-built course shell").not.toContain("Course progress");
+  });
+
+  it("offers the finish-chapter link on the course's final lesson", () => {
+    // Lessons form one course-wide sequence, so "Next" continues into the next chapter; the
+    // "Finish chapter" link belongs to the final lesson of the last chapter.
+    const pythonCourse = courseById("python")!;
+    const chapter = pythonCourse.chapters[pythonCourse.chapters.length - 1];
+    const last = chapter.lessons[chapter.lessons.length - 1];
+    const before = allLessons(pythonCourse).slice(0, -1).map((lesson) => lesson.id);
+    saveProgress({ ...defaultProgress, completedExercises: before });
+    route(`/${pythonCourse.id}/chapter-${chapter.number}/lesson-${last.order}`);
+    const view = render(<App />);
+
+    expect(view.container.textContent, "the last lesson closes the course").toContain("Finish chapter");
+    expect(screen.queryByRole("button", { name: /^next:/i }), "there is no next lesson to offer").toBeNull();
+    expect(view.container.textContent, "and it can go back").toContain(`Previous: ${chapter.lessons[chapter.lessons.length - 2].title}`);
+    fireEvent.click(screen.getByRole("link", { name: /finish chapter/i }));
+    expect(window.location.pathname).toBe(`/${pythonCourse.id}/chapter-${chapter.number}`);
+  });
+
+  it("routes the chapter page's export button to a pre-filled chapter export", async () => {
+    const pythonCourse = courseById("python")!;
+    const chapter = pythonCourse.chapters[1];
+    route(`/${pythonCourse.id}/chapter-${chapter.number}`);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /export this chapter pdf/i }));
+    await waitFor(() => expect(window.location.pathname).toBe("/export"));
+    expect((screen.getByRole("radio", { name: /one chapter/i }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(/^Chapter/, { selector: "select" }) as HTMLSelectElement).value).toBe(String(chapter.number));
+  });
+
+  it("switches the home action to review once the whole course is complete", () => {
+    const pythonCourse = courseById("python")!;
+    saveProgress({ ...defaultProgress, completedExercises: allLessons(pythonCourse).map((lesson) => lesson.id) });
+    route("/");
+    const view = render(<App />);
+
+    expect(view.container.textContent, "the next-action card reports completion").toContain("Python course complete");
+    const review = screen.getByRole("link", { name: /review python/i });
+    expect(review.getAttribute("href")).toBe(`/${pythonCourse.id}`);
+    fireEvent.click(review);
+    expect(window.location.pathname).toBe(`/${pythonCourse.id}`);
+  });
+
   it("boots on defaults when the stored record is corrupted", () => {
     localStorage.setItem("codeforge-progress-v2", "{ this is not json");
     const view = render(<App />);
