@@ -381,7 +381,12 @@ function buildExercise(language: Exclude<LanguageId, "python">, topic: string, s
     starterCode: plan.project.starterCode ?? blankStarter(language),
     solution: plan.project.solution ?? sample.code,
     solutionExplanation: plan.project.solutionExplanation ?? `This small build applies ${topic.toLowerCase()} in a realistic scenario while keeping the boundary explicit and reviewable.`,
-    testCases: plan.project.testCases ?? [{ label: `${topic} build`, expected: plan.project.solution ? sample.output : modifiedOutputFor(language, sample) }],
+    // The lesson asks for the chapter's own artifact from a blank starter, and the shipped solution is
+    // exactly that artifact, so the declared result describes what the code does. The extended
+    // variation (modifiedCode) belongs to the modify/design/compare lessons, which declare
+    // modifiedOutputFor(...) together with the modified code, and to the chapter projects, whose own
+    // test cases describe the project deliverable.
+    testCases: plan.project.testCases ?? [{ label: `${topic} build`, expected: sample.output }],
     hints: plan.project.hints ?? sample.hints,
     checker: checkerFor(language, { ...sample, required: plan.project.requiredPatterns ?? sample.required }, true),
   };

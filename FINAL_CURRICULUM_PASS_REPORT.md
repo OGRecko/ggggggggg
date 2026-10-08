@@ -2064,3 +2064,148 @@ genuinely produced by the code as written. 0 defects, nothing changed.
 `src/courses/pythonDebugLabs.ts`, `src/courses/pythonGaps.ts` (the three `pass` bodies),
 `src/data/courseIntegrity.test.ts` (the new boundary test), and the new tracked audit pair
 `.arena-pyexec.ts` / `.arena-pyexec.py`.
+
+---
+
+## Appendix X — a real compiler and a real parser on the closed corpus
+
+Appendix W checked Python with the standard library's parser, the CPython interpreter, a
+void-aware tag balance, and a Java name cross-reference. Two gaps stayed open: C++ had only
+structural evidence, and the HTML/CSS structure had only been checked by that hand-written
+balance. Both were closed with real tools this round, and the C++ work turned up a content defect
+that the pattern-based checks had never been able to see.
+
+### 1. Every C++ program compiled and run with g++ (GCC 12, `-std=c++20`)
+
+`.arena-cppexec.ts` dumps every C++ string with its declared result and the lesson context the
+driver needs (`lessonKind`, whether the lesson ships a deliberately broken example);
+`.arena-cppexec.py` compiles each one in its own temporary directory and runs it. Rows are judged by
+what they are:
+
+```
+627 C++ strings checked with g++ (GCC 12, -std=c++20)
+451 programs matched | 0 mismatched | 0 unexpected failures | 22 broken samples failed as designed | 0 surprising passes
+fragments: 4 syntax-clean | 1 header/source pairs checked as files | 1 not C++ (not compiled) | 0 anomalies
+starters: 125 parse | 22 are a debug lesson's deliberate break | 1 wait for the learner's definitions
+```
+
+Three details are worth stating plainly, because getting them wrong would have produced false
+findings:
+
+- **The standard is the course's own.** The first run used `-std=c++17` and reported six failures,
+  including the `std::integral` concept lesson. The course names `-std=c++20` in 34 places (its
+  project solutions and gap lessons), so the driver was wrong, not the lessons.
+- **A console transcript is both streams.** `std::cerr` is unbuffered and `std::cout` is flushed at
+  exit, so a reader watching the program sees the `std::cerr` line first. The driver originally
+  compared only stdout and flagged every chapter 24 logging sample; it now merges the two streams.
+- **Isolation matters as much as compilation.** Each program runs in a fresh directory, so a
+  file-writing sample cannot read a file left behind by its own previous run (the same defect the
+  Python driver had in Appendix W).
+
+The six rows that are not standalone programs were read and adjudicated, not skipped: a dangling
+reference demonstration, three type sketches (rule-of-zero, cycle-aware ownership, a condition
+variable), a header/source pair, and a CMake target sketch. Five are C++ fragments that pass
+`-fsyntax-only`, and the header/source pair is now split into real files and checked as the pair it
+claims to be. The CMake snippet is not C++ and is reported as structural. The starters were checked
+as fragments: 125 parse, 22 are the deliberate `std::cot` break that their debug lesson ships on
+purpose, and one — `cpp-8-2`, a read lesson whose `main` calls the two members the learner is asked
+to write — is a fill-in scaffold, listed for review rather than counted as a pass or a failure.
+
+The browser app still cannot compile C++, so nothing in the course's own language changed: the
+lessons keep saying that C++ is structurally checked, and the compile evidence lives here.
+
+### 2. Every HTML/CSS string parsed with parse5
+
+`.arena-htmlparse.mjs` runs parse5 8.0.1 — the reference implementation of the HTML5 tree
+construction algorithm — over all 600 strings, using document mode for the 17 strings that are full
+documents and fragment mode for the 551 snippets.
+
+```
+600 HTML/CSS strings | 568 parsed as markup (17 documents, 551 fragments) | 32 not markup
+568 parsed without a reported error | 0 ordinary samples with reported errors
+```
+
+parse5 is an audit-only dependency (`npm install --no-save parse5`); it is deliberately not in
+`package.json`, because the application never parses HTML itself. Worth noting for honesty: HTML5's
+error recovery silently repairs an unclosed tag, so the deliberately broken debug samples produce no
+parser diagnostics at all — the hand-written tag balance remains the check that catches that class,
+and every one of its 42 flags was confirmed to be the broken half of a debug lesson.
+
+### 3. The finding: 24 lessons declared a result their own solution did not produce
+
+`courseFactory.buildExercise` builds the blank-page/build/integration lessons. When a chapter plan
+supplied no project test case it fell back to `modifiedOutputFor(...)` — the generated *extended
+variation* text — while shipping the *unmodified* chapter sample as the solution:
+
+```ts
+solution: plan.project.solution ?? sample.code,
+testCases: plan.project.testCases ?? [{ label: `${topic} build`, expected: plan.project.solution ? sample.output : modifiedOutputFor(language, sample) }],
+```
+
+The declared result and the code disagreed, so 24 HTML/CSS lessons across 12 chapters told the
+learner to expect "…, plus the added practice paragraph" for a document, form, panel, navigation
+row, grid, button, card, image, link, or print stylesheet that contains no paragraph — and neither
+the lesson's prompt nor its required patterns asked for one. The table below shows the first
+finding as the audit reported it:
+
+```
+24 rows whose declared result claims an extension the code lacks
+   [solution] htmlcss-1-4 [solution]   claims 'practice paragraph'
+        declared: 'A valid document with language and title, plus the added practice para'
+        code:     '<!doctype html> <html lang="en"> <head><meta charset="utf-8"><title>Co'
+```
+
+Python, Java, JavaScript and C++ were clean (0 rows each), because the build family exists only in
+HTML/CSS. The fix makes the declared result describe what the lesson asks for and what its shipped
+solution produces:
+
+```ts
+testCases: plan.project.testCases ?? [{ label: `${topic} build`, expected: sample.output }],
+```
+
+The extended variation is untouched where it belongs: the modify/design/compare lessons still ship
+`modifiedCode` together with `modifiedOutputFor(...)`, and `courseIntegrity.test.ts` still binds their
+expected output to the 25 verified entries in `modifiedOutputs.ts`. A new test (*never declares the
+generated extended variation for a build-family lesson*) locks the fix in; it was confirmed to fail
+on the old code with `htmlcss-1-4 declares the added practice paragraph but ships no paragraph`, then
+pass once the fix was restored. The C++, Java, JavaScript and Python dumps were diffed before and
+after the change and are byte-identical (627, 654, 625 and 712 rows), so no other course moved.
+
+### 4. Cross-course consistency: identical code, different declared results
+
+Grouping every non-starter row by its code (comments stripped) and looking for one program shown with
+two different declared results found **0 clashes** in Python (688 distinct programs), C++ (216),
+JavaScript (223), Java (235) and HTML/CSS (222). The only groups that initially looked like clashes
+were scaffold skeletons — identical blank starters with different targets — which is why starters are
+excluded from that comparison.
+
+### Final measured state
+
+| Check | Before this round | After |
+| --- | --- | --- |
+| C++ programs compiled and executed | never (structural only) | **451 matched, 22 broken as designed, 0 mismatched, 0 unexpected failures** |
+| C++ strings checked by the toolchain | 0 | **627** |
+| HTML/CSS strings parsed by a spec parser | 0 | **568 (0 reported errors)** |
+| Lessons declaring a result their solution does not produce | 24 | **0** |
+| Tests / build | 70 / 3,945.19 kB | **71 / 3,945.17 kB** (gzip 1,182.35 kB) |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **71 tests, all passing**.
+- `.arena-cppexec.ts` + `.arena-cppexec.py` — 0 mismatches, 0 unexpected failures, 0 anomalies.
+- `.arena-htmlparse.mjs` — 568 markup strings, 0 reported errors.
+- `.arena-pyexec.ts` + `.arena-pyexec.py` — 712 programs, 708 matched, 4 documented input boundary,
+  0 mismatched.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, 0 named-not-shown, 0 with no trace.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises,
+  0 failing chapter projects.
+- `.arena-audit.ts` — C++, Python, Java, HTML/CSS 0; JavaScript 11 (the pattern-criterion artifact
+  explained in Appendix U; its exercises are graded by real Worker execution).
+- `npm run build` — succeeds, 3,945.17 kB (gzip 1,182.35 kB).
+
+### Files changed in this round
+
+`src/courses/courseFactory.ts` (the build-family declared result), `src/data/courseIntegrity.test.ts`
+(the guard test), the new tracked audit tools `.arena-cppexec.ts` / `.arena-cppexec.py` and
+`.arena-htmlparse.mjs`, and this appendix.

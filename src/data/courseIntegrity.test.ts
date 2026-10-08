@@ -209,6 +209,33 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("never declares the generated extended variation for a build-family lesson", () => {
+    // buildExercise used to fall back to modifiedOutputFor(...) for a lesson whose plan supplies no
+    // project test case, while the solution it shipped was the unmodified chapter sample. That made
+    // 24 HTML/CSS blank-page/build/integration lessons declare "..., plus the added practice
+    // paragraph" for code containing no paragraph, and neither their prompt nor their required
+    // patterns asked for one. The extended variation belongs to the modify/design/compare lessons,
+    // which ship modifiedCode together with modifiedOutputFor(...), and to the authored project test
+    // cases checked above. A generated extension marker in a build-family declared result must be
+    // backed by the lesson's own solution.
+    const buildKinds: Array<(typeof courses)[number]["chapters"][number]["lessons"][number]["kind"]> = ["blank-page", "build", "integration"];
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
+        for (const lesson of chapter.lessons) {
+          if (!buildKinds.includes(lesson.kind)) continue;
+          const expected = lesson.exercise?.testCases?.[0]?.expected ?? "";
+          const solution = lesson.exercise?.solution ?? "";
+          if (/plus the added practice paragraph/i.test(expected)) {
+            expect(solution, `${lesson.id} declares the added practice paragraph but ships no paragraph`).toMatch(/<p[\s>]/);
+          }
+          if (/\bmodified\b/i.test(expected)) {
+            expect(solution, `${lesson.id} declares a modified result but ships unmodified code`).toMatch(/\bmodified\b/i);
+          }
+        }
+      }
+    }
+  });
+
   it("keeps the repaired Java and C++ project solutions prompt-faithful and self-consistent", () => {
     // Java and C++ cannot run in this browser, so the strongest honest guarantee is that the
     // shipped answer to each project satisfies the project's own structural check and is not the
