@@ -455,6 +455,24 @@ describe("CodeForge curriculum integrity", () => {
     expect(new Set(criteria).size).toBe(criteria.length);
   });
 
+  it("names the input boundary for Python examples that read a line of input", () => {
+    // The Run button supplies no input line, so a program that calls input() prints its prompt and
+    // stops with EOFError. An example that reads input therefore has to say so in its declared
+    // output instead of showing a transcript with the supplied line echoed into it, which no
+    // non-interactive runner produces.
+    const python = courseById("python")!;
+    const undocumented: string[] = [];
+    for (const chapter of python.chapters) {
+      for (const lesson of chapter.lessons) {
+        for (const example of lesson.examples ?? []) {
+          if (!/\binput\s*\(/.test(example.code)) continue;
+          if (!/sandbox|input line/i.test(example.output)) undocumented.push(`${lesson.id}/${example.title} -> ${example.output.slice(0, 60)}`);
+        }
+      }
+    }
+    expect(undocumented).toEqual([]);
+  });
+
   it("keeps default scaffold samples aligned with late-course chapter topics", () => {
     const java = courseById("java")!;
     const javaConcurrencyRead = java.chapters[15].lessons.find((lesson) => lesson.kind === "read");

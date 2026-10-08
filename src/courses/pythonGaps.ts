@@ -1101,7 +1101,7 @@ const gapLessonRoundTwo: Record<number, LessonSeed[]> = {
       ],
       exercise: {
         prompt: "Define Shape with __match_args__ = (\"kind\",) and one attribute kind. Match Shape(\"circle\") and print round for the keyword pattern case Shape(kind=\"circle\"), otherwise print other.",
-        starterCode: "class Shape:\n    # Declare the attribute that patterns may capture\n",
+        starterCode: "class Shape:\n    # Declare the attribute that patterns may capture\n    pass\n",
         solution: 'class Shape:\n    __match_args__ = ("kind",)\n    def __init__(self, kind):\n        self.kind = kind\nmatch Shape("circle"):\n    case Shape(kind="circle"):\n        print("round")\n    case Shape():\n        print("other")',
         solutionExplanation: "The keyword pattern checks the type and one attribute value. The bare class pattern is the fallback for any other shape, so only accepted shapes run the first branch.",
         testCases: [{ label: "Matched shape", expected: "round" }],

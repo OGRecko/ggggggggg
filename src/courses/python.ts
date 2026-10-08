@@ -189,7 +189,7 @@ const inputAndConversion: Lesson = {
   minutes: 28,
   summary: "Collect text from a person and convert numeric text before calculating.",
   learningGoals: ["Use input()", "Explain why input returns a string", "Convert text with int()"],
-  explanation: "input() pauses a program and waits for a person to type. It always returns a string because typed characters begin as text. When you need arithmetic, int() converts a whole-number string into an integer. Conversion is deliberate so Python does not guess what text means.",
+  explanation: "input() pauses a program and waits for a person to type. It always returns a string because typed characters begin as text. When you need arithmetic, int() converts a whole-number string into an integer. Conversion is deliberate so Python does not guess what text means. The Run button supplies no input line, so a program that calls input() is verified with Check answer, which passes the values listed in the exercise tests.",
   keywordNotes: [
     "input(prompt) displays prompt and returns the typed characters as a string.",
     "int(value) converts a compatible string such as \"8\" into the integer 8.",
@@ -199,8 +199,8 @@ const inputAndConversion: Lesson = {
     {
       title: "Use a typed name",
       code: 'name = input("What is your name? ")\nprint("Hello, " + name)',
-      output: "What is your name? Ada\nHello, Ada",
-      explanation: "The first line shows a prompt and stores the text Ada. The second line joins a greeting string with that stored name.",
+      output: "Sandbox: Run prints the prompt and stops with EOFError, because Run has no input line. With Ada supplied as the first input line the program prints: What is your name? Hello, Ada",
+      explanation: "The first line prints its prompt and takes one supplied line as the value of name; the sandbox never echoes that line, so the greeting appears on the same line as the prompt. The second line joins a greeting string with the stored name.",
       lines: [
         "Line 1: input displays the quoted prompt and pauses. When the person types Ada and presses Enter, input returns the string Ada. = assigns it to name.",
         "Line 2: The + operator joins the string Hello, and the string stored in name. print then writes the completed greeting.",
@@ -214,8 +214,8 @@ const inputAndConversion: Lesson = {
     {
       title: "Convert a typed number",
       code: 'age_text = input("Age: ")\nage = int(age_text)\nnext_year = age + 1\nprint(next_year)',
-      output: "Age: 19\n20",
-      explanation: "The typed characters 19 arrive as text. int changes them into a number so + can calculate the following age.",
+      output: "Sandbox: Run prints the prompt and stops with EOFError, because Run has no input line. With 19 supplied as the first input line the program prints: Age: 20",
+      explanation: "The supplied characters 19 arrive as text, and int changes them into a number so + can calculate the following age. Because nothing echoes the supplied line, the prompt and the converted result share one output line.",
       lines: [
         "Line 1: input displays Age: and returns whatever was typed as a string. The program stores that string in age_text.",
         "Line 2: int receives the numeric string 19 and converts it to the integer 19. = assigns the converted value to age.",

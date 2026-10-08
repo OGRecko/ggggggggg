@@ -370,7 +370,7 @@ const pythonDebugLabs: Record<number, LessonSeed> = {
     ],
     exercise: {
       prompt: "Define Timer with an initializer that stores minutes on the instance and a remaining() method that returns it. Print Timer(25).remaining().",
-      starterCode: 'class Timer:\n    def __init__(self, minutes):\n        # Store the value on the instance\n',
+      starterCode: 'class Timer:\n    def __init__(self, minutes):\n        # Store the value on the instance\n        pass\n',
       solution: 'class Timer:\n    def __init__(self, minutes):\n        self.minutes = minutes\n    def remaining(self):\n        return self.minutes\nprint(Timer(25).remaining())',
       solutionExplanation: "Assigning through self stores the value on the instance, so the method reads the minutes the caller supplied.",
       testCases: [{ label: "Stored attribute", expected: '25' }],
@@ -566,7 +566,7 @@ const pythonDebugLabs: Record<number, LessonSeed> = {
     ],
     exercise: {
       prompt: "Write double(value: int) -> int that raises TypeError when value is not an int and otherwise returns value * 2. Print double(3).",
-      starterCode: 'def double(value: int) -> int:\n    # Reject a value the rule cannot use\n',
+      starterCode: 'def double(value: int) -> int:\n    # Reject a value the rule cannot use\n    pass\n',
       solution: 'def double(value: int) -> int:\n    if not isinstance(value, int):\n        raise TypeError("value must be int")\n    return value * 2\nprint(double(3))',
       solutionExplanation: "The isinstance guard converts the annotated contract into a runtime check, so the int input is rejected with a clear TypeError instead of producing a wrong total.",
       testCases: [{ label: "Typed boundary", expected: '6' }],

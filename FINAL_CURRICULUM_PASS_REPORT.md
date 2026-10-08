@@ -1950,3 +1950,117 @@ lessons carry no JDK and say so; **all six printed values were recomputed by han
   Appendix U (its exercises are graded by real execution, and each solution reproduces its declared output).
 - Balanced-delimiter audit after comment stripping — Java, C++, JavaScript 0.
 - `npm run build` — succeeds, 3,943.70 kB (gzip 1,182.00 kB).
+
+---
+
+## Appendix W — Independent verification of the closed corpus
+
+The concept series closed at commit `10dc22c` with every flag swept to zero, but those checks all ran
+through the course's *own* machinery: a lesson's exercise was checked by the same pattern its own lesson
+declares, and a declared output was compared against a program the same authored lesson supplied. This
+appendix records what happened when the four claims that had never been tested by an independent mechanism
+were put to real tools: Python syntax by the standard library parser, Python behaviour by a real
+interpreter, HTML/CSS structure by tag balance, and Java names by a type cross-reference.
+
+### 1. Every Python string parses (`ast`, standard library)
+
+All **937** Python code strings were dedented to their common margin and parsed with `ast.parse`. Three
+failed, all starters whose `def` or `class` body contained only a comment: `python-9-8` and `python-15-8`
+in `pythonDebugLabs.ts`, `python-23-10` in `pythonGaps.ts`. The corpus convention was surveyed (225
+starters): comment-only *scripts* are the norm and are valid Python; a comment-only *body* is not. The
+three bodies received a `pass` line, and a re-parse is now **937/937 valid**.
+
+### 2. Every declared Python output is what actually prints (real interpreter)
+
+`.arena-pyexec.ts` dumps every Python string that declares an output — **712 programs** — and
+`.arena-pyexec.py` executes each one under a verbatim copy of the input shim shipped in
+`src/utils/pythonRunner.ts` (CPython 3 in the sandbox; the browser runs the same strings under Pyodide, a
+path this audit does not stand in for). First full run:
+
+```
+712 programs executed | 708 matched | 4 EOFError (declared input boundary) | 0 mismatched
+```
+
+The four were exactly the examples that call `input()`: `python-2-2` (twice), `python-2-5`,
+`python-2-6`. Reading the app settles why: the Run button has no input field at all (`App.tsx` passes
+`""`), and the shim's `input()` prints its prompt and then raises
+`EOFError('No more test input available')` once the supplied lines run out. Their declared outputs showed
+a complete transcript with the typed line echoed into it, which nothing in the product can produce. The
+four outputs were rewritten to state the boundary — for example:
+
+> *Sandbox: Run prints the prompt and stops with EOFError, because Run has no input line. With Ada
+> supplied as the first input line the program prints: What is your name? Hello, Ada*
+
+and the `python-2-2`, `python-2-5` and `python-2-6` lesson descriptions now say the same thing in prose.
+`courseIntegrity.test.ts` gained one test — *names the input boundary for Python examples that read a line
+of input* — which fails if any example that calls `input()` declares an output that neither says
+"S sandbox" nor mentions the input line. Its teeth were verified by temporarily restoring one old
+transcript and watching it fail, then restoring the fix.
+
+One finding came from the audit tooling itself and is worth recording honestly: the first version ran each
+program in the repository root, so `python-7-7`'s file-writing example appended to a `notes.txt` left by
+its own previous run and reported a mismatch the audit had caused. Each program now runs in its own fresh
+temporary directory, and two consecutive runs both end at:
+
+```
+712 programs executed | 708 matched | 4 documented input boundary | 0 mismatched | 0 errors
+```
+
+### 3. Every HTML/CSS string is tag-balanced (void-aware)
+
+All **600** HTML/CSS code strings were walked with a void-element-aware tag balance. 42 flags appeared,
+spread over 21 lessons — and every one is the intentionally broken half of a `debug` lesson ("Repair this
+deliberately broken … example"). All **143** HTML/CSS lessons were dumped and each flagged string was read
+against its lesson; no defect, nothing changed. This is a structural check only: it says nothing about
+standards conformance, accessibility, or rendering, which continue to be covered the way Appendix T
+describes — sandboxed preview for behaviour the browser owns, structural statements for everything else.
+
+### 4. Java references no type it does not declare or import (name cross-reference)
+
+All **654** Java strings were scanned for capitalized identifiers that are used but neither declared in the
+string nor imported, against a JDK name whitelist. The raw result was 26 hits. Adjudicated one by one, they
+are **real JDK types my whitelist had simply not listed**: `java.io.StringReader` (8-1 … 8-6, reading text),
+`Comparable` (6-2, 10-2), `AutoCloseable` (8-7, try-with-resources), `Number` (10-2, generics). The only
+hit that is not a JDK type is the pair `new English()` / `new French()` in the `java-9-5` starter — the two
+subclasses the learner is instructed to write, immediately above the instruction `// write the two
+subclasses here`, which the reference solution declares. That is the exercise, not a defect. Java name
+audit result: **0 defects**; Java evidence remains structural, with no JDK reachable from this sandbox,
+exactly as Appendices S and V state.
+
+### 5. JavaScript input and network boundary checked the same way
+
+The same question was asked of JavaScript: all **625** strings scanned for `prompt(`, readline,
+`process.stdin`, `require(`, and `fetch(` produced 3 hits, all in `javascript-16-6`, and all three pass the
+network function in as a stand-in (`loadTopics(url, standIn)`), so the declared console transcript is
+genuinely produced by the code as written. 0 defects, nothing changed.
+
+### Final measured state
+
+| Check | Before this round | After |
+| --- | --- | --- |
+| Python strings that parse | 934 / 937 | **937 / 937** |
+| Python programs executed with real interpreter | 0 (never checked) | **712 (708 matched, 4 declared input boundary, 0 mismatched)** |
+| Python examples declaring an impossible transcript | 4 | **0** |
+| HTML/CSS strings tag-balanced (excluding deliberate breakage) | unchecked | **checked: 0 defects** |
+| Java types referenced but never declared | unchecked | **checked: 0 defects** |
+| Tests / build | 69 / 3,943.70 kB | **70 / 3,945.19 kB** (gzip 1,182.35 kB) |
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **70 tests, all passing**.
+- `.arena-pyexec.ts` + `.arena-pyexec.py` — 712 programs, 708 matched, 4 documented boundary, 0
+  mismatched, 0 errors; stable across consecutive runs and leaves no files behind.
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, 0 named-not-shown, 0 with no trace.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
+  chapter projects.
+- `.arena-audit.ts` — C++, Python, Java, HTML/CSS 0; JavaScript 11 (the pattern-criterion artifact
+  explained in Appendix U; its exercises are graded by real Worker execution).
+- `npm run build` — succeeds, 3,945.19 kB (gzip 1,182.35 kB).
+
+### Files changed in this round
+
+`src/courses/python.ts`, `src/courses/pythonFoundations.ts` (the four input-boundary example outputs),
+`src/courses/pythonDebugLabs.ts`, `src/courses/pythonGaps.ts` (the three `pass` bodies),
+`src/data/courseIntegrity.test.ts` (the new boundary test), and the new tracked audit pair
+`.arena-pyexec.ts` / `.arena-pyexec.py`.
