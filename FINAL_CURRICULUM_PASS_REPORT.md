@@ -2699,3 +2699,44 @@ element.
 
 New: `src/app.outcomes.test.tsx`. Changed: `src/app.export.test.tsx` (the chapter-scope test) and this
 appendix.
+
+## Appendix AD — refusing to save, a corrupted hand-off, and structural naming
+
+Three app properties that had no test: what happens when the browser refuses to store anything, what
+happens when the export hand-off is corrupt, and whether the controls on every page shape carry a
+name. New file `src/app.a11y.test.tsx` (3 tests).
+
+### 1. Claims and the test that stands behind them
+
+| Claim about the app | Evidence |
+| --- | --- |
+| When the browser throws on write (private mode, full quota) the app shows its own warning instead of losing work silently, the change still applies for the session, and the warning can be dismissed | `app.a11y.test.tsx` (stubs `Storage.prototype.setItem` to throw) |
+| A corrupted `codeforge-export-preference` is ignored: the export page renders with its defaults | `app.a11y.test.tsx` |
+| Across ten page shapes (home, course, chapter, a worker lesson, an HTML/CSS lesson, progress, settings, export, audit, 404) every `button`, link, `select`, `input` and `textarea` offers a name, every page has exactly one `h1`, and the preview frame has a `title` | `app.a11y.test.tsx` |
+
+### 2. What the naming check is, and what it is not
+
+It is a **presence** check in the DOM: an `aria-label`, an `aria-labelledby` reference, a `title`, its
+own visible text, a wrapping `<label>`, a `for`-linked `<label>`, or a placeholder. It is **not** an
+accessibility audit and **not** a claim about assistive technology — this repository has no browser and
+no screen reader, and every earlier appendix says so. What it catches is silent rot: a new icon-only
+button or select that loses its name.
+
+To show the check is not vacuous, it was teeth-checked: removing `aria-label="Toggle color theme"` from
+the theme button made it report `<button class="icon-button"> has no name` on all ten page shapes, and
+removing the preview's `title` made it report the titleless iframe. The source was restored immediately
+and the file is green again. With `App.tsx` untouched, all ten shapes pass.
+
+### 3. Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — **19 files, 114 tests, all passing** (18 files / 111 before this appendix).
+- `npm run build` — succeeds, `dist/index.html` 3,946.80 kB (gzip 1,182.82 kB).
+- `src/courses/` has no changes in this round either: the appendix Z battery still describes the corpus.
+- The whole app-verification series now stands at appendices AA–AD: **nine new test files, 47 new
+  tests**, and one real defect fixed (the placeholder title). Two of the four worker/mocks named in AA
+  remain the only substitutions in the series: the Worker sandbox and the browser download step.
+
+### 4. Files changed in this round
+
+New: `src/app.a11y.test.tsx`. Changed: this appendix.
