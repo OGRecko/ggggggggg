@@ -2,7 +2,10 @@
 
 ## Branch / commit
 - Branch: `arena/1b23fec7-ggggggggg`
-- Final commit: `722f818` — `Finish truthful curriculum quality and authorship pass`
+- Series head: the branch's latest commit. This file is amended in every round, so a fixed hash here
+  would go stale the moment it was written; the honest pointer is `git log -1
+  arena/1b23fec7-ggggggggg`. The earlier fixed hash `722f818` was superseded by the whole appendix
+  series below, which was added on top of it in `f5abbf2 … cc3f926` and continues with this commit.
 - PR: https://github.com/OGRecko/ggggggggg/pull/1
 
 ## What changed
@@ -2822,3 +2825,67 @@ install and the advisory picture, and nothing about `dist/index.html`.
 
 `package.json` and `package-lock.json` (the three changes above), and this appendix. No source file was
 deleted or modified; the corpus is still untouched since the Appendix Z battery.
+
+## Appendix AF — the whole battery, re-run at the head of the branch
+
+Every app-round appendix rested on one inference: the curriculum data has not changed since the
+Appendix Z battery, therefore that battery still describes it. The inference is evidenced — `git diff
+2495ba2..HEAD -- src/courses/` is empty — but this appendix replaces it with direct measurement. Every
+tool was re-run at the head of the branch, from the final dependency state, and every number below is
+from this run, not copied from Z.
+
+### 1. Static and structural battery
+
+| Tool | Command | Result at this commit |
+| --- | --- | --- |
+| Curriculum integrity | `npx tsc --noEmit` / `npm test` | silent / **19 files, 114 tests passing** |
+| Example delivery | `.arena-dump-verify.ts` ×5 | 25 chapters each, **0 failing lesson exercises, 0 failing chapter projects** |
+| Chapter traceability | `.arena-code-sweep.ts -- all` | **125 chapters | 0 named-not-shown | 0 with no trace** |
+| Corpus census | `.arena-stats.ts` | **125 chapters | 817 lessons | 120 authored lessons | 1,684 examples (278 authored)** |
+| Authored-lesson audit | `.arena-audit.ts` | cpp 0, python 0, java 0, htmlcss 0, **javascript 11** (the known criterion artifact, unchanged) |
+| Java grammar | `.arena-javaparse.mjs` | **654 strings | 653 accepted | 0 refused | 1 not Java**; 21 broken samples syntactically valid — no JDK, so *parsed*, never "compiled" |
+| CSS parser | `.arena-cssparse.mjs` | **265 stylesheets | 264 plain clean | 0 syntax / 0 unknown-property / 0 value problems**; 74 `var()`-deferred, 6 `@font-face` descriptors; 1 broken-clean (htmlcss-11-3, an HTML-half defect) |
+| HTML tree | `.arena-htmlparse.mjs` | 600 strings | **568 markup parsed, 0 reported errors** | 32 not markup |
+| HTML conformance | `.arena-htmlvalidate.mjs` | **411 ordinary samples with no findings | 42 deliberate breaks shown | 0 breaks without a finding | 114 scaffolds validate | 1 incomplete by design**; rules 86 close-order / 8 element-name / 2 element-permitted-parent / 1 element-required-content |
+
+### 2. Execution battery
+
+| Tool | Engine | Result at this commit |
+| --- | --- | --- |
+| `.arena-pyexec.ts` + `.arena-pyexec.py` | host CPython, one namespace per row | **712 programs | 706 matched | 6 documented sandbox boundary | 0 mismatched | 0 errors** |
+| `.arena-pyodide.mjs` (`node --experimental-wasm-stack-switching`) | **Pyodide 0.29.3 / Python 3.13.2** — the app's own interpreter | **712 programs | 681 matched | 6 documented boundary | 0 mismatched | 0 errors | 25 package-unavailable (offline)** |
+| `.arena-cppexec.ts` + `.arena-cppexec.py` | **g++ 12.2.0, `-std=c++20`** | **627 strings | 451 matched | 0 mismatched | 0 unexpected failures | 22 broken samples failed as designed | 0 surprising passes**; 4 syntax-clean fragments, 1 header/source pair, 1 not C++; starters: 125 parse, 22 are a debug lesson's deliberate break, 1 waits for the learner's definitions |
+
+The 25 `package-unavailable (offline)` rows are the documented `sqlite3` boundary: this sandbox cannot
+reach the Pyodide package CDN, so those rows are reported as boundary rows rather than as passes. The
+same 25 are excluded from the C++ and CPython claims, which do not depend on that CDN.
+
+### 3. What this re-run changes
+
+Nothing in the corpus — every number matches Appendix Z. What it changes is the *kind of evidence*: the
+Z numbers are now **reproduced at the head of the branch**, from a clean `npm ci` followed by the
+documented one-line `--no-save` install of the five audit tools, so a reader can follow the same
+commands and see the same totals. The `--no-save` install left `package.json` and `package-lock.json`
+byte-identical to the committed versions (verified with `diff -q`), and the working tree was clean
+afterwards.
+
+### 4. The app, at the same commit
+
+- `npx tsc --noEmit` (and `--noUnusedLocals --noUnusedParameters`) — silent.
+- `npm test` — **19 files, 114 tests, all passing** (from 8 files / 71 before the app round).
+- `npm run build` — `dist/index.html` 3,946.80 kB (gzip 1,182.82 kB), SHA-256 `4c3cf120e4b55cb9…`,
+  unchanged by the dependency work in Appendix AE.
+- `npm audit --omit=dev` — **0 vulnerabilities**; the full audit's 3 high findings are all in the
+  dev-only `vite-plugin-singlefile → micromatch → braces` chain, with no non-breaking fix.
+- The only substitutions in the app-level tests remain the two named in Appendix AA: the Worker
+  sandbox (real runners tested separately) and the browser download step (the PDF bytes are read from
+  disk instead).
+
+### 5. Honest boundaries, restated once more
+
+No JDK: Java is grammar- and pattern-validated, never "compiled". No browser: HTML/CSS render claims
+belong to the sandboxed preview, not to screenshots or audit scores, and the structural naming test is
+a DOM presence check, not an accessibility verdict. No package CDN: the 25 `sqlite3` rows stay at the
+documented boundary. No C++ compiler inside the product: the g++ evidence lives in this report, not in
+the app's language about itself. No fabricated execution anywhere: every number above came from a tool
+that ran, and the four mistakes I made along the way are recorded in their appendices.
