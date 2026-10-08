@@ -2740,3 +2740,85 @@ and the file is green again. With `App.tsx` untouched, all ten shapes pass.
 ### 4. Files changed in this round
 
 New: `src/app.a11y.test.tsx`. Changed: this appendix.
+
+## Appendix AE — dead declarations, unused dependencies, and the advisory set
+
+The app round checked behaviour; this appendix checks the static and packaging layer, with tools that
+really ran: the TypeScript compiler, a declaration-usage scan, two production builds compared byte for
+byte, and `npm audit`.
+
+### 1. Static hygiene
+
+`npx tsc --noEmit --noUnusedLocals --noUnusedParameters` exits **0** across `src/` (app and tests): no
+unused local, parameter or import.
+
+A declaration-usage scan (every `export` in `src/` **and** in the root-level `.arena-*` audit tools,
+counting uses beyond the declaration itself) found:
+
+- **Two declarations used nowhere at all:** `cn` in `src/utils/cn.ts` and `kindsForChapter` in
+  `src/data/curriculumQuality.ts`.
+- Nine exports used only inside their own file (for example `CoverageRow`, `ExportScope`,
+  `StructureCheckResult`): unnecessary exports, not dead code — they still document their modules.
+
+Nothing was deleted. The standing instruction for this work is not to remove existing work, and these
+declarations are harmless, so they are **reported rather than removed**: `src/utils/cn.ts` and
+`kindsForChapter` are the two candidates if a future round wants them gone.
+
+### 2. What the dead helper costs the bundle: nothing
+
+Measured, not assumed. The production build was run with `src/utils/cn.ts` present and removed:
+
+```
+with cn.ts     dist/index.html  3,946.80 kB │ gzip 1,182.82 kB
+without cn.ts  dist/index.html  3,946.80 kB │ gzip 1,182.82 kB
+```
+
+Byte-identical, because nothing imports the file, so Rollup never reaches it. That also means the two
+runtime dependencies it alone uses — `clsx` and `tailwind-merge` — are **unused dependencies** of the
+app. They are not shipped either (same reason) and are reported, not removed. `tailwindcss` itself is a
+genuine build dependency: `src/index.css` begins `@import "tailwindcss"`.
+
+### 3. The one real packaging defect, fixed
+
+`vitest` was declared under `dependencies`: the **test runner was a production dependency**. That is
+why `npm audit --omit=dev` surfaced `vite` (a dependency of vitest) and two vite advisories even though
+`vite` itself is correctly a devDependency.
+
+Fixed in this round:
+
+| Change | Why |
+| --- | --- |
+| `vitest` moved from `dependencies` to `devDependencies` | A test runner is not a runtime dependency; it must not pull the build toolchain into a production install |
+| `vite` 7.3.2 → 7.3.7 | Clears both flagged advisories (`server.fs.deny` bypass on Windows alternate paths; `launch-editor` NTLMv2 hash disclosure) |
+| transitive `esbuild` 0.27.7 → 0.28.2 via `npm audit fix` | Clears the low-severity Windows dev-server file-read advisory |
+
+**Result: `npm audit --omit=dev` reports 0 vulnerabilities** (it reported 2 before). The full audit
+reports 3 high advisories, all in the **dev-only build chain** `vite-plugin-singlefile → micromatch →
+braces`: a stack-exhaustion denial of service in a glob matcher. There is no non-breaking fix — the
+only "fix" npm offers is a downgrade of the single-file plugin to 0.9.0, which would replace the build
+this project verifies. The impact is confined to the author's build machine, on patterns the project
+itself writes; none of it is in the shipped file.
+
+### 4. Proof that nothing shipped changed
+
+The build was run before and after the dependency work, from a clean `npm ci` each time:
+
+```
+before:  Inlining: index-DF2hLzB3.js / style-QzP8IAqB.css   3,946.80 kB (gzip 1,182.82 kB)   sha256 4c3cf120e4b55cb9…
+after:   Inlining: index-DF2hLzB3.js / style-QzP8IAqB.css   3,946.80 kB (gzip 1,182.82 kB)   sha256 4c3cf120e4b55cb9…
+```
+
+Identical size, identical inlined asset names, identical SHA-256. The dependency changes altered the
+install and the advisory picture, and nothing about `dist/index.html`.
+
+### 5. Verified state at this commit
+
+- `npx tsc --noEmit` (and with `--noUnusedLocals --noUnusedParameters`) — silent.
+- `npm test` — **19 files, 114 tests, all passing** after the dependency changes.
+- `npm run build` — 3,946.80 kB (gzip 1,182.82 kB), SHA-256 unchanged.
+- `npm audit --omit=dev` — 0 vulnerabilities; full audit — 3 high, dev-only, no non-breaking fix.
+
+### 6. Files changed in this round
+
+`package.json` and `package-lock.json` (the three changes above), and this appendix. No source file was
+deleted or modified; the corpus is still untouched since the Appendix Z battery.
