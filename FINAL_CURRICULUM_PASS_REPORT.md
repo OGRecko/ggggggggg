@@ -2486,3 +2486,114 @@ A plain `npm ci` removes them, which is expected and is why each tool's header r
 solution, and the two fragment-level 20-1 rows), `.arena-dump-code.ts` (dumps now carry lesson kind and
 the broken-example flag), the new tracked `.arena-javaparse.mjs`, `.arena-cssparse.mjs` and
 `.arena-htmlvalidate.mjs`, and this appendix.
+
+## Appendix AA — the same standard applied to the app itself
+
+A note on the labels, so nothing here looks like a missing document: the lettered appendices in this
+report begin at **B**. That is the label the first appendix was given, the earlier PR comments cite
+those letters, and renumbering them now would invalidate those references for no gain, so the sequence
+simply continues with AA.
+
+Every earlier appendix audited the *curriculum*. The app around it — the router, the lesson gate, the
+practice flow, the Worker protocol, the preview boundary, the export, the store — was only read. This
+round mounts the real `<App />` (the component `src/main.tsx` renders) in a jsdom document with
+Testing Library and drives it the way a learner does, then inspects what the production build actually
+ships. Eight new test files, 17 new tests, one real app defect fixed.
+
+### 1. What is real in these tests, and what is not
+
+Real: every chapter and lesson object of all five courses (the sweeps mount all 817 lesson pages), the
+real router and history handling, the real `checkRequiredPatterns` grading, the real `CodeMirror`
+editor, the real jsPDF document construction, the real `localStorage` round trip through the app's own
+`saveProgress`/`loadProgress`.
+
+Not real, stated plainly:
+
+- **The Worker sandboxes.** jsdom has no `Worker`. The protocol test installs a labelled `FakeWorker`
+  that speaks the shipped message format and answers with each declared test case's expected output.
+  It proves the app sends the right messages and displays what came back; it does not prove the
+  sandbox works. That evidence stays where it already is: `pythonRunner.test.ts`,
+  `javascriptRunner.test.ts` and `javascriptRuntime.test.ts` execute the real worker sources.
+- **A browser.** There is no real browser in this sandbox (Appendix S). The preview is therefore
+  asserted at the level of its own configuration — `sandbox="allow-scripts"`, `srcDoc`, no URL `src`,
+  no `allow-same-origin` — never as a rendering claim. Likewise the Pyodide loader only ever runs in a
+  browser, so the app-level Python path is exercised through the protocol stub while Pyodide itself
+  was verified separately (Appendix Y).
+- **Download semantics.** jsdom has no download machinery, so the export test reads the bytes jsPDF
+  produced rather than claiming a browser download happened.
+
+### 2. Defect found and fixed
+
+`index.html` still carried the scaffold's placeholder `<title>Arena Web Dev App</title>`. It is now
+`CodeForge — practical coding lessons for Python, JavaScript, Java, C++, and HTML/CSS`, and the same
+title is present in the built `dist/index.html`. That was the only app defect this round found; the
+router, gate, grading, worker protocol, preview boundary, store and export behaved as the code claims.
+
+### 3. Claims and the test that stands behind them
+
+| Claim about the app | Evidence |
+| --- | --- |
+| Home lists the five supported courses | `app.integration.test.tsx` |
+| A lesson whose predecessor has not passed renders "Lesson locked" and withholds the prompt | `app.integration.test.tsx` |
+| Structure-checked practice uses the real checker, records completion, and marks the exercise "Passed" | `app.integration.test.tsx` (`.completed-mark`) |
+| A starter missing a required construct fails and is not recorded as complete | `app.integration.test.tsx` |
+| Java/C++ state the no-compiler boundary instead of pretending to run | `app.integration.test.tsx` |
+| `Run` posts an empty input; `Check answer` posts **every declared test case in order**; the console shows the worker's output and "Nice work" only when all cases match | `app.integration.test.tsx` (labelled `FakeWorker`) |
+| Alt+H/P/S navigate; a bare key does not; browser back/forward arrives as `popstate`; unknown paths render the 404 page | `app.integration.test.tsx` |
+| Settings reach the document (`data-*` on `<html>`) and persist; "Delete local data" confirms first, keeps data when declined, resets it when accepted | `app.integration.test.tsx` |
+| The HTML/CSS preview is `sandbox="allow-scripts"`, srcdoc-only, no same-origin escape; the editor is the real CodeMirror showing stored code | `app.editor.test.tsx` |
+| Generate PDF builds a real PDF: `%PDF-1.3`, >100 kB and >5 pages for a whole course, containing the course name, the learner's saved code and recorded scores; lesson scope exports one lesson | `app.export.test.tsx` (reads the file jsPDF wrote) |
+| Every chapter and lesson page of all five courses renders (125 chapter pages, 817 lesson pages) | `app.sweep.<course>.test.tsx` ×5 |
+
+### 4. What the build ships
+
+Measured on the production build (`npm run build`, vite 7.3.2 with the single-file plugin):
+
+- `dist/` contains exactly one file, `index.html`, 3,946.80 kB (gzip 1,182.82 kB); JS, CSS and both
+  Worker sources are inlined; no separate assets, no source maps.
+- The preview frame ships as `sandbox="allow-scripts"`; the only `allow-same-origin` string in the
+  bundle belongs to DOMPurify's default attribute allowlist, not to the preview.
+- The only network reference is the pinned `https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js`
+  (plus that path as `indexURL`) inside the Python worker's inline source. Everything else is local.
+  The `example.com`/`example.test` URLs in the bundle are lesson text, never fetched by the app.
+- No `eval(` and no `new Function(` anywhere in the bundle.
+- The jsPDF code that ships is the browser download shim (`"download" in HTMLAnchorElement.prototype`);
+  the Node `require("fs")`/`writeFileSync` path is absent. (In tests the Node entry is resolved instead,
+  which is exactly why the export test can read real bytes.)
+
+### 5. Corrections to my own work
+
+The four mistakes below were mine, not the app's, and are recorded so the evidence can be judged:
+
+1. The first generated sweep wrote `` `/{course.id}/chapter-${chapter.number}` `` — a dropped `$` left
+   a literal placeholder in every route, and the app correctly answered with its 404 page. The router
+   was right; the generator was wrong.
+2. "Check answer" was clicked while a run was still in flight; the button reads "Checking…" then, so
+   the query failed. The test now waits for the run's output before pressing Check.
+3. I assumed Check sends only the first test case. It sends *every* declared case, in order, on one
+   worker (`python-2-2`: inputs `""`, `"5"`, `"0"`, `"-4"`). That behaviour is now asserted as found.
+4. I first wrote that jsPDF's `save()` is a no-op under jsdom, because my first probe stubbed the wrong
+   hook. Measurement corrected it: vitest resolves jsPDF's Node build, whose `save()` writes a real file
+   — that is where the stray PDFs in the repo root came from. The export test was rewritten around that
+   fact and now contains no mock at all.
+
+Memory note for anyone extending the sweeps: a single file mounting all ~942 pages exhausts the default
+heap (observed `FATAL ERROR: Reached heap limit`, 1,887 MB). Each course therefore gets its own file and
+its own fresh worker; 148 mounts peak around 163 MB.
+
+### 6. Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — **16 files, 88 tests, all passing** (the round took the suite from 8 files / 71 tests).
+- `npm run build` — succeeds, 3,946.80 kB (gzip 1,182.82 kB), title verified in `dist/index.html`.
+- The curriculum data is untouched by this round: no file under `src/courses/` changed, so the
+  Appendix Z battery (grammars, Pyodide, C++ driver, html-validate, dump-verify, sweep, audit) still
+  describes the corpus exactly.
+
+### 7. Files changed in this round
+
+New: `src/app.integration.test.tsx`, `src/app.editor.test.tsx`, `src/app.export.test.tsx`,
+`src/app.sweep.python.test.tsx`, `src/app.sweep.java.test.tsx`, `src/app.sweep.javascript.test.tsx`,
+`src/app.sweep.cpp.test.tsx`, `src/app.sweep.htmlcss.test.tsx`. Changed: `index.html` (the title),
+`package.json` and `package-lock.json` (dev-only test dependencies: `jsdom`, `@testing-library/react`,
+`@testing-library/dom`; the app's own dependency list is unchanged), and this appendix.
