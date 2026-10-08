@@ -2597,3 +2597,64 @@ New: `src/app.integration.test.tsx`, `src/app.editor.test.tsx`, `src/app.export.
 `src/app.sweep.cpp.test.tsx`, `src/app.sweep.htmlcss.test.tsx`. Changed: `index.html` (the title),
 `package.json` and `package-lock.json` (dev-only test dependencies: `jsdom`, `@testing-library/react`,
 `@testing-library/dom`; the app's own dependency list is unchanged), and this appendix.
+
+## Appendix AB — the rest of the learner's path
+
+Appendix AA mounted the shell. This appendix finishes the walk: the chapter gate, the chapter test and
+its scoring, the chapter project, the reading check's feedback, the hint ladder, the reference-solution
+reveal, Reset, the export hand-off, the header language switcher, the mobile navigation toggle, the
+progress page's arithmetic, the coverage audit page, the course overview, the lesson-row gate, the
+cumulative checkpoint, the corrupted-store path, and the authored teaching blocks themselves. One new
+file, `src/app.flows.test.tsx`, **15 tests**, all mounting the real `<App />`.
+
+### 1. The design rule for these tests
+
+Where a learner's answer is declared by the curriculum — a reading check's `correctIndex`, a test
+question's `correctIndex`, the hints, the reference solution, the starter code — the test reads that
+declaration from the course data instead of repeating it. So the tests cannot drift into agreeing with
+a stale copy of the content, and a genuine content change updates the expectation automatically.
+
+### 2. Claims and the test that stands behind them
+
+| Claim about the app | Evidence |
+| --- | --- |
+| A chapter keeps its project and test closed until every lesson has passed, and reports the real count; with all lessons passed the brief and test open | `app.flows.test.tsx` |
+| The chapter test blocks an empty submission, scores against the declared `correctIndex` answers, explains every question, and stores the score under `python-chapter-N-test` | `app.flows.test.tsx` |
+| A passing chapter project is recorded in `projectComplete` and marked "Passed" | `app.flows.test.tsx` |
+| The hint ladder advances one hint at a time, then removes its own button; "Show answer" reveals the lesson's reference solution; Reset stores the starter code | `app.flows.test.tsx` |
+| The reading check rejects an unanswered submission, says "Not quite." with the declared explanation, and re-evaluates after the answer changes | `app.flows.test.tsx` |
+| "Export this lesson PDF" routes to `/export` with scope, language, chapter and lesson pre-filled, and consumes the `sessionStorage` hand-off exactly once | `app.flows.test.tsx` |
+| The header switcher routes to the chosen course; the navigation toggle opens and closes | `app.flows.test.tsx` |
+| The progress page recomputes both percentages and the per-language counts from the stored record, and shows zero for a course with no practice | `app.flows.test.tsx` (element-scoped, not substring) |
+| A corrupted `localStorage` record boots the app on defaults instead of throwing | `app.flows.test.tsx` |
+| The home action follows the learner: "Start Python" at step one, "Continue Python" at the next unfinished lesson | `app.flows.test.tsx` |
+| The course page lists one row per chapter with its own practiced count, and a chapter row opens its chapter | `app.flows.test.tsx` |
+| A locked lesson row does not navigate; an open one does | `app.flows.test.tsx` |
+| A milestone chapter shows both its chapter test and its cumulative checkpoint, and the checkpoint scores under its own `-cumulative` key without touching the chapter test's | `app.flows.test.tsx` |
+| The audit page renders one section and one status per declared row, only the declared statuses, and never shows Java or C++ as COMPLETE | `app.flows.test.tsx` (reads `coverageAudit`) |
+| A lesson renders its goals, every example's declared output, every line note, every mistake and its fix, its decision guide, its recap and its keyword notes | `app.flows.test.tsx` |
+
+### 3. Corrections to my own work
+
+My first version of the home-action test clicked "Start Python" and then mounted the app again without
+resetting the URL. The router reads `window.location.pathname`, so the second mount was a *lesson*
+page, and the query for "Continue Python" failed on a page that should never have had it. The app was
+right again; the test was wrong. It now re-routes to `/` before the second mount, and the click itself
+is asserted as a navigation.
+
+A workspace reset also hit during this round (the second this session): the checkout reverted to the
+pre-round base with an empty `node_modules`. Recovery was the documented one — `git fetch origin`,
+`git reset --mixed origin/arena/1b23fec7-ggggggggg`, `npm ci` — and the new test file, being untracked,
+survived the reset intact. Nothing was lost and no work was redone.
+
+### 4. Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — **17 files, 103 tests, all passing** (16 files / 88 before this appendix).
+- `npm run build` — succeeds, `dist/index.html` 3,946.80 kB (gzip 1,182.82 kB), title still verified.
+- `src/courses/` is still untouched, so the Appendix Z curriculum battery continues to describe the
+  corpus exactly.
+
+### 5. Files changed in this round
+
+New: `src/app.flows.test.tsx`. Changed: this appendix.
