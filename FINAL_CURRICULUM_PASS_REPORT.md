@@ -1992,6 +1992,9 @@ four outputs were rewritten to state the boundary — for example:
 > supplied as the first input line the program prints: What is your name? Hello, Ada*
 
 and the `python-2-2`, `python-2-5` and `python-2-6` lesson descriptions now say the same thing in prose.
+**Appendix Y corrects the wording above:** the Run button's line list is `[""]`, not `[]`, so a program
+that reads input once receives an empty string — only a second read raises `EOFError`. The four declared
+outputs were rewritten again, precisely, in Appendix Y.
 `courseIntegrity.test.ts` gained one test — *names the input boundary for Python examples that read a line
 of input* — which fails if any example that calls `input()` declares an output that neither says
 "S sandbox" nor mentions the input line. Its teeth were verified by temporarily restoring one old
@@ -2209,3 +2212,114 @@ excluded from that comparison.
 `src/courses/courseFactory.ts` (the build-family declared result), `src/data/courseIntegrity.test.ts`
 (the guard test), the new tracked audit tools `.arena-cppexec.ts` / `.arena-cppexec.py` and
 `.arena-htmlparse.mjs`, and this appendix.
+
+---
+
+## Appendix Y — the app's own Python engine, not a stand-in
+
+Every earlier Python audit ran the corpus through **system CPython**. The application does not: it runs
+learner code through **Pyodide 0.29.3 (Python 3.13.2)** in a Worker, loaded from the jsdelivr URLs in
+`src/utils/pythonRunner.ts`. WebAssembly CPython is a different build of the language — the same syntax,
+but a different standard library surface — so "matches under CPython" was never proof that the course's
+declared outputs appear in the product. This round closed that gap by running all 712 programs through
+**the engine and version the app pins**, in `.arena-pyodide.mjs`.
+
+A browser is not reachable from this sandbox (the jsdelivr, Playwright and Google CDNs are all blocked,
+and the image has no browser binary), so the audit loads Pyodide from the npm package of the same
+version — the same distribution files the CDN serves — and drives it exactly the way the Worker does:
+the shim is copied from `src/utils/pythonRunner.ts` and a drift guard re-extracts those lines from the
+source at run time and fails the audit if they ever change.
+
+### The environment raises its own findings, stated as such
+
+- **`runPythonAsync` needs WebAssembly stack switching (JSPI).** Node without
+  `--experimental-wasm-stack-switching` fails the 21 asynchronous chapter-18 rows with
+  `RuntimeError: WebAssembly stack switching not supported in this JavaScript runtime`. With the flag,
+  every one of them runs and matches. This is a runtime requirement of the app's design (a JSPI-capable
+  browser provides it), not a defect in the lessons, and the audit now runs with the flag.
+- **Four mistakes were mine, not the course's**, and each was fixed before any conclusion was drawn:
+  the CPython harness modelled Run as "no lines at all" instead of the runner's real `[""]`; my first
+  Pyodide harness shared one global namespace across programs, so a missing-name sample printed a
+  leftover value; it attributed Pyodide's batched stdout to the following row, which invented three
+  mismatches that vanish in isolation; and it left `__name__` undefined where the app's shared namespace
+  makes it `"__main__"`, which broke the module-execution chapter. The harness now drains and flushes
+  between rows and runs each program in a fresh namespace with `__name__ = "__main__"`.
+
+### The findings in the course
+
+**1. Four input examples described the wrong failure.** The runner builds its line list as
+`String(input || "").split("\n")`, and JavaScript splits the empty string into one empty element. Run
+therefore supplies **one empty line**: the first `input()` returns `""`, and only a *second* read raises
+`EOFError`. The four examples had been rewritten in Appendix W with wording that was close but wrong —
+two claimed an `EOFError` where the sandbox actually raises `ValueError: invalid literal for int() with
+base 10: ''`, and one completes without any error at all. Each declared output now quotes what the
+learner really sees, and the lesson text says the same thing:
+
+| Lesson | Run button, verbatim behaviour |
+| --- | --- |
+| `python-2-2` name example | prints `What is your name? Hello,` with nothing after the comma |
+| `python-2-2` conversion example | `Age:` then `ValueError: invalid literal for int() with base 10: ''` |
+| `python-2-5` reading goal | `Pages today:` then the same `ValueError` |
+| `python-2-6` ticket total | `Price: Count:` then `EOFError: No more test input available` |
+
+**2. Chapter 18's debug example could not show its own lesson.** In
+`python-18-8/A result that was only a promise`, the point is that a missing `await` hands the caller a
+coroutine object instead of a string. Under CPython the example prints `coroutine`; under Pyodide's
+stack-switching `asyncio.run` the returned coroutine is resolved and the same code prints `api: ok`, so
+the sandbox silently erased the defect the lesson asks the learner to find. The example now awaits
+`monitor()` inside an explicit `main()` and prints the type there, which is `coroutine` in **both**
+engines — verified in both — so the printed clue the lesson depends on survives.
+
+**3. Two examples declare a CPython transcript the sandbox cannot produce.** `Pyodide is WebAssembly,
+and `subprocess.run` raises `OSError: [Errno 138] emscripten does not support processes`. Both
+`python-21-9` examples keep their real transcripts — produced by a real interpreter while authoring —
+and now label them: the declared output names the `OSError` the Run button shows and states where the
+transcript came from. The explanations already said the browser cannot start processes; they now name
+the exact message. The chapter's own exercise is unaffected: its solution uses `shlex`, which runs.
+
+### Coverage after this round
+
+| Harness | Result |
+| --- | --- |
+| System CPython (`.arena-pyexec.py`) | 712 programs — **706 matched, 6 documented sandbox boundary, 0 mismatched, 0 errors** |
+| **Pyodide 0.29.3 / Python 3.13.2 (JSPI)** (`.arena-pyodide.mjs`) | 712 programs — **681 matched, 6 documented sandbox boundary, 0 mismatched, 0 errors, 25 package-unavailable offline** |
+
+The 25 remaining rows are chapter 17's `sqlite3` examples and solutions: `sqlite3` is a real Pyodide
+package (`sqlite3-1.0.0-cp313-cp313-pyodide_2025_0_wasm32.whl` in `pyodide-lock.json`), which the runner
+loads with `loadPackagesFromImports` from the CDN the app already references. This sandbox cannot reach
+that CDN, so those rows are covered by the CPython run (which matched all of them) and are reported as
+offline, not as passes or failures.
+
+Both harnesses now enforce the same, checkable boundary rule: a declared output that begins
+`Sandbox:` is prose rather than a transcript, so it must still **name the exception the learner sees**
+when the program stops, or **quote the text that actually reached the screen** when it does not. The
+rule immediately flagged the old wording it replaced, which is how the Appendix W error surfaced.
+
+### Tests
+
+`courseIntegrity.test.ts` gained one rule covering both boundaries: an example that calls `input()` must
+declare a `Sandbox:` output, an example that reads input exactly once must not claim `EOFError`, a
+`subprocess` example must name the process limitation, and no exercise or project solution may call
+`subprocess` (its Check answer could never pass). It was confirmed to fail on the old wording with
+`python-2-5/Calculate a reading goal reads input once but declares EOFError`.
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent.
+- `npm test` — 8 files, **71 tests, all passing**.
+- `.arena-pyodide.mjs` with JSPI — 0 mismatched, 0 errors (above).
+- `.arena-pyexec.py` — 0 mismatched, 0 errors (above).
+- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, 0 named-not-shown, 0 with no trace.
+- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises,
+  0 failing chapter projects.
+- `.arena-audit.ts` — C++, Python, Java, HTML/CSS 0; JavaScript 11 (the pattern-criterion artifact
+  explained in Appendix U).
+- `npm run build` — succeeds, 3,946.62 kB (gzip 1,182.74 kB).
+
+### Files changed in this round
+
+`src/courses/python.ts`, `src/courses/pythonFoundations.ts`, `src/courses/pythonDebugLabs.ts`,
+`src/courses/pythonGaps.ts` (the four input boundaries, the chapter-18 example, the two subprocess
+transcripts), `src/data/courseIntegrity.test.ts` (the boundary rule), `.arena-pyexec.py` (app-true line
+list and the boundary check), the new tracked `.arena-pyodide.mjs`, and this appendix with the
+correction marker in Appendix W.

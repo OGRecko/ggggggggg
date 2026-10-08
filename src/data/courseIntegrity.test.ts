@@ -482,22 +482,39 @@ describe("CodeForge curriculum integrity", () => {
     expect(new Set(criteria).size).toBe(criteria.length);
   });
 
-  it("names the input boundary for Python examples that read a line of input", () => {
-    // The Run button supplies no input line, so a program that calls input() prints its prompt and
-    // stops with EOFError. An example that reads input therefore has to say so in its declared
-    // output instead of showing a transcript with the supplied line echoed into it, which no
-    // non-interactive runner produces.
+  it("names the sandbox boundary for Python code the browser sandbox cannot run as written", () => {
+    // Two boundaries are real in the shipped runner and both are stated in the course.
+    // Reading input: Run supplies no typed input, so the runner's line list is [""] -- the first
+    // input() returns an empty string, and only a second read raises EOFError. A one-read example
+    // that declares EOFError would describe something the learner never sees.
+    // Starting a process: Pyodide is WebAssembly, so subprocess.run raises
+    // "OSError: [Errno 138] emscripten does not support processes". Those examples keep their real
+    // CPython transcript and say where it came from.
     const python = courseById("python")!;
     const undocumented: string[] = [];
+    const wrongBoundary: string[] = [];
+    const impossibleSolutions: string[] = [];
     for (const chapter of python.chapters) {
       for (const lesson of chapter.lessons) {
         for (const example of lesson.examples ?? []) {
-          if (!/\binput\s*\(/.test(example.code)) continue;
-          if (!/sandbox|input line/i.test(example.output)) undocumented.push(`${lesson.id}/${example.title} -> ${example.output.slice(0, 60)}`);
+          const reads = (example.code.match(/\binput\s*\(/g) ?? []).length;
+          if (reads > 0) {
+            if (!example.output.startsWith("Sandbox:")) undocumented.push(`${lesson.id}/${example.title}`);
+            if (reads === 1 && /EOFError/.test(example.output)) wrongBoundary.push(`${lesson.id}/${example.title} reads input once but declares EOFError`);
+          }
+          if (/subprocess\.run\s*\(|subprocess\.CalledProcessError/.test(example.code)) {
+            if (!example.output.startsWith("Sandbox:") || !/does not support processes/.test(example.output)) {
+              undocumented.push(`${lesson.id}/${example.title} (subprocess)`);
+            }
+          }
         }
+        const solution = lesson.exercise?.solution ?? "";
+        if (/subprocess\./.test(solution)) impossibleSolutions.push(`${lesson.id} [solution]`);
       }
+      const projectSolution = chapter.project?.solution ?? "";
+      if (/subprocess\./.test(projectSolution)) impossibleSolutions.push(`ch${chapter.number} project`);
     }
-    expect(undocumented).toEqual([]);
+    expect({ undocumented, wrongBoundary, impossibleSolutions }).toEqual({ undocumented: [], wrongBoundary: [], impossibleSolutions: [] });
   });
 
   it("keeps default scaffold samples aligned with late-course chapter topics", () => {

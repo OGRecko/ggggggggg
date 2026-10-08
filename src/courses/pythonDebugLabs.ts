@@ -689,7 +689,7 @@ const pythonDebugLabs: Record<number, LessonSeed> = {
     examples: [
       {
         title: "A result that was only a promise",
-        code: 'import asyncio\nasync def check(name):\n    return name + ": ok"\nasync def monitor():\n    result = check("api")\n    return result\nvalue = asyncio.run(monitor())\nprint(type(value).__name__)',
+        code: 'import asyncio\nasync def check(name):\n    return name + ": ok"\nasync def monitor():\n    result = check("api")\n    return result\nasync def main():\n    value = await monitor()\n    print(type(value).__name__)\nasyncio.run(main())',
         output: 'coroutine',
         explanation: "The inner call created a coroutine object and returned it, so monitor handed a description of work to the caller instead of a result. Nothing failed, and the printed type is the clue: the value is a coroutine, not the string the function appears to return.",
         reasons: [
@@ -697,10 +697,12 @@ const pythonDebugLabs: Record<number, LessonSeed> = {
           "check declares a coroutine that produces one string.",
           "Returning a value from a coroutine is what makes it awaitable work.",
           "monitor declares the coroutine that should collect the result.",
-          "The call builds a coroutine object; without await, no work happens here.",
+          "The call builds a coroutine object; without await, no work happens inside monitor.",
           "That object is returned, so monitor's own result is a promise rather than the text.",
-          "asyncio.run drives monitor and returns what it produced.",
-          "The printed type, coroutine, is the evidence that the await is missing.",
+          "main gives the outer coroutine a place to await monitor and inspect what came back.",
+          "await runs monitor, which finishes by handing over a coroutine object instead of a string.",
+          "The printed type, coroutine, is the evidence that the inner await is missing.",
+          "asyncio.run drives the outermost coroutine to completion.",
         ],
       },
       {

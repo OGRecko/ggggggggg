@@ -514,8 +514,8 @@ const gapLessonRoundOne: Record<number, LessonSeed[]> = {
         {
           title: "Run a program and read the captured result",
           code: 'import subprocess\nimport sys\n\nresult = subprocess.run(\n    [sys.executable, "-c", "print(6 * 7)"],\n    capture_output=True,\n    text=True,\n)\nprint(result.returncode)\nprint(result.stdout.strip())\nprint(type(result).__name__)',
-          output: "0\n42\nCompletedProcess",
-          explanation: "This example was executed with a real CPython interpreter on a real machine while authoring the lesson, which is where its output comes from; the browser worker cannot start operating-system processes, so the sandbox shows the code for reading rather than producing this result itself. The argument list names the interpreter and one program to run, capture_output with text records the child process output as text, and the result object carries both the exit status and the captured text, which is why the printed status is 0 and the printed line is the value the child computed.",
+          output: "Sandbox: Run reports OSError: [Errno 138] emscripten does not support processes, because the browser sandbox cannot start child processes. This transcript was produced by a real CPython interpreter while authoring the lesson: 0\n42\nCompletedProcess",
+          explanation: "This example was executed with a real CPython interpreter on a real machine while authoring the lesson, which is where its output comes from; the browser worker cannot start operating-system processes, so pressing Run reports OSError: [Errno 138] emscripten does not support processes instead of this transcript, which is here to show the shape of the result the API hands back. The argument list names the interpreter and one program to run, capture_output with text records the child process output as text, and the result object carries both the exit status and the captured text, which is why the printed status is 0 and the printed line is the value the child computed.",
           reasons: [
             "The subprocess import is what makes running another program possible at all.",
             "The sys import supplies sys.executable, the path of the interpreter running this program.",
@@ -533,7 +533,7 @@ const gapLessonRoundOne: Record<number, LessonSeed[]> = {
         {
           title: "Turn a failed exit status into an exception",
           code: 'import subprocess\nimport sys\n\ntry:\n    subprocess.run([sys.executable, "-c", "raise SystemExit(3)"], check=True)\nexcept subprocess.CalledProcessError as error:\n    print("failed with code", error.returncode)',
-          output: "failed with code 3",
+          output: "Sandbox: Run reports OSError: [Errno 138] emscripten does not support processes, because the browser sandbox cannot start child processes. This transcript was produced by a real CPython interpreter while authoring the lesson: failed with code 3",
           explanation: "This example was also executed with a real interpreter while authoring, so the printed code 3 came from an actual child process that exited with that status. check=True is what makes a failed program raise CalledProcessError instead of being ignored, and the exception carries the returncode, which is how the handler names the failure without parsing any text.",
           reasons: [
             "The subprocess import brings in both run and the exception type this example catches.",
