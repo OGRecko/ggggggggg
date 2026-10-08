@@ -2323,3 +2323,166 @@ declare a `Sandbox:` output, an example that reads input exactly once must not c
 transcripts), `src/data/courseIntegrity.test.ts` (the boundary rule), `.arena-pyexec.py` (app-true line
 list and the boundary check), the new tracked `.arena-pyodide.mjs`, and this appendix with the
 correction marker in Appendix W.
+
+---
+
+## Appendix Z — real grammars for the last two languages, and a closing ledger
+
+Three languages still had only partial tool coverage: Java had a hand-written identifier cross-reference,
+CSS had never been read by a CSS parser at all (the tag balance and parse5 both look at HTML), and HTML
+itself had only a tree-construction check, which follows the error-recovery algorithm but knows nothing
+about the spec's content models. All three gaps are closed with the real tools their ecosystems use, and
+this appendix ends with the ledger that says, for every claim the corpus makes, which tool stands
+behind it.
+
+### 1. Java: every string parses with a real Java grammar (java-parser 3.0.1)
+
+```
+654 Java strings parsed with java-parser 3.0.1 (a real Java grammar; no JDK, so nothing is compiled or executed here)
+653 accepted | 0 refused | 1 not Java (a build file, not parsed)
+
+21 deliberately broken samples are syntactically valid Java (expected for the prinln marker)
+```
+
+The one non-Java string is a Gradle `dependencies { implementation("…") }` block whose declared result
+is "A build dependency block sketch" — a fragment of a build file, classified rather than compiled, the
+same way the C++ driver classifies a CMake sketch. The 21 broken samples parse because the course's
+Java break marker substitutes `System.out.prinln`, which is syntactically well-formed: calling a method
+that does not exist is a *semantic* error, and no parser can see it. That is stated rather than hidden —
+it is also exactly why the lesson asks the reader to compare the token, and why the app's check for a
+repaired exercise asserts the corrected construct (`println`) rather than claiming a compiler verdict.
+The JDK remains unreachable from this sandbox (Appendix S), so Java evidence is: real grammar, real
+pattern check, hand-derived outputs — and nothing more.
+
+### 2. CSS: every stylesheet parses and every judgeable value is valid (css-tree 3.2.1)
+
+```
+css-tree 3.2.1 | 265 HTML/CSS strings carry CSS (265 stylesheets)
+264 plain samples parse and validate cleanly | 1 broken sample whose break is in its HTML half
+0 syntax errors | 0 unknown properties | 0 invalid values
+74 declarations defer to var() substitution | 6 are @font-face descriptors
+```
+
+This is the check the course had never had: every `<style>` block and every standalone rule in the
+600 strings, parsed and then validated declaration by declaration against css-tree's property and value
+syntax database. Two families of declaration cannot be judged statically and are counted, not guessed:
+a value containing `var()` depends on substitution at use time, and `src`/`font-display` inside
+`@font-face` are descriptors belonging to the at-rule's own grammar rather than properties. Both counts
+are in the output so the reader knows exactly what was and was not checked. The one broken sample whose
+stylesheet is clean (`htmlcss-11-3`) breaks with `<broken-button>`, an HTML defect in the same string —
+detected by the validator below, not missed.
+
+### 3. HTML: conformance, not just recovery (html-validate 11.16.2)
+
+```
+html-validate:standard | 568 markup strings checked
+411 ordinary samples validate with no findings
+42 deliberate-break samples show their breakage | 0 break samples with no structural finding
+114 scaffolds are complete enough to validate | 1 scaffold is incomplete by design
+
+Findings by rule: 86 close-order | 8 element-name | 2 element-permitted-parent | 1 element-required-content
+```
+
+Every finding belongs to a deliberately broken sample or its scaffold. Unlike parse5, this validator
+knows the content models — and it immediately found a real defect in an ordinary sample, described next.
+The single scaffold finding is `htmlcss-18-2`, an authored metadata scaffold consisting of comments
+(`<!-- title and description -->` …) that the learner replaces with elements; an incomplete skeleton is
+what a scaffold is, so it is reported for information and not counted as a defect. Scope is stated in
+the tool header: the course's samples are fragments previewed in the app's frame, so the two rule
+families that describe an *implied whole document* are labelled as such in the output.
+
+### 4. The defect the validator found: `<main>` inside `<article>`
+
+The chapter-23 "Article page" sample taught an invalid structure. `<main>` must not be a descendant of
+`article`, `aside`, `footer`, `header` or `nav`, so a learner copying this shape would write
+non-conforming HTML:
+
+```html
+<article>
+  <header><h1>Build a form</h1><p>By CodeForge</p></header>
+  <main><p>Meaningful article content.</p></main>     <!-- main may not live inside article -->
+  <footer><a href="#top">Back to top</a></footer>
+</article>
+```
+
+It appeared in 13 rows across five chapter-23 lessons (working program, trace, repaired, target,
+edge-aware, minimal, extended, starter and solution), because they all share one sample definition. The
+fix restores the intended relationship — the landmark wraps the article rather than sitting inside it —
+and the lesson's hint now matches the code it ships:
+
+```html
+<main>
+  <article>
+    <header><h1>Build a form</h1><p>By CodeForge</p></header>
+    <p>Meaningful article content.</p>
+    <footer><a href="#top">Back to top</a></footer>
+  </article>
+</main>
+```
+
+The lesson's required patterns (`<article`, `<header`, `<footer`) are unchanged and still satisfied, the
+extended variation still inserts its paragraph in a valid position, and all 24 downstream rows validate
+cleanly.
+
+### 5. Two fragment-level corrections
+
+The validator also flagged five ordinary rows for whole-document rules, and each was judged on its
+merits rather than waved through:
+
+- **`htmlcss-2-1`** (head resources + video) and **`htmlcss-9-1`** (viewport + responsive images,
+  example and solution) present explicit `<head>` regions without a `<title>`. A head in a document must
+  contain one, so each now names the page on its head line, and the two authored line notes for line 1
+  were updated to say so. Line counts did not change, so no other note needed renumbering.
+- **`htmlcss-20-1`** (skip link and inert template) wrapped its starter and solution in an explicit
+  `<body>` with the `<style>` block inside it — non-conforming, because metadata content belongs in the
+  head. Both are now fragment-level like the lesson's own example, which is the corpus convention and
+  what the app's preview frame renders.
+
+### 6. Closing ledger: what stands behind each claim
+
+| Claim the corpus makes | Tool that checks it | Result at `HEAD` |
+| --- | --- | --- |
+| Python code is valid Python | CPython 3.11 `ast` over 937 strings | 937 / 937 parse |
+| Python prints what lessons declare | CPython 3.11, shipped input shim | 706 matched, 6 documented boundary, 0 mismatched |
+| Python behaves the same in the app's engine | Pyodide 0.29.3 / Python 3.13.2 (JSPI), same shim | 681 matched, 6 boundary, 0 errors, 25 rows offline (sqlite3 CDN) |
+| Input and process boundaries are stated truthfully | both harnesses + an integrity test | enforced, 0 undocumented |
+| C++ compiles and prints what lessons declare | g++ 12.2, `-std=c++20`, per-program temp dirs | 451 matched, 0 mismatched, 22 broken as designed |
+| C++ fragments and starters are well-formed | g++ `-fsyntax-only`, multi-file split | 0 anomalies |
+| JavaScript prints what lessons declare | the shipped Worker source, byte-compared | 0 mismatches (all samples, starters, solutions, projects) |
+| HTML parses by the standard's algorithm | parse5 8.0.1 | 568 markup strings, 0 reported errors |
+| HTML conforms to the content models | html-validate 11.16.2 (`standard`) | 411 ordinary samples, 0 findings |
+| CSS parses and every judgeable value is valid | css-tree 3.2.1 + its syntax database | 265 stylesheets, 0 problems, var()/descriptors counted |
+| Java is syntactically valid Java | java-parser 3.0.1 | 653 / 654 parse, 1 build file classified |
+| Java names resolve or are declared | identifier cross-reference + JDK whitelist | 0 defects (Appendix W) |
+| Exercises pass their own checkers | `.arena-dump-verify.ts` on all five courses | 25 chapters each, 0 failures |
+| Declared outputs match their code | four execution harnesses + declaration-coherence audit | 0 conflicts across 3,443 rows |
+| Lessons are authored or scaffolded honestly | `.arena-stats.ts`, `.arena-audit.ts`, sweep | 120 authored lessons, sweep 0/0, JavaScript 11 criterion artifact |
+
+Honest boundaries, unchanged and restated: **no JDK** (Java is grammar- and pattern-checked, outputs
+hand-derived); **no browser** (Pyodide runs under Node, HTML/CSS render claims stay with the sandboxed
+preview rather than screenshots or audit scores); **no CDN** for the 25 `sqlite3` rows and the Pyodide
+package loads; **no C++ compiler in the app** (the compile evidence lives in this report, not in the
+product's language about itself).
+
+### Verified state at this commit
+
+- `npx tsc --noEmit` — silent. `npm test` — 8 files, **71 tests, all passing**.
+- `.arena-javaparse.mjs`, `.arena-cssparse.mjs`, `.arena-htmlvalidate.mjs` — as above.
+- `.arena-cppexec.ts` + `.arena-cppexec.py` — 451 matched, 0 anomalies.
+- `.arena-pyexec.py` — 706 matched, 0 mismatched. `.arena-pyodide.mjs` — 681 matched, 0 errors.
+- `.arena-htmlparse.mjs` — 568 markup strings, 0 reported errors.
+- `.arena-code-sweep.ts -- all` — 0/0. `.arena-dump-verify.ts` — 0 failures in all five courses.
+- `.arena-audit.ts` — C++, Python, Java, HTML/CSS 0; JavaScript 11 (Appendix U artifact).
+- `npm run build` — succeeds, 3,946.73 kB (gzip 1,182.77 kB).
+
+The four audit tools share one install line, deliberately kept out of the app's dependencies because the
+app never uses them: `npm install --no-save java-parser@3.0.1 css-tree@3.2.1 parse5@8 html-validate@11.16.2 pyodide@0.29.3`.
+A plain `npm ci` removes them, which is expected and is why each tool's header repeats the line.
+
+### Files changed in this round
+
+`src/courses/courseFactory.ts` (the article sample and its hint),
+`src/courses/htmlcssGapLessons.ts` (titles for the two head snippets and their line notes, the 9-1
+solution, and the two fragment-level 20-1 rows), `.arena-dump-code.ts` (dumps now carry lesson kind and
+the broken-example flag), the new tracked `.arena-javaparse.mjs`, `.arena-cssparse.mjs` and
+`.arena-htmlvalidate.mjs`, and this appendix.

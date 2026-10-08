@@ -6,7 +6,7 @@
  * diagnostics for the constructs the specification calls errors.
  *
  * Usage:
- *   npm install --no-save parse5                 # audit-only dependency; the app never parses HTML
+ *   npm install --no-save java-parser@3.0.1 css-tree@3.2.1 parse5@8 html-validate@11.16.2 pyodide@0.29.3
  *   npx vite-node .arena-dump-code.ts -- htmlcss # writes /tmp/htmlcss_code.json
  *   node .arena-htmlparse.mjs
  *

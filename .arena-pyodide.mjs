@@ -15,7 +15,7 @@
  * from this sandbox (the jsdelivr and browser-download CDNs are blocked).
  *
  * Usage:
- *   npm install --no-save pyodide@0.29.3
+ *   npm install --no-save java-parser@3.0.1 css-tree@3.2.1 parse5@8 html-validate@11.16.2 pyodide@0.29.3
  *   npx vite-node .arena-pyexec.ts          # writes /tmp/python_exec.json (712 programs)
  *   node .arena-pyodide.mjs                 # all programs
  *   node .arena-pyodide.mjs --only <text>   # only rows whose "where" contains <text>
