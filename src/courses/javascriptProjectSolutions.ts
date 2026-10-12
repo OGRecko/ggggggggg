@@ -12,15 +12,15 @@ import type { ProjectSolution } from "./chapterPlanHelpers";
 export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>> = {
   // Chapter 1: Getting Started
   1: {
-    solution: "console.log(\"Start\");\nconsole.log(\"Ready\");",
-    solutionExplanation: "Two console.log calls make the order visible: Start is printed before Ready. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
-    expected: "Start\nReady",
+    solution: 'const learner = "Mina";\nconst completed = 0;\nconsole.log("Learner: " + learner);\nconsole.log("Completed: " + completed);\nconsole.log("Next: begin");',
+    solutionExplanation: "The named constants keep source data visible, zero remains a valid numeric count, and three ordered log calls produce the session card. The same worker-safe program is executed by CodeForge's JavaScript Worker.",
+    expected: "Learner: Mina\nCompleted: 0\nNext: begin",
   },
   // Chapter 2: Types and Operators
   2: {
-    solution: "const count = 3;\nconst label = \"3\";\nconsole.log(count === Number(label));",
-    solutionExplanation: "count is a number and label is text, so Number(label) converts the text before strict equality reports true. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
-    expected: "true",
+    solution: 'const raw = "0";\nconst quantity = Number(raw);\nconsole.log(quantity + 1);\nconsole.log(raw + 1);\nconsole.log(quantity === 0);',
+    solutionExplanation: "The numeric quantity adds arithmetically to 1, the raw string concatenates to 01, and strict equality confirms the converted count is numeric zero. The same worker-safe program is executed by CodeForge's JavaScript Worker.",
+    expected: "1\n01\ntrue",
   },
   // Chapter 3: Control Flow
   3: {
@@ -98,7 +98,7 @@ export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>
   15: {
     solution: "async function search(query) {\n  const text = query.trim();\n  if (!text) return [];\n  return [`result for ${text}`];\n}\nsearch(\"code\").then(console.log);",
     solutionExplanation: "The async function returns a Promise, blank text resolves to an empty array, and then receives the resolved array for code. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
-    expected: '["result for code"]',
+    expected: "[ 'result for code' ]",
   },
   // Chapter 16: Browser Networking
   16: {

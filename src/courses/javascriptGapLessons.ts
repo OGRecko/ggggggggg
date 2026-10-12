@@ -260,7 +260,7 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
         solution: "const settings = { theme: \"dark\", read() { return this.theme; } };\nconst read = settings.read.bind(settings);\nconsole.log(read());",
         solutionExplanation: "The method reads this.theme, so it only returns dark when this is the settings object. bind returns a new function permanently attached to settings, and calling that function later still finds the object, which prints dark.",
         testCases: [{ label: "Bound method", expected: "dark" }],
-        hints: ["A method copied into a variable is called without its object, so this is lost.", "bind(object) returns a new function with this fixed to that object.", "Print the result of calling the bound function."],
+        hints: ["A method copied into a variable is called without its object, so this is lost.", "bind(object) returns a new function with this fixed to that object.", "Print the result of calling the bound function.", "For the second half, compare reading a let binding early with calling a function declaration before its line."],
         checker: { mode: "patterns", requiredPatterns: ["this\\.", "bind", "console\\.log"], successMessage: "The method is bound to its object, so the detached call still resolves this." },
       },
       recap: ["this is supplied by the call site, not by where the function was written.", "A detached method loses its object; strict mode leaves this undefined.", "bind fixes this permanently, while call and apply supply it once.", "A let or const binding is unusable until its declaration runs, and reading it earlier throws.", "Function declarations are hoisted with their bodies and can be called earlier."],

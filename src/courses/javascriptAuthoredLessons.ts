@@ -400,12 +400,12 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
         ),
       ],
       exercise: {
-        prompt: "Write function makePrefix(prefix) that returns a closure. The closure accepts value and returns prefix + value. Log makePrefix(\"JS: \" )(\"closures\") so the output is JS: closures.",
+        prompt: "Write function makePrefix(prefix) that returns a closure. The closure accepts value and returns prefix + value. Log makePrefix(\"JS: \")(\"closures\") so the output is JS: closures.",
         starterCode: "// Return a closure that remembers one prefix\n",
         solution: 'function makePrefix(prefix) {\n  return function (value) {\n    return prefix + value;\n  };\n}\nconsole.log(makePrefix("JS: ")("closures"));',
         solutionExplanation: "makePrefix creates the outer binding prefix. The returned inner function closes over that binding and can still read it later when the value arrives.",
         testCases: [{ label: "Prefix closure", expected: "JS: closures" }],
-        hints: ["Return a function from makePrefix instead of logging immediately.", "The inner function should accept value and use prefix from the outer scope.", "Call the outer function first, then call the returned function with the text to format."],
+        hints: ["Return a function from makePrefix instead of logging immediately.", "The inner function should accept value and use prefix from the outer scope.", "Call the outer function first, then call the returned function with the text to format.", "Create a second prefix with an empty string to check that the closure still returns its input unchanged."],
       },
       recap: [
         "A closure remembers bindings from the lexical environment where the function was created.",

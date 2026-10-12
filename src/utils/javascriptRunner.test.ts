@@ -62,10 +62,31 @@ describe("JavaScript worker source", () => {
     expect(result.output).toBe("Hello, JavaScript!");
   });
 
-  it("formats values the way the lessons describe them", async () => {
-    const result = await runWorkerSource('console.log([1, 2, 3]);\nconsole.log({ mode: "study" });\nconsole.log(undefined);\nconsole.log(3 === Number("3"));');
+  it("formats numbers, collections, objects, and functions like a readable console", async () => {
+    const result = await runWorkerSource([
+      "console.log(NaN, Infinity, -Infinity, -0, 5n);",
+      'console.log([1, "a"]);',
+      'console.log({ a: 1, "needs-quote": "ready" });',
+      "function f() {}",
+      "console.log(f);",
+      "console.log(undefined);",
+      'console.log(3 === Number("3"));',
+    ].join("\n"));
     expect(result.error).toBeUndefined();
-    expect(result.output).toBe('[1,2,3]\n{"mode":"study"}\nundefined\ntrue');
+    expect(result.output).toBe([
+      "NaN Infinity -Infinity -0 5n",
+      "[ 1, 'a' ]",
+      "{ a: 1, 'needs-quote': 'ready' }",
+      "[Function: f]",
+      "undefined",
+      "true",
+    ].join("\n"));
+  });
+
+  it("renders cycles without crashing or hiding the rest of the console line", async () => {
+    const result = await runWorkerSource('const item = { label: "loop" }; item.self = item; console.log(item);');
+    expect(result.error).toBeUndefined();
+    expect(result.output).toBe("{ label: 'loop', self: [Circular] }");
   });
 
   it("awaits async work before reporting the output", async () => {

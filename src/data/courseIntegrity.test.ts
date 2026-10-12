@@ -16,6 +16,22 @@ describe("CodeForge curriculum integrity", () => {
     }
   });
 
+  it("provides mixed eight-question retrieval tests for the first four authored JavaScript foundations", () => {
+    const javascript = courseById("javascript")!;
+    const requiredQuestionKinds = ["[Prediction]", "[Trace]", "[Debug]", "[Code build]", "[Edge case]"];
+    const expectedAuthoredLessons = [7, 7, 7, 6];
+    for (const chapterNumber of [1, 2, 3, 4]) {
+      const chapter = javascript.chapters[chapterNumber - 1];
+      expect(chapter.test).toHaveLength(8);
+      for (const kind of requiredQuestionKinds) {
+        expect(chapter.test?.some((question) => question.question.startsWith(kind)), `chapter ${chapterNumber}: ${kind}`).toBe(true);
+      }
+      const authored = chapter.lessons.filter((lesson) => lesson.quality?.authoredDepth === "authored");
+      expect(authored).toHaveLength(expectedAuthoredLessons[chapterNumber - 1]);
+      for (const lesson of authored) expect(lesson.exercise.hints).toHaveLength(4);
+    }
+  });
+
   it("keeps lesson ids unique and lesson orders sequential inside each chapter", () => {
     const ids = courses.flatMap((course) => course.chapters.flatMap((chapter) => chapter.lessons.map((lesson) => lesson.id)));
     expect(new Set(ids).size).toBe(ids.length);
@@ -31,7 +47,8 @@ describe("CodeForge curriculum integrity", () => {
       for (const chapter of course.chapters) {
         expect(chapter.project).toBeDefined();
         expect(chapter.project?.brief.trim().length).toBeGreaterThan(20);
-        expect(chapter.test?.length).toBe(3);
+        const expectedTestLength = course.id === "javascript" && chapter.number <= 4 ? 8 : 3;
+        expect(chapter.test?.length).toBe(expectedTestLength);
         if (course.id === "python") {
           expect(chapter.project?.testCases?.length).toBeGreaterThan(0);
           expect(chapter.project?.hints?.length).toBeGreaterThan(0);
@@ -88,7 +105,7 @@ describe("CodeForge curriculum integrity", () => {
         for (const lesson of chapter.lessons) {
           for (const example of lesson.examples) {
             const codeLines = example.code.split("\n");
-            expect(example.lines).toHaveLength(codeLines.length);
+            expect(example.lines, `${course.id} chapter ${chapter.number}: ${lesson.title} / ${example.title}`).toHaveLength(codeLines.length);
             for (const line of example.lines) {
               expect(line.trim().length).toBeGreaterThan(10);
               expect(line).toMatch(/^Line \d+:/);

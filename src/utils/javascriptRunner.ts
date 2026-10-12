@@ -20,15 +20,113 @@ const blockedInWorker = () => {
 self.eval = blockedInWorker;
 self.Function = blockedInWorker;
 
-function stringifyValue(value) {
-  if (typeof value === "string") return value;
+const MAX_INSPECT_DEPTH = 4;
+const MAX_INSPECT_ITEMS = 100;
+
+function quoteString(value) {
+  return "'" + value
+    .replaceAll(String.fromCharCode(92), String.fromCharCode(92, 92))
+    .replace(/'/g, "\\'")
+    .replace(/\\n/g, "\\n")
+    .replace(/\\r/g, "\\r")
+    .replace(/\\t/g, "\\t") + "'";
+}
+
+function formatKey(key) {
+  return /^[A-Za-z_$][\\w$]*$/.test(key) ? key : quoteString(key);
+}
+
+function inspectValue(value, depth, seen, nested) {
+  if (typeof value === "string") return nested ? quoteString(value) : value;
   if (typeof value === "undefined") return "undefined";
-  if (typeof value === "function") return "[function]";
-  try {
-    return JSON.stringify(value);
-  } catch {
+  if (typeof value === "boolean") return String(value);
+  if (value === null) return "null";
+  if (typeof value === "number") {
+    if (Number.isNaN(value)) return "NaN";
+    if (value === Infinity) return "Infinity";
+    if (value === -Infinity) return "-Infinity";
+    if (Object.is(value, -0)) return "-0";
     return String(value);
   }
+  if (typeof value === "bigint") return String(value) + "n";
+  if (typeof value === "symbol") return String(value);
+  if (typeof value === "function") {
+    return value.name ? "[Function: " + value.name + "]" : "[Function (anonymous)]";
+  }
+  if (value instanceof RegExp) return String(value);
+  if (value instanceof Date) {
+    try { return isNaN(value.getTime()) ? "Invalid Date" : value.toISOString(); }
+    catch { return "Invalid Date"; }
+  }
+  if (value instanceof Error) return (value.name || "Error") + (value.message ? ": " + value.message : "");
+  if (depth >= MAX_INSPECT_DEPTH) return Array.isArray(value) ? "[Array]" : "[Object]";
+  if (seen.has(value)) return "[Circular]";
+
+  seen.add(value);
+  let rendered;
+  try {
+    if (Array.isArray(value)) {
+      const items = [];
+      const count = Math.min(value.length, MAX_INSPECT_ITEMS);
+      for (let index = 0; index < count; index += 1) {
+        if (!(index in value)) {
+          items.push("<empty item>");
+          continue;
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (descriptor && !("value" in descriptor)) {
+          items.push(descriptor.get && descriptor.set ? "[Getter/Setter]" : descriptor.get ? "[Getter]" : "[Setter]");
+        } else {
+          items.push(inspectValue(value[index], depth + 1, seen, true));
+        }
+      }
+      if (value.length > count) items.push("... " + (value.length - count) + " more items");
+      rendered = items.length ? "[ " + items.join(", ") + " ]" : "[]";
+    } else if (value instanceof Map) {
+      const entries = [];
+      let count = 0;
+      for (const [key, item] of value) {
+        if (count >= MAX_INSPECT_ITEMS) break;
+        entries.push(inspectValue(key, depth + 1, seen, true) + " => " + inspectValue(item, depth + 1, seen, true));
+        count += 1;
+      }
+      if (value.size > count) entries.push("... " + (value.size - count) + " more items");
+      rendered = value.size ? "Map(" + value.size + ") { " + entries.join(", ") + " }" : "Map(0) {}";
+    } else if (value instanceof Set) {
+      const items = [];
+      let count = 0;
+      for (const item of value) {
+        if (count >= MAX_INSPECT_ITEMS) break;
+        items.push(inspectValue(item, depth + 1, seen, true));
+        count += 1;
+      }
+      if (value.size > count) items.push("... " + (value.size - count) + " more items");
+      rendered = value.size ? "Set(" + value.size + ") { " + items.join(", ") + " }" : "Set(0) {}";
+    } else {
+      const keys = Object.keys(value);
+      const fields = [];
+      const count = Math.min(keys.length, MAX_INSPECT_ITEMS);
+      for (const key of keys.slice(0, count)) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        const fieldValue = descriptor && !("value" in descriptor)
+          ? descriptor.get && descriptor.set ? "[Getter/Setter]" : descriptor.get ? "[Getter]" : "[Setter]"
+          : inspectValue(value[key], depth + 1, seen, true);
+        fields.push(formatKey(key) + ": " + fieldValue);
+      }
+      if (keys.length > count) fields.push("... " + (keys.length - count) + " more items");
+      const prefix = Object.getPrototypeOf(value) === null ? "[Object: null prototype] " : "";
+      rendered = fields.length ? prefix + "{ " + fields.join(", ") + " }" : prefix + "{}";
+    }
+  } catch {
+    rendered = "[Object]";
+  } finally {
+    seen.delete(value);
+  }
+  return rendered;
+}
+
+function stringifyValue(value) {
+  return inspectValue(value, 0, new Set(), false);
 }
 
 self.onmessage = async (event) => {

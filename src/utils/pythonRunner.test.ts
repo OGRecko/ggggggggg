@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PythonRunner } from "./pythonRunner";
+import { PythonRunner, pythonWorkerSource } from "./pythonRunner";
 
 type WorkerListener = (event: MessageEvent<{ id: number; output?: string; error?: string; errorLine?: number }>) => void;
 
@@ -40,6 +40,86 @@ class MockWorker {
     }
   }
 }
+
+type FakePyGlobals = {
+  values: Map<string, unknown>;
+  destroyed: boolean;
+  set(name: string, value: unknown): void;
+  destroy(): void;
+};
+
+function makePythonWorkerHarness(webAssembly: { Suspending?: unknown }) {
+  const runs: Array<{ source: string; globals: FakePyGlobals }> = [];
+  const namespaces: FakePyGlobals[] = [];
+  const messages: Array<{ id: number; output?: string; error?: string }> = [];
+  const pyodide = {
+    setStdout: () => {},
+    setStderr: () => {},
+    loadPackagesFromImports: async () => {},
+    runPython: () => {
+      const globals: FakePyGlobals = {
+        values: new Map(),
+        destroyed: false,
+        set(name, value) { this.values.set(name, value); },
+        destroy() { this.destroyed = true; },
+      };
+      namespaces.push(globals);
+      return globals;
+    },
+    runPythonAsync: async (source: string, options: { globals: FakePyGlobals }) => {
+      runs.push({ source, globals: options.globals });
+    },
+  };
+  const self: {
+    postMessage: (message: { id: number; output?: string; error?: string }) => void;
+    onmessage?: (event: { data: { id: number; code: string; input?: string } }) => Promise<void>;
+  } = { postMessage: (message) => messages.push(message) };
+  const createWorker = new Function("self", "importScripts", "loadPyodide", "WebAssembly", pythonWorkerSource);
+  createWorker(self, () => {}, async () => pyodide, webAssembly);
+  return { self, runs, namespaces, messages };
+}
+
+describe("Python worker source", () => {
+  it("creates a fresh __main__ namespace for each submission", async () => {
+    const harness = makePythonWorkerHarness({});
+    await harness.self.onmessage!({ data: { id: 1, code: "value = 41" } });
+    await harness.self.onmessage!({ data: { id: 2, code: "print(value)" } });
+
+    expect(harness.namespaces).toHaveLength(2);
+    expect(harness.namespaces[0].values.get("__name__")).toBe("__main__");
+    expect(harness.namespaces[1].values.get("__name__")).toBe("__main__");
+    const programRuns = harness.runs.filter((run) => !run.source.startsWith("import sys"));
+    const flushRuns = harness.runs.filter((run) => run.source.startsWith("import sys"));
+    expect(programRuns).toHaveLength(2);
+    expect(programRuns[0].globals).toBe(harness.namespaces[0]);
+    expect(programRuns[1].globals).toBe(harness.namespaces[1]);
+    expect(flushRuns).toHaveLength(2);
+    expect(flushRuns[0].globals).toBe(harness.namespaces[0]);
+    expect(flushRuns[1].globals).toBe(harness.namespaces[1]);
+    expect(harness.namespaces.every((globals) => globals.destroyed)).toBe(true);
+  });
+
+  it("uses top-level-await AST rewriting when WebAssembly.Suspending is absent", async () => {
+    const harness = makePythonWorkerHarness({});
+    const code = "import asyncio\\nasync def main():\\n    return 42\\nasyncio.run(main())";
+    await harness.self.onmessage!({ data: { id: 1, code } });
+
+    const executedSource = harness.runs[0].source;
+    expect(executedSource).toContain("__CodeForgeRunToAwait");
+    expect(executedSource).toContain("PyCF_ALLOW_TOP_LEVEL_AWAIT");
+    expect(executedSource).toContain(JSON.stringify(code));
+    expect(executedSource).not.toContain("asyncio.run(main())\\n");
+  });
+
+  it("leaves asyncio.run unchanged when the JSPI capability is present", async () => {
+    const harness = makePythonWorkerHarness({ Suspending: function Suspending() {} });
+    const code = "import asyncio\\nasyncio.run(main())";
+    await harness.self.onmessage!({ data: { id: 1, code } });
+
+    expect(harness.runs[0].source).toContain(code);
+    expect(harness.runs[0].source).not.toContain("__CodeForgeRunToAwait");
+  });
+});
 
 describe("PythonRunner", () => {
   beforeEach(() => {

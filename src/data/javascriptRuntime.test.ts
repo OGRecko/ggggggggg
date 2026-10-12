@@ -93,6 +93,12 @@ describe("JavaScript samples and the real Worker sandbox", () => {
         const result = await runInSandbox(row.code);
         if (!result) continue;
 
+        if (row.declared.startsWith("Does not run:")) {
+          if (!result.error) unexplainedErrors.push(`${row.where} claims a deliberate failure but execution succeeded`);
+          if (result.output) mismatches.push(`${row.where} should have no console output before its error`);
+          continue;
+        }
+
         if (result.error) {
           if (BROWSER_BOUNDARY_ERROR.test(result.error)) {
             // Browser-only code cannot run in the Worker, so its declared output must say so

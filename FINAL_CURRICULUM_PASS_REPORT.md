@@ -3012,3 +3012,97 @@ New: `src/app.navigation.test.tsx`, `.arena-reachability.ts`. Changed: `src/app.
 `src/app.export.test.tsx`, `src/app.flows.test.tsx` (six shell-branch tests),
 `src/utils/exerciseCheck.test.ts` (four unit cases), `src/utils/exportTargets.test.ts` (one unit case),
 and this appendix. No source file under `src/` outside tests was modified.
+
+## Appendix AH — JavaScript Chapter 4 repair and first full acceptance re-run (2026-10-12)
+
+This batch continued the existing CodeForge application and curriculum; it did not restart or redesign
+anything. The goal was to repair the chapter 4 defects found in the step-0 verification, make the
+integrity checks match the actual six authored chapter-4 lessons, and publish the required course-wide
+coverage inventory before moving on to the grading-engine work.
+
+### Chapter 4 corrections
+
+- Consolidated a duplicated `decisionGuide` property in `src/courses/javascriptFunctions.ts`. The prior
+duplicate made TypeScript fail and caused esbuild's duplicate-key warning.
+- Split a combined closure example note into one note per code line. The example now has 11 lines and 11
+  notes.
+- Updated the JavaScript authored-content test to expect chapter 4's actual six authored lesson titles,
+  rather than seven, and extended the worker-executed project test to include chapter 4's distinct
+  formatter-toolbox project with its four hints.
+- Extended the JavaScript mixed-test integrity gate to cover chapters 1–4 (eight questions each) and
+  made the general integrity expectation reflect chapter 4's eight-question test.
+- Updated the JavaScript `coverageAudit` row to describe the 7/7/7/6 authored-lesson split and to say
+  explicitly that hidden cases, alternative reference solutions, and anti-hardcoding coverage are not
+  present yet.
+
+### Evidence and current measurements
+
+| Check | Result |
+| --- | --- |
+| `npm ci` | Succeeded; 231 packages added. npm reported 3 high-severity advisories. |
+| `npx tsc --noEmit` | Passes silently after the duplicate property was removed. |
+| `npm test` | **21 test files, 145 tests, all passing.** The app-sweep tests rendered all 125 chapter pages and 821 lesson pages. |
+| `npm run build` | Succeeds; `dist/index.html` 4,079.61 kB (gzip 1,221.33 kB), with no duplicate-key warning. |
+| Targeted curriculum/runtime tests | **3 files, 34 tests, all passing**, including per-line note parity and execution of authored lesson/project code in the shipped JavaScript Worker source. |
+| `.arena-stats.ts` | 125 chapters, 821 lessons, 141 authored lessons, 1,689 examples (317 in authored lessons). JavaScript: 150 lessons, 50 authored across 22 chapters. |
+| `.arena-audit.ts` | 0 reported authored-lesson problems for C++, Python, Java, and HTML/CSS; 34 JavaScript structural-pattern flags remain. No line-note mismatch remains. These flags are checker-pattern audit findings, not 34 demonstrated runtime failures. |
+| `.arena-dump-verify.ts` for all five courses | Each has 25 chapters; 0 failing lesson exercises and 0 failing chapter projects under the shipped structure checker. |
+| `.arena-code-sweep.ts -- all` | 125 chapters scanned; 5 named-not-shown concepts, 0 with no trace. Findings are in JavaScript chapters 1–3: Worker execution / statement boundaries; equality and coercion / operators; and for/while. |
+| `npm audit --json` | Exits 1 with 3 high advisories: direct `vite-plugin-singlefile` plus transitive `braces` and `micromatch`. npm proposes a semver-major plugin change; no dependency upgrade was made in this content batch. |
+| `CURRICULUM_COVERAGE_MAP.md` | Generated inventory with 821 lesson rows, chapter-test/project metadata, authorship-depth labels, and missing-work notes. Hidden-test count is 0 throughout because `TestCase` currently has only `label`, optional `input`, and `expected`; hidden visibility is not modeled. |
+
+Vitest still prints non-fatal CodeMirror/jsdom `textRange(...).getClientRects is not a function` traces in a few UI tests. The suite passes, but this test-environment warning remains open. The map and audit are inventories, not completion claims: chapter tests outside JavaScript 1–4 remain at three questions; the new hidden behavioral grading gates, alternative solutions, and anti-hardcoding checks are not yet implemented.
+
+### Remaining boundaries and next work
+
+- Do not start JavaScript chapter 5 or further mass authoring until the grader supports the requested appended/input/hidden/throws/state/timeout cases and the first four JavaScript chapters have a behavioral corpus that tests alternative valid solutions, rejects fixed-output cheating, and proves each starter fails. Ordinary per-case stdin already exists through `TestCase.input`; hidden visibility, appended harnesses, expected throws, state, and timeout case kinds still need explicit support.
+- JavaScript and Python currently have Worker-level timeouts and error-line fields. The UI labels syntax versus runtime (and output mismatch as logic), but does not give timeouts a dedicated error class; static-check line highlights are heuristic. Extend and test this instead of claiming comprehensive classification.
+- In-app Java and C++ execution remains static structural review only. Python uses Pyodide where supported; JavaScript uses the shipped Worker where supported; HTML/CSS uses sandboxed preview and structural checking. No full browser walkthrough is claimed.
+- Coverage remains conservatively PARTIAL for audited topic rows, with four explicit MISSING rows listed in `CURRICULUM_COVERAGE_MAP.md`. No language or chapter is marked COMPLETE.
+- The sandbox initially reopened at `f5abbf2` with only the uploaded archive tracked even though the session branch had advanced remotely. I fetched `origin/arena/1b23fec7-ggggggggg` at `3b17f23` and ran `git reset --mixed` to that ref, preserving every worktree file. No hard reset, checkout, or clean was used. Runtime/curriculum changes already present in that worktree are summarized in Appendix AI; future curriculum additions remain chapter-scoped.
+
+## Appendix AI — runtime fidelity and the no-JSPI Python path
+
+The restored worktree also contained a cross-cutting runtime batch that is required before continuing
+curriculum authoring. It was preserved and exercised alongside the chapter 4 gates; it is recorded here
+so its execution claims stay tied to measured evidence.
+
+### Shipped JavaScript Worker output
+
+- Replaced JSON-only formatting in `src/utils/javascriptRunner.ts` with a bounded, cycle-safe inspector
+  for arrays, objects, functions, `Map`, `Set`, dates, errors, symbols, and numeric edge values. This
+  changes displayed transcripts (for example, arrays now resemble `[ 1, 'a' ]`) without changing the
+  learner program's semantics.
+- Updated sample declarations and `modifiedOutputs.ts` to match the actual Worker transcript. The
+  JavaScript runtime tests now cover `NaN`, infinities, negative zero, bigint, nested strings, object
+  keys, function names, cycles, and stable async output.
+- The app labels deliberately invalid JavaScript examples as “Execution behavior” and identifies their
+  intentionally broken source, rather than presenting the declared syntax/runtime error as ordinary
+  expected output. The chapter-test intro now uses the actual question count instead of hard-coding
+  “Three”.
+
+### Shipped Python Worker and evidence
+
+- `src/utils/pythonRunner.ts` now creates isolated per-submission globals with `__name__ == "__main__"`,
+  installs the `input()` shim only in that namespace, captures and flushes stdout/stderr there, adjusts
+  reported lines for the setup prelude, and destroys the globals after each run.
+- On hosts without `WebAssembly.Suspending` (JSPI), the Worker parses learner code with Python's AST and
+  rewrites only supported module-scope `asyncio.run(coro)` calls to top-level `await`. Function, async
+  function, class, and lambda bodies are left unchanged. When JSPI is available, the original
+  `asyncio.run` route remains untouched.
+- `src/utils/pythonRunner.test.ts` tests the fresh namespace and both capability branches. The separate
+  Pyodide audit executes the **exact exported Worker source** under Pyodide 0.29.3 with a Node transport
+  shim; it is actual Python/WebAssembly execution, but is not a real browser or a native CPython run.
+- `npx vite-node .arena-pyexec.ts` — 712 course programs dumped. `node .arena-pyodide.mjs` — Pyodide
+  0.29.3 / Python 3.13.2, JSPI absent; Worker smoke **5/5**, corpus **681 matched, 0 mismatched, 6
+  documented sandbox-boundary rows, 0 other errors, 25 package-unavailable rows**. The targeted
+  `node .arena-pyodide.mjs --only python-18` run passed **27/27**, with zero package-unavailable cases.
+  The 25 unavailable package rows are honestly retained; they do not count as passing database runs.
+- The declared `npm install --no-save --package-lock=false --ignore-scripts pyodide@0.29.3` attempt hit
+  an npm internal error (`Cannot read properties of null (reading 'edgesOut')`). To avoid changing the
+  manifest or lockfile, the package tarball was fetched with `npm pack` and unpacked only under ignored
+  `node_modules/pyodide` for the audit. No dependency manifest or lockfile was changed by this workaround.
+
+This evidence supports the existing Pyodide claim only for the paths that ran in this Node-hosted Pyodide
+harness. It does not verify a real-browser Worker, network/package CDN access, sqlite3, native processes,
+threads, or a general package-install workflow.
