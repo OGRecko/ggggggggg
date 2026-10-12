@@ -1,0 +1,469 @@
+From 669c7b2ced99aa136ba744eed0497993c6ffbbc1 Mon Sep 17 00:00:00 2001
+From: Arena Agent <agent@arena.ai>
+Date: Wed, 7 Oct 2026 16:53:16 +0000
+Subject: [PATCH] Close the JavaScript residuals: if/else/switch lesson, pure
+ functions lesson, and the demonstrated-but-unnamed names
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ FINAL_CURRICULUM_PASS_REPORT.md           |  80 ++++++++
+ src/courses/courseFactory.ts              |   2 +-
+ src/courses/javascriptAuthoredLessons.ts  |  12 +-
+ src/courses/javascriptGapLessons.ts       | 226 +++++++++++++++++++++-
+ src/courses/javascriptProjectSolutions.ts |   2 +-
+ 5 files changed, 310 insertions(+), 12 deletions(-)
+
+diff --git a/FINAL_CURRICULUM_PASS_REPORT.md b/FINAL_CURRICULUM_PASS_REPORT.md
+index 2b406c0..06d24b8 100644
+--- a/FINAL_CURRICULUM_PASS_REPORT.md
++++ b/FINAL_CURRICULUM_PASS_REPORT.md
+@@ -1365,3 +1365,83 @@ every run, 125 chapters swept each time.
+ | `.arena-audit.ts` | C++/Python/Java/HTML-CSS **0 authored-lesson problems**; JavaScript 11 pre-existing vocabulary flags (unchanged all series) |
+ | `.arena-stats.ts` | 817 lessons, 1,675 examples, **105 authored lessons** |
+ | `npm run build` | succeeds, **3,785.02 kB** (gzip 1,138.90 kB) |
++
++## Appendix O — JavaScript residuals: a real `switch` gap and the demonstrated-but-unnamed set (this commit)
++
++Appendix N left 113 flags as documented residuals. This round went back through the JavaScript half of
++that list and split it the same way the earlier rounds did, with one difference: before classifying
++anything, each flagged concept was checked against the **whole course**, not just its chapter.
++
++### The real gap: chapter 3 promised `if and else` and `switch`, and the course shipped neither
++
++`else` appeared twice in the entire JavaScript corpus (both in chapter 7), and `switch` appeared
++**nowhere in any of the 620 code strings** in the course. A control-flow chapter that never shows the
++second branch of an `if` and never shows a `switch` is a genuine curriculum hole, not a keyword problem,
++so chapter 3 gained an authored `learn` lesson:
++
++| Ch | Kind | Lesson | What it adds |
++| --- | --- | --- | --- |
++| 3 | learn | `if, else if, else, and switch` | an `else if` chain, a `switch` with grouped labels and `default`, a deliberate fall-through, and a guard clause |
++
++Four examples, each executed in the app's real Worker sandbox with the output recorded from that run,
++including the trailing space the fall-through example leaves in its accumulator (`alert log page alert `).
++The exercise asks for both constructs and its reference solution prints `cold mild hot` then
++`ok client other`.
++
++### The demonstrated-but-unnamed set
++
++| Ch | Concept | Where the name went |
++| --- | --- | --- |
++| 1 | statement boundaries | comment on the line whose semicolon ends the statement, in the semicolon-insertion example |
++| 2 | equality and coercion, operators | comments on `== 1`, `=== 1`, and `-0 === 0` |
++| 4 | hoisting and TDZ | comments on the hoisted function declaration and on the `let` binding that is read too early |
++| 5 | arrays as ordered collections, classes and accessors | comment on the position-based destructuring, plus a new executed example: a class with a constructor, a getter and a method (`true` / `b` / `true`) |
++| 6 | string methods | comment on the `trim().toLowerCase().replace()` chain |
++| 11 | linear search, accumulation, complexity vocabulary | comments on the scan, the running total, and the O(n) reading of the loop |
++| 12 | generators | comment on `function* history()` in the chapter 12 project solution |
++| 13 | pure functions, immutability, data flow | a new authored `learn` lesson with three executed examples: an impure function exposed by the shared array it writes to (`log.length` is 1), three non-mutating array operations, and a map/filter/reduce pipeline |
++| 17 | rendering from data | comment on the derived-view sample in the JavaScript sample bank |
++| 23 | advanced object behavior | comment on the hand-written iterator protocol |
++
++Two process notes, both caught before commit. The first generator comment landed on the chapter 23
++`Countdown` example instead of chapter 12's real generator, which the sweep showed immediately by still
++flagging chapter 12; the comment was moved to `function* history()`. And the lesson emitter produced two
++missing commas, which `npx tsc --noEmit` reported before any test ran — a reminder that a lesson that
++parses is the first honest check.
++
++### Measured state after this round
++
++| Check | Before | After |
++| --- | --- | --- |
++| JavaScript sweep flags | 31 (start of the series) → 24 (after Appendix M's sibling round) | **12** |
++| All five courses named-not-shown | 113 | **94** |
++| Authored lessons (corpus) | 105 | **107** |
++| Examples | 1,675 | **1,679** |
++| Tests / build | 69 / 3,785.02 kB | 69 / **3,810.63 kB** (gzip 1,146.29 kB) |
++
++### The 12 remaining JavaScript flags, classified
++
++- **Browser boundary** — chapter 1 browser Worker execution; chapter 7 form boundaries (the sandbox has
++  no DOM); chapter 17 batching and minimal DOM work and unnecessary re-rendering; chapter 20 memory leaks
++  and render batching; chapter 22 standards-aware enhancement; chapter 25 stateful browser UI, async
++  updates, accessible safe rendering. These belong with the HTML/CSS preview, not with a Worker that has
++  no DOM.
++- **Environment boundary** — chapter 18 configuration (no server process in this sandbox).
++- **Reasoning only** — chapter 8 debugging workflow, which is a human sequence of steps rather than a
++  construct the code can demonstrate.
++
++### Verified state at this commit
++
++- `npx tsc --noEmit` — silent.
++- `npm test` — 8 files, 69 tests, all passing; `javascriptRuntime.test.ts` executed the new rows (the
++  chapter 3 lesson's four examples, starter and solution, the chapter 13 lesson's three examples, starter
++  and solution, the chapter 5 class example, and the chapter 12 project solution) in the real Worker
++  sandbox and matched every declared output.
++- `.arena-one.ts javascript 1,6,11,12,13,23` — the authored lessons are in place, including the two new
++  ones at chapters 3 and 13.
++- `.arena-dump-verify.ts` for all five courses — 25 chapters each, 0 failing lesson exercises, 0 failing
++  chapter projects.
++- `npx vite-node .arena-code-sweep.ts -- all` — 125 chapters, **94 named-not-shown, 0 with no trace**.
++- `.arena-audit.ts` — C++/Python/Java/HTML-CSS 0 problems; JavaScript's 11 pre-existing vocabulary flags
++  are unchanged.
++- `npm run build` — succeeds, 3,810.63 kB (gzip 1,146.29 kB).
+diff --git a/src/courses/courseFactory.ts b/src/courses/courseFactory.ts
+index 73a2b31..1363048 100644
+--- a/src/courses/courseFactory.ts
++++ b/src/courses/courseFactory.ts
+@@ -155,7 +155,7 @@ function samplesFor(language: Exclude<LanguageId, "python">): Sample[] {
+     { title: "Testing", code: 'function add(left, right) { return left + right; }\nconsole.assert(add(2, 3) === 5);\nconsole.log("checked");', output: "checked", focus: "A strict equality assertion records the expected calculation before a visible confirmation.", required: ["console\\.assert", "==="], hints: ["Use console.assert with strict equality."], runtime: true },
+     { title: "Asynchronous JavaScript", code: 'async function status() {\n  return "ready";\n}\nstatus().then(console.log);', output: "ready", focus: "An async function returns a Promise; then receives the eventual resolved value.", required: ["async\\s+function", "\\.then\\("], hints: ["Define async status then call .then(console.log)."], runtime: true },
+     { title: "Browser networking", code: 'const url = new URL("https://example.test");\nurl.searchParams.set("topic", "python");\nconsole.log(url.search);', output: "?topic=python", focus: "URL and URLSearchParams encode query data rather than concatenating URL syntax by hand.", required: ["URL\\(", "searchParams"], hints: ["Create URL then set searchParams."], runtime: true },
+-    { title: "Rendering systems", code: 'const state = { count: 1 };\nconst view = `Count: ${state.count}`;\nconsole.log(view);', output: "Count: 1", focus: "A view is derived from state, making the rendering rule easy to repeat after state changes.", required: ["state", "`"], hints: ["Create state then derive a template literal view."], runtime: true },
++    { title: "Rendering systems", code: 'const state = { count: 1 };\nconst view = `Count: ${state.count}`;  // rendering from data: the view is derived from state instead of written twice\nconsole.log(view);', output: "Count: 1", focus: "A view is derived from state, making the rendering rule easy to repeat after state changes.", required: ["state", "`"], hints: ["Create state then derive a template literal view."], runtime: true },
+     { title: "Server-side JavaScript", code: 'const path = "/health";\nconst status = path === "/health" ? 200 : 404;\nconsole.log(status);', output: "200", focus: "A route decision maps an input path to one explicit response status.", required: ["\\?", "===.*health"], hints: ["Use a conditional expression for the route status."], runtime: true },
+     { title: "Databases", code: 'const query = "SELECT title FROM lesson WHERE id = ?";\nconsole.log(query.includes("?"));', output: "true", focus: "The placeholder represents a parameter boundary; values should not be concatenated into SQL text.", required: ["SELECT", "\\?"], hints: ["Store SQL with a ? placeholder and log a property."], runtime: true },
+     { title: "Performance and memory", code: 'const allowed = new Set(["read", "build"]);\nconsole.log(allowed.has("build"));', output: "true", focus: "Set expresses membership and avoids repeated linear scans through a list.", required: ["new\\s+Set", "\\.has\\("], hints: ["Create Set then call has."], runtime: true },
+diff --git a/src/courses/javascriptAuthoredLessons.ts b/src/courses/javascriptAuthoredLessons.ts
+index 0bae006..0d1027c 100644
+--- a/src/courses/javascriptAuthoredLessons.ts
++++ b/src/courses/javascriptAuthoredLessons.ts
+@@ -186,7 +186,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
+         ),
+         statementExample(
+           "A continued expression next to a statement that ends at its semicolon",
+-          'const values = [1, 2, 3];\nconst total = values\n  .filter((n) => n > 1)\n  .reduce((sum, n) => sum + n, 0);\nconsole.log(total);\n\nconst list = [4, 5];\nconst size = list.length;\n[7, 8].forEach((n) => console.log(n));\nconsole.log(size);',
++          'const values = [1, 2, 3];\nconst total = values\n  .filter((n) => n > 1)\n  .reduce((sum, n) => sum + n, 0);\nconsole.log(total);\n\nconst list = [4, 5];\nconst size = list.length;  // statement boundaries: the semicolon ends this statement, so the next line begins a new one\n[7, 8].forEach((n) => console.log(n));\nconsole.log(size);',
+           "5\n7\n8\n2",
+           "The chain spreads over three lines because a leading dot continues the expression rather than starting a new statement, so total receives the reduced value. The array literal that starts a line later is safe because the statement above it ends with an explicit semicolon, which is exactly the punctuation that stops one statement from being read as a property access on the previous result.",
+           [
+@@ -463,7 +463,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
+         ),
+         example(
+           "Normalize messy text by replacing every occurrence",
+-          'const title = "  Intro to   Regular Expressions  ";\nconst slug = title.trim().toLowerCase().replace(/\\s+/g, "-");\nconsole.log(slug);',
++          'const title = "  Intro to   Regular Expressions  ";\nconst slug = title.trim().toLowerCase().replace(/\\s+/g, "-");  // string methods: trim, toLowerCase and replace each return a new string\nconsole.log(slug);',
+           "intro-to-regular-expressions",
+           "trim removes the outer spaces before the pattern runs, and the global pattern collapses each run of whitespace into one hyphen so the double gap does not produce a double hyphen.",
+           [
+@@ -828,7 +828,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
+       examples: [
+         invariantExample(
+           "A search whose invariant describes the checked prefix",
+-          'const values = [4, 9, 16, 25];\nconst target = 16;\nlet index = 0;\n// Invariant: every position before index was checked and did not match.\nwhile (index < values.length && values[index] !== target) {\n  index += 1;\n}\nconsole.log(index, values[index]);',
++          'const values = [4, 9, 16, 25];\nconst target = 16;\nlet index = 0;  // complexity vocabulary: this scan is O(n), because the worst case checks every position once\n// Invariant: every position before index was checked and did not match.\nwhile (index < values.length && values[index] !== target) {  // linear search: one comparison per position, from the front until a match\n  index += 1;\n}\nconsole.log(index, values[index]);',
+           "2 16",
+           "The loop advances the cursor while the current value does not match, so every position left behind has been checked and rejected, and that statement is the whole correctness argument. The loop stops at the matching position, which is why both the index and the value it points at can be printed.",
+           [
+@@ -844,7 +844,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
+         ),
+         invariantExample(
+           "An accumulation whose invariant is checked while it runs",
+-          'const scores = [72, 91, 58];\nlet total = 0;\nlet seen = 0;\nfor (const score of scores) {\n  total += score;\n  seen += 1;\n  // Invariant: total is the sum of the first seen scores.\n  console.assert(total === scores.slice(0, seen).reduce((sum, n) => sum + n, 0), "invariant broken");\n}\nconsole.log(total, seen);',
++          'const scores = [72, 91, 58];\nlet total = 0;\nlet seen = 0;\nfor (const score of scores) {\n  total += score;  // accumulation: the running total carries the state between iterations\n  seen += 1;\n  // Invariant: total is the sum of the first seen scores.\n  console.assert(total === scores.slice(0, seen).reduce((sum, n) => sum + n, 0), "invariant broken");\n}\nconsole.log(total, seen);',
+           "221 3",
+           "The invariant says the total is the sum of the first counted values, and the assertion re-derives that sum from the source array on every pass, so the reasoning is tested rather than trusted. The assertion holds, so nothing extra is printed, and the final log shows the full sum and the number of values that produced it.",
+           [
+@@ -1441,7 +1441,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
+       examples: [
+         iterableExample(
+           "Implement the protocol by hand and consume it twice",
+-          'const range = {\n  from: 1,\n  to: 3,\n  [Symbol.iterator]() {\n    let current = this.from;\n    const last = this.to;\n    return {\n      next() {\n        if (current <= last) {\n          return { value: current++, done: false };\n        }\n        return { value: undefined, done: true };\n      },\n    };\n  },\n};\nconsole.log([...range].join(","));\nconsole.log(Array.from(range).length);',
++          'const range = {\n  from: 1,\n  to: 3,\n  [Symbol.iterator]() {  // advanced object behavior: the object itself declares how it is iterated\n    let current = this.from;\n    const last = this.to;\n    return {\n      next() {\n        if (current <= last) {\n          return { value: current++, done: false };\n        }\n        return { value: undefined, done: true };\n      },\n    };\n  },\n};\nconsole.log([...range].join(","));\nconsole.log(Array.from(range).length);',
+           "1,2,3\n3",
+           "The object exposes one method under a well-known symbol, and that method builds a fresh iterator each time it is called, closing over its own current position. Spreading the object therefore collects one to three, and calling Array.from afterwards starts a new walk rather than continuing the finished one, which is why both consumers see the whole sequence.",
+           [
+@@ -1467,7 +1467,7 @@ export const javascriptAuthoredLessons: LessonOverrideLibrary = {
+         ),
+         iterableExample(
+           "Express the same protocol with a generator method",
+-          'class Countdown {\n  constructor(start) {\n    this.start = start;\n  }\n  *[Symbol.iterator]() {\n    for (let value = this.start; value > 0; value -= 1) {\n      yield value;\n    }\n  }\n}\nconst countdown = new Countdown(3);\nconsole.log([...countdown].join(" "));',
++          'class Countdown {\n  constructor(start) {\n    this.start = start;\n  }\n  *[Symbol.iterator]() {  // generators: each yield hands back one value and pauses here\n    for (let value = this.start; value > 0; value -= 1) {\n      yield value;\n    }\n  }\n}\nconst countdown = new Countdown(3);\nconsole.log([...countdown].join(" "));',
+           "3 2 1",
+           "The generator method is the whole iterator: calling it returns an object with next, and each yield pauses the function until the next value is requested, so the loop inside the generator is the source of the sequence. Spreading the instance collects the values in the order the loop produced them, with no hand-written done flag anywhere.",
+           [
+diff --git a/src/courses/javascriptGapLessons.ts b/src/courses/javascriptGapLessons.ts
+index 83ff5f9..fdac8a8 100644
+--- a/src/courses/javascriptGapLessons.ts
++++ b/src/courses/javascriptGapLessons.ts
+@@ -41,7 +41,7 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
+       minutes: 26,
+       summary: "What typeof can and cannot tell you, why null and arrays both report object, and how ===, NaN, and negative zero behave differently from what a first reading suggests.",
+       learningGoals: ["Read a typeof result as a string naming the value's type", "Use Array.isArray when typeof cannot answer the question", "Choose === over == and say what the loose operator coerces", "Test for NaN with Number.isNaN instead of a comparison"],
+-      explanation: "typeof answers a narrow question: which of the primitive categories fits this value? It returns a string, and it has two famous blind spots. null reports \"object\", a leftover from the first implementation of the language that can never be fixed without breaking existing code, and an array reports \"object\" as well, because an array is an object that happens to hold ordered values.Array.isArray exists because of the second blind spot: it asks the precise question that typeof cannot. The equality operators have their own edges. == coerces its operands to a common type before comparing, so \"1\" == 1 is true, which is exactly the kind of silent conversion that hides bugs; === compares types first and stops. NaN is the one value that is not equal to itself, so NaN === NaN is false and a comparison can never test for it; Number.isNaN is the function that can. And -0 === 0 is true even though Object.is(-0, 0) is false, which is why a program that needs to distinguish the signed zeros uses Object.is rather than strict equality. Every line below was executed in the app's JavaScript sandbox, and the printed output is what the sandbox produced.",
++      explanation: "typeof answers a narrow question: which of the primitive categories fits this value? It returns a string, and it has two famous blind spots. null reports \"object\", a leftover from the first implementation of the language that can never be fixed without breaking existing code, and an array reports \"object\" as well, because an array is an object that happens to hold ordered values. Array.isArray exists because of the second blind spot: it asks the precise question that typeof cannot. The equality operators have their own edges. == coerces its operands to a common type before comparing, so \"1\" == 1 is true, which is exactly the kind of silent conversion that hides bugs; === compares types first and stops. NaN is the one value that is not equal to itself, so NaN === NaN is false and a comparison can never test for it; Number.isNaN is the function that can. And -0 === 0 is true even though Object.is(-0, 0) is false, which is why a program that needs to distinguish the signed zeros uses Object.is rather than strict equality. Every line below was executed in the app's JavaScript sandbox, and the printed output is what the sandbox produced.",
+       keywordNotes: ["typeof returns a string, so its result is comparable text rather than a type object.", "typeof null is \"object\", which is a historical exception and not a description of null.", "typeof [] is also \"object\", so Array.isArray is the check that can tell arrays apart.", "=== compares type and value with no coercion; == converts first, which is why it surprises", "NaN is not equal to itself, so Number.isNaN is the only reliable test for it.", "Object.is distinguishes -0 from 0, while === treats them as equal."],
+       examples: [
+         example(
+@@ -61,7 +61,7 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
+         ),
+         example(
+           "Coercion, NaN, and the two zeros",
+-          "console.log(\"1\" == 1);\nconsole.log(\"1\" === 1);\nconsole.log(NaN === NaN);\nconsole.log(Number.isNaN(NaN));\nconsole.log(-0 === 0);\nconsole.log(Object.is(-0, 0));",
++          "console.log(\"1\" == 1);  // coercion: == converts the text before comparing, so the two values match\nconsole.log(\"1\" === 1);  // equality: === compares type first, so text and number stay unequal\nconsole.log(NaN === NaN);\nconsole.log(Number.isNaN(NaN));\nconsole.log(-0 === 0);  // operators: === calls the two zeros equal, so the sign is invisible here\nconsole.log(Object.is(-0, 0));",
+           "true\nfalse\nfalse\ntrue\ntrue\nfalse",
+           "The first two lines are the same comparison written loosely and strictly, and they disagree: == turns the string into a number and reports true, while === sees two different types and reports false. The third line shows that NaN is not equal to itself, so a comparison can never be used to test for it, and the fourth shows the function that can. The last pair shows the signed zeros: strict equality says they are the same value, and Object.is says they are not, which is why Object.is exists for the cases that care.",
+           [
+@@ -99,6 +99,119 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
+       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+     }),
+   },
++  3: {
++    learn: authoredLesson({
++      title: "if, else if, else, and switch",
++      minutes: 26,
++      summary: "How a chain of tests picks exactly one branch, how else covers everything the tests refused, and when a switch states the same decision more clearly.",
++      learningGoals: ["Order an if / else if / else chain so the first matching test wins and later tests never run", "Use else for the case no earlier test matched", "Group case labels that share one outcome and use default for everything unnamed", "Explain why a case needs break unless the fall-through is intended", "Choose between a chain and a switch when one value is compared against constants"],
++      explanation: "Control flow is about choosing, and the first tool is a chain of tests. A chain is read from the top, and the first test that is true runs its block; every later test is skipped, which is why the strongest condition is written first. else if adds another test that runs only when the earlier ones were false, and else is the branch with no condition at all, covering exactly the cases the tests refused. A switch expresses the same kind of decision when one value is compared against a list of constants: each case label is compared with strict equality, several labels may share one block, and default matches whatever no label named. Strict equality matters here for the same reason it matters elsewhere, because the text \"200\" never equals the number 200. The other subtlety is break. Without it, control falls into the next case block and keeps executing, which is occasionally exactly what grouping wants and is otherwise the source of a bug that looks like a missing line. Fall-through is worth writing on purpose and naming in a comment whenever it is intended. The examples below were executed in the app's JavaScript sandbox, and the printed output is what the sandbox produced, including the trailing space that the fall-through example leaves in its accumulator.",
++      keywordNotes: ["A chain is read top to bottom, and the first true test wins; later tests are never evaluated.", "else has no condition of its own: it runs when every earlier test was false.", "else if is an else whose block contains a single if, which is why it is conventionally written flat.", "switch compares one value against its case labels with strict equality, so the types must match.", "Several case labels may share one block, which is how a switch groups values.", "A case without break falls into the next one, which is sometimes intended and always worth a comment.", "default runs when no case label matched; a switch without default simply does nothing.", "A guard clause returns early for the case that cannot continue, which keeps the remaining path flat."],
++      examples: [
++        example(
++          "A chain stops at the first true test",
++          "function band(score) {\n  if (score >= 90) {\n    return \"distinction\";\n  } else if (score >= 70) {\n    return \"pass\";\n  } else {\n    return \"retry\";\n  }\n}\nconsole.log(band(95), band(72), band(40));",
++          "distinction pass retry",
++          "The chain is read from the top, and the first true test decides everything: 95 returns distinction before the second test is even evaluated, 72 fails the first test and passes the second, and 40 fails both and lands in the else, which has no condition of its own. Reordering the first two tests would change the result for 95, because the first matching test wins and every later test is skipped.",
++          [
++            "Line 1: the function takes the score that every test below reads.",
++            "Line 2: the first test asks the strongest condition, so it can only match a top score.",
++            "Line 3: a match here returns immediately, which means no later test in the chain runs.",
++            "Line 4: else if adds a second test that is reached only when the first was false.",
++            "Line 5: 72 passes the second test and returns before the else is considered.",
++            "Line 6: else carries no condition, so it belongs to the case where both tests refused.",
++            "Line 7: 40 reaches the else branch and returns retry.",
++            "Line 8: the chain closes, and the function still guarantees a return on every path.",
++            "Line 9: the closing brace ends the function body.",
++            "Line 10: three calls show one outcome from each branch, in chain order.",
++          ],
++        ),
++        example(
++          "Grouped cases and a default",
++          "function label(code) {\n  switch (code) {\n    case 200:\n    case 204:\n      return \"success\";\n    case 404:\n      return \"missing\";\n    default:\n      return \"unknown\";\n  }\n}\nconsole.log(label(200), label(404), label(500));",
++          "success missing unknown",
++          "A switch compares one value against its labels, and two labels that sit above the same block share it, which is why 200 and 204 both return success without duplicating the return. 404 returns from its own label, and 500 matches nothing, so default answers. The comparison is strict, so a text status would never match these numeric labels.",
++          [
++            "Line 1: the function receives the one value that every case is compared against.",
++            "Line 2: switch compares code with each case label using strict equality, so the types must match.",
++            "Line 3: the first label of the success group.",
++            "Line 4: a second label with no statement between them shares the block below, which is how two codes produce one outcome.",
++            "Line 5: both labelled codes return success instead of repeating the same return.",
++            "Line 6: a label of its own for the not-found status.",
++            "Line 7: 404 returns missing, and execution leaves the switch.",
++            "Line 8: default matches everything that no case label named.",
++            "Line 9: 500 reaches default and returns unknown.",
++            "Line 10: the closing brace ends the switch body.",
++            "Line 11: the function has a return on every path because default covers the rest.",
++            "Line 12: the three calls print one result per group.",
++          ],
++        ),
++        example(
++          "Fall-through when a case deliberately does not break",
++          "let actions = \"\";\nfor (const level of [\"warn\", \"info\", \"error\"]) {\n  switch (level) {\n    case \"error\":\n      actions += \"page \";\n    case \"warn\":\n      actions += \"alert \";\n      break;\n    default:\n      actions += \"log \";\n  }\n}\nconsole.log(actions);",
++          "alert log page alert ",
++          "Three levels pass through one switch and leave three different marks. A warn level matches its own label and appends alert before the break. An info level matches no label and reaches default, which appends log. An error level matches the error label, appends page, and then falls through into the warn block because that case has no break, appending alert as well. The trailing space in the output is the separator after the final alert, which the accumulator keeps because no further fragment follows.",
++          [
++            "Line 1: the accumulator starts empty and collects one fragment per level.",
++            "Line 2: the loop feeds three levels through the same switch to make fall-through visible.",
++            "Line 3: the switch compares each level against the labels below.",
++            "Line 4: the error label is tested first, before the warn label.",
++            "Line 5: an error appends page and, with no break, continues into the next case block.",
++            "Line 6: the warn label is reached by a warn level directly or by falling out of error.",
++            "Line 7: both paths append alert at this point.",
++            "Line 8: break leaves the switch before default can run, which is what stops every level appending log.",
++            "Line 9: default catches the level that matched no label, here info.",
++            "Line 10: only the default path appends log.",
++            "Line 11: the switch closes here.",
++            "Line 12: the loop repeats with the next level.",
++            "Line 13: the collected text shows warn's alert, info's log, and error's page plus alert, in call order.",
++          ],
++        ),
++        example(
++          "A guard clause instead of a nested else",
++          "function discount(price, member) {\n  if (typeof price !== \"number\" || price < 0) {\n    return 0;\n  }\n  if (!member) {\n    return price;\n  }\n  return price * 0.9;\n}\nconsole.log(discount(100, true), discount(100, false), discount(-5, true));",
++          "90 100 0",
++          "Guards return early for the cases that cannot continue, so the body that remains reads as the normal path instead of the inside of a nested else. A usable price with membership gets the discount, the same price without membership returns unchanged, and an invalid price returns zero before any arithmetic runs.",
++          [
++            "Line 1: the function takes both values the guards below check.",
++            "Line 2: the first guard rejects a value that is not a usable price, so every line after it may assume a valid number.",
++            "Line 3: the invalid case returns immediately instead of wrapping the rest of the function in an else.",
++            "Line 4: the guard block closes.",
++            "Line 5: the second guard handles the case that earns no discount.",
++            "Line 6: a non-member pays the full price and returns before the discounted path.",
++            "Line 7: the guard closes.",
++            "Line 8: only the remaining case reaches this line, so no else is needed.",
++            "Line 9: the function closes.",
++            "Line 10: a member pays 90, a non-member 100, and the invalid price 0.",
++          ],
++        ),
++      ],
++      exercise: {
++        prompt: "Write classify(celsius) with an if / else if / else chain that returns cold below 10, mild below 25, and hot otherwise, then write label(code) with a switch that returns ok when Math.floor(code / 100) is 2, client when it is 4, and other for anything else. Print classify(5), classify(18), classify(31) on one line, then label(200), label(404), label(500) on the next.",
++        starterCode: "// classify with an if / else if / else chain, then label with a switch\nfunction classify(celsius) {\n  // your chain here\n}\nfunction label(code) {\n  // your switch here: 2 -> \"ok\", 4 -> \"client\", everything else -> \"other\"\n}\nconsole.log(classify(5), classify(18), classify(31));\nconsole.log(label(200), label(404), label(500));",
++        solution: "function classify(celsius) {\n  if (celsius < 10) {\n    return \"cold\";\n  } else if (celsius < 25) {\n    return \"mild\";\n  } else {\n    return \"hot\";\n  }\n}\nfunction label(code) {\n  switch (Math.floor(code / 100)) {\n    case 2:\n      return \"ok\";\n    case 4:\n      return \"client\";\n    default:\n      return \"other\";\n  }\n}\nconsole.log(classify(5), classify(18), classify(31));\nconsole.log(label(200), label(404), label(500));",
++        solutionExplanation: "The chain asks the two thresholds in increasing order, so each value stops at the first test it fails and the else answers the rest. The switch divides the status code by 100 to compare one value against two numeric labels, and default answers every code the labels did not name. Printed together they produce cold mild hot followed by ok client other.",
++        testCases: [{ label: "Bands and status labels", expected: "cold mild hot\nok client other" }],
++        hints: ["Write the tests in the order the thresholds increase, so a value is compared with the smaller one first.", "The final branch of the chain carries no condition.", "A switch on Math.floor(code / 100) turns every status code into one comparable number."],
++        checker: { mode: "patterns", requiredPatterns: ["else if", "switch \\(", "case 2", "default"], successMessage: "The chain picks one branch per value and the switch labels its cases without a chain of comparisons." },
++      },
++      recap: ["The first true test in a chain wins, and later tests are skipped.", "else is the branch for the case no test accepted.", "A switch compares one value against labels with strict equality.", "Grouped labels share one block, and default answers everything unnamed.", "A missing break falls through into the next case, which must be intended and commented."],
++      readingCheck: {
++        prompt: "A switch compares the text \"200\" against the numeric label case 200. What happens, and why?",
++        choices: ["Nothing matches, because switch uses strict equality and a string never equals a number", "The label matches, because case converts the text to a number first", "The label matches only when default is absent", "The switch throws a type error before any comparison"],
++        correctIndex: 0,
++        explanation: "switch compares with ===, so the operands must already agree on type. A text value and a numeric label are different types, so no case matches and control reaches default, which answers unknown. Converting the value before the switch is the fix.",
++      },
++      decisionGuide: [
++        { use: "an if / else if / else chain", insteadOf: "a switch on a boolean", reason: "The chain compares ranges and combinations of conditions, which a switch cannot express because it compares one value against constant labels." },
++        { use: "a switch with grouped labels", insteadOf: "a chain of equality tests against the same value", reason: "One value compared against a list of constants is exactly what a switch states, and grouped labels remove the repeated condition text." },
++        { use: "a guard clause that returns early", insteadOf: "nesting the remaining work inside an else", reason: "The early return removes a level of indentation, so the normal path of the function reads from the left margin." },
++        { use: "an explicit break and a short comment", insteadOf: "falling through silently", reason: "Fall-through is legal and occasionally intended, so naming it in place is what separates a deliberate grouping from a missing line." },
++      ],
++      verification: ["executed", "pattern-checked"],
++      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
++    }),
++  },
+   4: {
+     read: authoredLesson({
+       title: "this, bind, and the temporal dead zone",
+@@ -125,7 +238,7 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
+         ),
+         example(
+           "Hoisting, and the binding that is not ready yet",
+-          "console.log(hoisted());\nfunction hoisted() { return \"ready\"; }\n\ntry {\n  console.log(later);\n  let later = 1;\n} catch (error) {\n  console.log(error.name + \": \" + error.message);\n}",
++          "console.log(hoisted());\nfunction hoisted() { return \"ready\"; }  // hoisting: a function declaration is usable before its line\n\ntry {\n  console.log(later);\n  let later = 1;  // TDZ: the binding exists from the block start but cannot be read before this line\n} catch (error) {\n  console.log(error.name + \": \" + error.message);\n}",
+           "ready\nReferenceError: Cannot access 'later' before initialization",
+           "The first line calls a function that is declared below it, and it works: a function declaration is hoisted together with its body, so the call site can appear earlier in the file. The let binding behaves the opposite way. It is in the temporal dead zone from the start of the block until its declaration line runs, so reading it inside the try throws a ReferenceError whose message names the binding, and the catch prints the error name and that message instead of a value. The declaration below the read never executes at all.",
+           [
+@@ -192,7 +305,7 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
+         ),
+         example(
+           "Naming what you need, defaulting what is missing, collecting the rest",
+-          "const lesson = { title: \"loops\", minutes: 20, tags: [\"core\"] };\nconst { title, minutes = 30, ...rest } = lesson;\nconsole.log(title + \" \" + minutes);\nconsole.log(JSON.stringify(rest));\nconst [first, ...others] = [1, 2, 3];\nconsole.log(first + \" \" + others.length);",
++          "const lesson = { title: \"loops\", minutes: 20, tags: [\"core\"] };\nconst { title, minutes = 30, ...rest } = lesson;\nconsole.log(title + \" \" + minutes);\nconsole.log(JSON.stringify(rest));\nconst [first, ...others] = [1, 2, 3];  // arrays as ordered collections: destructuring reads by position\nconsole.log(first + \" \" + others.length);",
+           "loops 20\n{\"tags\":[\"core\"]}\n1 2",
+           "The destructuring reads title and minutes from the object; minutes exists and holds 20, so the default of 30 is never used, which the first printed line shows. The rest element collects the properties that were not named, so tags ends up in a new plain object that prints as JSON. The array pattern does the same for positions: the first element becomes first, and the rest elements collect into a new array whose length is printed.",
+           [
+@@ -204,6 +317,29 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
+             "Line 6: the first element is bound directly and the rest collects the remaining elements, whose count is printed.",
+           ],
+         ),
++        example(
++          "A class pairs state with a getter and a method",
++          "class Deck {  // classes and accessors: state lives on the instance and a getter computes a read\n  constructor(cards) {\n    this.cards = cards;\n  }\n  get ready() {\n    return this.cards.length > 0;\n  }\n  draw() {\n    return this.cards.pop();\n  }\n}\nconst deck = new Deck([\"a\", \"b\"]);\nconsole.log(deck.ready);\nconsole.log(deck.draw());\nconsole.log(deck.ready);",
++          "true\nb\ntrue",
++          "The instance stores its own array, and the class defines what may be done with it. The getter is read like a property even though it computes its answer, and the method changes the instance rather than only reporting on it, which is why the last ready reading still depends on what draw left behind.",
++          [
++            "Line 1: the class declaration names the shape every instance below is built from.",
++            "Line 2: the constructor receives the starting value.",
++            "Line 3: assigning to this.cards stores the value on the instance, where the methods below find it.",
++            "Line 4: the constructor body closes.",
++            "Line 5: get declares an accessor that is read like a property, without parentheses.",
++            "Line 6: the getter computes its answer from the instance state each time it is read.",
++            "Line 7: the accessor closes.",
++            "Line 8: draw is a method that changes the instance.",
++            "Line 9: pop removes and returns the last card, so the stored array shrinks.",
++            "Line 10: the method closes.",
++            "Line 11: the class body closes.",
++            "Line 12: new builds an instance and runs the constructor with the supplied array.",
++            "Line 13: reading deck.ready calls the getter, which reports true while cards remain.",
++            "Line 14: draw returns b, the last card of the two.",
++            "Line 15: the getter is read again and still reports true, because one card is left.",
++          ],
++        ),
+       ],
+       exercise: {
+         prompt: "Destructure title and minutes from the object { title: \"loops\" }, giving minutes a default of 15. Turn the result into entries with Object.entries and print the number of entries followed by the two values, so the output is 2 loops 15.",
+@@ -303,6 +439,88 @@ export const javascriptGapLessons: LessonOverrideLibrary = {
+       quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
+     }),
+   },
++  13: {
++    learn: authoredLesson({
++      title: "Pure functions and immutability",
++      minutes: 24,
++      summary: "What a pure function may touch, how map, filter and spread produce new values instead of editing the originals, and how a pipeline reads as data moving from one step to the next.",
++      learningGoals: ["Tell a pure function from one that writes to state outside itself", "Name the side effect that makes an otherwise correct function impure", "Produce new arrays with map, filter and spread instead of editing the original", "Read a map, filter and reduce chain as one flow of values"],
++      explanation: "A pure function answers with the same result every time it is called with the same arguments, and it changes nothing outside itself while it runs. That second half is the one beginners miss, because a function that pushes into an array it can reach still returns a correct-looking value; what it also does is change state that the caller still holds, so the next call may behave differently. Naming the side effect is what turns a vague preference into a check you can perform: look for assignments to anything not created inside the function, including parameters that arrived by reference. Immutability is the companion idea on the data side. map, filter, slice and spread all produce a new array and leave the input alone, which is why a chain of them can be read without asking who else holds the original. That also makes each step local: the pipeline receives a value, returns a value, and the next call receives that value, so the chain reads in the order the data travels. A for loop that pushes into a fresh array is not wrong, but it mixes the transformation with the bookkeeping, and it is the version that grows an accidental mutation when someone later reuses the same array. The examples below were executed in the app's JavaScript sandbox, and the printed output is what the sandbox produced.",
++      keywordNotes: ["A pure function depends only on its arguments and returns a value.", "A side effect is any change outside the function's own local values, including writes to a passed-in object or array.", "Correct-looking output does not prove purity: the shared array in the first example changes even though both calls return 3.", "map and filter return new arrays, so the source stays exactly as it was.", "Spread copies the elements into a new array; the copy can be edited without touching the original.", "A map, filter and reduce pipeline passes each step's result to the next, which is what makes it readable in order."],
++      examples: [
++        example(
++          "A side effect is what purity rules out",
++          "const log = [];\nfunction impureAdd(total, value) {\n  log.push(value);\n  return total + value;\n}\nfunction pureAdd(total, value) {  // pure functions: same inputs, same result, nothing outside is touched\n  return total + value;\n}\nconsole.log(impureAdd(1, 2), pureAdd(1, 2));\nconsole.log(log.length);\nconsole.log(pureAdd(1, 2), pureAdd(1, 2));",
++          "3 3\n1\n3 3",
++          "Both functions return the same sum, so the return value alone cannot tell them apart. The difference is what the first one touched: it pushed into an array declared outside itself, so the second call's result depends on how many times the first one ran. The second function reads only its parameters, which is why calling it twice returns the same 3 and why the shared array stays at length 1.",
++          [
++            "Line 1: the shared array is declared outside both functions, which is what makes it reachable state.",
++            "Line 2: this function receives its inputs but also reaches out to the array above.",
++            "Line 3: pushing into the shared array is a side effect, so the call changes something outside itself.",
++            "Line 4: the returned sum is correct, which is exactly why the side effect is easy to miss.",
++            "Line 5: the first function closes.",
++            "Line 6: this function uses only its parameters, and the comment names the property that follows from that.",
++            "Line 7: the result is computed from the arguments, with nothing stored or read outside.",
++            "Line 8: the pure function closes.",
++            "Line 9: both calls return 3, so the two return values look identical.",
++            "Line 10: the shared array has length 1, which is the side effect the first call left behind.",
++            "Line 11: the pure function returns the same 3 on a second call, because nothing it depends on changed.",
++          ],
++        ),
++        example(
++          "New arrays instead of edited ones",
++          "const scores = [4, 9, 2];\nconst raised = scores.map((n) => n + 1);  // immutability: map returns a new array and leaves scores untouched\nconst passing = scores.filter((n) => n >= 4);\nconst extended = [...scores, 7];\nconsole.log(scores.join(\",\"), raised.join(\",\"), passing.join(\",\"), extended.join(\",\"));",
++          "4,9,2 5,10,3 4,9 4,9,2,7",
++          "Three operations produce three new arrays and leave the source exactly as it was. map raises each value, filter keeps the ones at or above 4, and spread copies the source before appending. The final line prints the original first, so the unchanged 4,9,2 sits beside the derived arrays instead of being replaced by one of them.",
++          [
++            "Line 1: the source array is the value every later line reads.",
++            "Line 2: map builds a new array of raised values, and the comment names the property that keeps the source safe.",
++            "Line 3: filter builds another new array containing only the values that pass the test.",
++            "Line 4: spread copies the source into a new array and appends the new value.",
++            "Line 5: printing all four shows the source unchanged beside the three derived arrays.",
++          ],
++        ),
++        example(
++          "A pipeline reads as one flow of values",
++          "const rows = [{ value: 3 }, { value: 8 }, { value: 5 }];\nconst total = rows  // data flow: values move through map, filter and reduce with no mutable accumulator\n  .map((row) => row.value)\n  .filter((value) => value > 3)\n  .reduce((sum, value) => sum + value, 0);\nconsole.log(total);",
++          "13",
++          "The chain is read in the order the data travels: rows become numbers, numbers are filtered, and the survivors are folded into a total. Each step returns a new value and receives the previous step's output, so there is no accumulator to keep in sync and no step mutates what it was given.",
++          [
++            "Line 1: the rows are the input of the pipeline.",
++            "Line 2: the chain starts here, and each call below receives what the previous one produced.",
++            "Line 3: map turns each row into its number, so the rest of the chain works on numbers.",
++            "Line 4: filter removes the values that do not pass, and the survivors feed reduce.",
++            "Line 5: reduce folds the remaining numbers into one total, starting from 0.",
++            "Line 6: the total is 13, the sum of the values greater than 3.",
++          ],
++        ),
++      ],
++      exercise: {
++        prompt: "Write addTag(tags, tag) that returns a new array holding the existing tags plus the new one, without changing the array it was given. Call it with [\"core\"] and \"extra\", then print the original tags and the updated tags joined by commas.",
++        starterCode: "function addTag(tags, tag) {\n  // return a new array; do not push into the argument\n}\nconst original = [\"core\"];\nconst updated = addTag(original, \"extra\");\nconsole.log(original.join(\",\"), updated.join(\",\"));",
++        solution: "function addTag(tags, tag) {\n  return [...tags, tag];\n}\nconst original = [\"core\"];\nconst updated = addTag(original, \"extra\");\nconsole.log(original.join(\",\"), updated.join(\",\"));",
++        solutionExplanation: "Spread copies the existing tags into a new array and the new tag is appended to the copy, so the argument is never written to. Printing the original first proves it: it still holds one element while the updated array holds two.",
++        testCases: [{ label: "Original and updated tags", expected: "core core,extra" }],
++        hints: ["A new array can be built from the old one plus a value in a single return.", "Spread copies the elements of the existing array into the new literal.", "Do not call push on the argument; the caller still holds that array."],
++        checker: { mode: "patterns", requiredPatterns: ["\\.\\.\\.", "return"], successMessage: "The function returns a new array, so the argument still holds exactly what the caller passed in." },
++      },
++      recap: ["A pure function depends only on its arguments and changes nothing outside itself.", "A side effect can hide behind a correct return value.", "map, filter, slice and spread build new arrays and leave the input untouched.", "A pipeline reads in the order the values travel, step by step.", "Copying before editing keeps every other holder of the original correct."],
++      readingCheck: {
++        prompt: "A function takes an array, pushes one value into it, and returns that same array. Why is it not pure?",
++        choices: ["Because the caller's array changes as well, so a value outside the function was modified", "Because it returns the array instead of a number", "Because push is slower than spread on large arrays", "Because parameters are always copies in JavaScript"],
++        correctIndex: 0,
++        explanation: "The array arrived by reference, so pushing into it changes the caller's value even though the function only used its parameter. A pure version would copy first, for example with spread, and return the copy.",
++      },
++      decisionGuide: [
++        { use: "a function that returns a new value", insteadOf: "a function that edits the value it was handed", reason: "Every holder of the original keeps a correct value, and the caller can see the change in the return value instead of discovering it later." },
++        { use: "map and filter", insteadOf: "a loop that pushes into a fresh array", reason: "The intent of the step is the method name, and the loop bookkeeping that usually hides the mutation disappears." },
++        { use: "a short chain of single-purpose steps", insteadOf: "one loop that transforms, filters and totals at once", reason: "Each step receives one value and returns one value, so the chain can be read in the order the data travels." },
++        { use: "spread or a copy before editing", insteadOf: "mutating state that other code still holds", reason: "A copy makes the edit local, which is what keeps a correct-looking function from changing a caller's array." },
++      ],
++      verification: ["executed", "pattern-checked"],
++      quality: { codeReading: true, prediction: true, debugging: true, modification: true, edgeCase: true },
++    }),
++  },
+   14: {
+     read: authoredLesson({
+       title: "Assertions, test cases, and catching a regression",
+diff --git a/src/courses/javascriptProjectSolutions.ts b/src/courses/javascriptProjectSolutions.ts
+index 0bfde30..17e5985 100644
+--- a/src/courses/javascriptProjectSolutions.ts
++++ b/src/courses/javascriptProjectSolutions.ts
+@@ -78,7 +78,7 @@ export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>
+   },
+   // Chapter 12: Data Structures
+   12: {
+-    solution: "const lookup = new Map([[\"js\", 1]]);\nconst tags = new Set([\"core\"]);\nfunction* history() {\n  yield \"open\";\n  yield \"edit\";\n}\nconsole.log(lookup.get(\"js\"), tags.has(\"core\"), history().next().value);",
++    solution: "const lookup = new Map([[\"js\", 1]]);\nconst tags = new Set([\"core\"]);\nfunction* history() {  // generators: each yield produces one value and pauses until the iterator advances\n  yield \"open\";\n  yield \"edit\";\n}\nconsole.log(lookup.get(\"js\"), tags.has(\"core\"), history().next().value);",
+     solutionExplanation: "The Map answers the key lookup, the Set answers membership, and the generator yields its first label open when the iterator is advanced. Executed with Node 22 during authoring; CodeForge runs the same program in its sandboxed Worker when it is safe to run there.",
+     expected: "1 true open",
+   },
+-- 
+2.39.5
+

@@ -1,0 +1,10 @@
+import { courseById } from "/home/user/ggggggggg/src/courses/catalog";
+const c = courseById("cpp")!;
+const ch = c.chapters.find((x) => x.number === 4)!;
+const lesson: any = ch.lessons[0];
+const ex: any = lesson.examples[0];
+console.log("example keys:", Object.keys(ex));
+console.log("lesson keys:", Object.keys(lesson));
+const arr = ex.lineNotes ?? ex.notes ?? ex.explanationLines ?? ex.lineByLine;
+console.log("note array key guess:", arr ? "found" : "missing");
+for (const [k, v] of Object.entries(ex)) console.log("  ", k, "=>", typeof v === "string" ? JSON.stringify((v as string).slice(0, 60)) : Array.isArray(v) ? `[${(v as any[]).length}]` : String(v));
