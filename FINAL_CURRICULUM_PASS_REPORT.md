@@ -3106,3 +3106,93 @@ so its execution claims stay tied to measured evidence.
 This evidence supports the existing Pyodide claim only for the paths that ran in this Node-hosted Pyodide
 harness. It does not verify a real-browser Worker, network/package CDN access, sqlite3, native processes,
 threads, or a general package-install workflow.
+
+## Appendix AJ — Section 1 grading infrastructure and HTML/CSS checker repair (2026-10-13)
+
+This batch continues the existing application. It does not replace its architecture, courses, editors,
+progress/settings, PDF export, authored curriculum, or runners. The Section 1 infrastructure foundation
+is in place, but the acceptance gate is still **PARTIAL**: the new behavior tests are synthetic runtime
+corpus tests, not yet attached to shipped lesson/project exercises. JavaScript chapters 1–4 still need
+their chapter-scoped behavioral migration, and JavaScript chapter 5 has not been started.
+
+### Grading contracts and feedback
+
+- `TestCase` now carries `hidden`, test-only `append`, line-oriented `input`, `kind` (`output`, `throws`,
+  or `state`), and per-case `timeoutMs` fields. `gradeExercise` executes appended checks without
+  rendering their source, applies hidden cases as the pass gate when present, and treats visible-case
+  failures as teaching feedback rather than as a grading failure in that mode.
+- Hidden failures include their hidden-case number/label, input, expected value, actual result, and
+  category. Hidden runner error details are withheld (they can contain a Python traceback or echo
+  appended test source); output mismatches still report actual output. A line is highlighted only when
+  the runner reported a learner-code line; append-only lines are not highlighted.
+- `state` cases currently use an appended assertion/serialization and compare its transcript against
+  `expected`. There is not yet a separate structured state-return channel from either Worker.
+- The success path displays the last visible example's actual output, never hidden-case output.
+  Timeout, syntax, type, compile, runtime, logic, test-failure, and resource-limit categories have
+  distinct labels where the runner provides enough evidence; classification is not a compiler claim.
+
+### Runtime and HTML/CSS boundaries
+
+- JavaScript Worker caps are **20,000 source characters**, **20,000 input characters**, **10 seconds
+  maximum wall time** (default 2.5 seconds), **200 transcript lines / 8,000 output characters**, and
+  100 scheduled timers. Python Worker caps are **30,000 source characters**, **20,000 input
+  characters**, **10 seconds maximum wall time** (default 5 seconds), **12,000 stdout characters**,
+  and **4,000 stderr characters**. Timeout is a distinct outcome. These limits were exercised in unit
+  tests and the JS corpus tests use the shipped JavaScript Worker source with network/nested-worker
+  APIs blocked by the harness.
+- **No hard memory/heap cap is implemented or verified.** The sandbox's browser/Worker isolation and
+  source/output/time limits are not a measured memory guarantee.
+- HTML/CSS checking now uses parsed DOM structure and a PostCSS tree for semantic attribute, access-
+  name, image-alt, associated-label, heading-order, viewport, CSS declaration/selector/at-rule, and
+  responsive-layout assertions. Plain `viewport`/`description` requirements now mean matching `<meta
+  name=...>` attributes; `noopener`/`noreferrer` mean tokens in an anchor's `rel`. Width-based
+  container queries that change columns/layout are distinguished from decoration-only container rules.
+  Java and C++ remain structural/pattern-only inside the product; no compiler or executor was added.
+- The DOM/CSS checker does **not** measure actual browser layout, run Lighthouse/axe, or replace a
+  manual accessibility review. The preview remains sandboxed and structurally checked.
+
+### Verification actually run
+
+| Command/check | Result |
+| --- | --- |
+| `npx vitest run src/utils/behavioralGrader.test.ts src/data/behavioralGradingCorpus.test.ts src/data/courseIntegrity.test.ts src/utils/exerciseCheck.test.ts` | **4 files, 68 tests passed** |
+| `npm test` | **23 files, 185 tests passed**. App sweeps rendered all 125 chapter pages and 821 lesson pages in jsdom. |
+| `npm run typecheck` | Pass (`tsc --noEmit`). |
+| `npm run build` | Pass; Vite transformed 2,272 modules; `dist/index.html` **4,317.16 kB** (gzip **1,293.93 kB**). |
+| `git diff --check` | Pass. |
+| `npx vite-node .arena-coverage-map.ts` | Regenerated `CURRICULUM_COVERAGE_MAP.md`: **5 courses, 125 chapters, 821 lesson rows**. Hidden-case count remains **0** across the shipped lesson/project corpus. |
+| `npm audit --omit=dev` | **0 vulnerabilities**. |
+| `npm audit --json` | Exits 1 with **3 high, dev-only findings** in `vite-plugin-singlefile → micromatch → braces`; npm reports a semver-major `vite-plugin-singlefile@0.9.0` change as the available fix. No dependency downgrade was applied. |
+
+The UI/jsdom tests continue to print non-fatal CodeMirror `textRange(...).getClientRects is not a function`
+traces. They do not fail the suite. No Chromium/Chrome/Firefox or Playwright browser is available in this
+sandbox, so no full real-browser walkthrough, visual layout measurement, or automated assistive-technology
+scan was run. The jsdom app sweeps are not represented as browser verification.
+
+### Files changed in this batch
+
+- Grader contract and feedback: `src/data/types.ts`, `src/utils/behavioralGrader.ts`,
+  `src/utils/behavioralGrader.test.ts`, `src/App.tsx`, `src/app.outcomes.test.tsx`, `src/index.css`.
+- Runner caps/classification and evidence: `src/utils/javascriptRunner.ts`,
+  `src/utils/javascriptRunner.test.ts`, `src/utils/pythonRunner.ts`, `src/utils/pythonRunner.test.ts`,
+  `src/data/behavioralGradingCorpus.test.ts`.
+- DOM/CSS checker: `src/utils/htmlStructure.ts`, `src/utils/exerciseCheck.ts`,
+  `src/utils/exerciseCheck.test.ts`; runtime parser dependencies in `package.json` and `package-lock.json`.
+- Inventory: `.arena-coverage-map.ts`, `CURRICULUM_COVERAGE_MAP.md`.
+- This report: `FINAL_CURRICULUM_PASS_REPORT.md`.
+
+### Remaining gates — do not promote to COMPLETE
+
+1. Migrate behavioral hidden cases onto JavaScript chapters 1–4 first; for each exercise/project, prove
+   starter failure, reference and materially different alternative success, and hardcoded-output-cheat
+   failure with distinct outputs and edge cases. Keep the corpus coverage rows PARTIAL until evidence
+   exists. Do not begin JavaScript chapter 5 until this and the JS1–4 behavioral gates are in place.
+2. No hidden behavioral cases have yet been attached to the shipped lesson/project corpus (the map's
+   zero count is intentional and verified); the new four-way starter/reference/alternative/cheat gates
+   exercise one synthetic JS Worker problem only.
+3. Implement or explicitly defer a real memory bound without claiming one. Preserve the present static-
+   only Java/C++ boundary and the documented Pyodide/CDN, `sqlite3`, PDF, and sandbox limits.
+4. Complete real-browser and assistive-technology verification before changing the map's browser or
+   accessibility rows. Keep the four MISSING coverage areas named in the map, all other unsupported
+   rows PARTIAL, and retain the existing compiler/parser, chapter/cumulative assessment, project, PDF,
+   advisory, and sandbox-boundary verification debt.

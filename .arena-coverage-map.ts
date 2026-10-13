@@ -6,14 +6,14 @@ const esc = (value: string) => value.replaceAll("|", "\\|").replaceAll("\n", " "
 const lines: string[] = [
   "# Curriculum coverage map",
   "",
-  "**Snapshot date:** 2026-10-12",
+  "**Snapshot date:** 2026-10-13",
   "**Scope:** every shipped course, chapter, and lesson in the current workspace. This is an inventory, not a completion claim.",
   "",
   "## Measurement notes",
   "",
   "- Current catalog census: 5 languages, 125 chapters, 821 lessons, 141 lessons marked `authored`, 1,689 examples (317 inside authored lessons).",
-  "- `hidden-test count` is **0 for every lesson and project** in this snapshot. `TestCase` currently has only `label`, optional `input`, and `expected`; there is no visibility/hidden-case field. Do not interpret a normal visible case as a hidden case.",
-  "- `distinct outputs` counts distinct strings in the lesson's current `testCases`. The requested four-plus distinct-output behavioral corpus, alternative reference solutions, and hardcoded-output cheat checks are not implemented yet.",
+  "- `hidden-test count` is **0 for every lesson and project** in this snapshot. The `TestCase` schema and behavioral grader support `hidden`, `append`, line-oriented `input`, `kind` (`output`/`throws`/`state`), and clamped `timeoutMs`, but those gates have not yet been attached to the shipped lesson/project corpus. Do not interpret a normal visible case as a hidden case.",
+  "- `distinct outputs` counts distinct strings in the lesson's current `testCases`. A separate real-JavaScript-Worker infrastructure fixture proves starter failure, reference success, alternative-reference success, and hardcoded-transcript-cheat failure across low/standard/high/invalid outputs. Lesson-specific four-plus behavioral tests, alternative solutions, and cheat gates remain to be migrated.",
   "- This map measures current lesson metadata and grading fields. It does not certify browser behavior, compiler execution, correctness, or chapter completion.",
   "",
   "## Per-language totals and in-app execution boundary",
@@ -23,11 +23,11 @@ const lines: string[] = [
 ];
 
 const runtime: Record<string, string> = {
-  python: "Pyodide Worker where supported; package/CDN, sqlite3, OS process/thread behavior remain bounded or unverified.",
+  python: "Pyodide Worker where supported; code/input, wall-clock, stdout, and stderr are capped; no hard memory cap; package/CDN, sqlite3, and OS process/thread behavior remain bounded or unverified.",
   java: "Static structural checking only in-app; no JVM/compiler is claimed.",
-  javascript: "Browser Worker execution where supported; DOM/network/timer boundaries use preview or declared stubs.",
+  javascript: "Browser Worker where supported; code/input, wall-clock, output, and scheduled-timer counts are capped; no hard memory cap; DOM/network boundaries are unavailable.",
   cpp: "Static structural checking only in-app; no compiler is claimed.",
-  htmlcss: "Sandboxed browser preview plus structural validation; no full accessibility/browser matrix is claimed.",
+  htmlcss: "Sandboxed preview plus parse5 DOM and PostCSS structure/accessibility/layout assertions; no full browser, geometry, or assistive-technology audit is claimed.",
 };
 
 for (const course of courses) {
@@ -40,7 +40,7 @@ lines.push(
   "",
   "## Language → chapter → lesson detail",
   "",
-  "Each lesson row lists its current authored-depth label, current hidden-case count, and concrete grading/content gaps visible in the shipped schema. Chapter-level rows record the mixed-test and project checkpoints separately.",
+  "Each lesson row lists its current authored-depth label, current hidden-case count, and concrete grading/content gaps visible in the shipped corpus. Chapter-level rows record the mixed-test and project checkpoints separately. The schema/grader already model the case modes; absence of lesson cases is a corpus gap, not a missing field.",
   "",
 );
 
@@ -53,7 +53,7 @@ for (const course of courses) {
     const cumulative = chapter.cumulativeTest?.length ?? 0;
     const chapterGaps = [
       chapterTests < 8 ? `chapter test has ${chapterTests} questions; target is 8–12 mixed items` : "",
-      `project hidden cases ${projectHidden}; ${projectCases} visible project case(s) only`,
+      `project hidden cases ${projectHidden}; ${projectCases} visible case(s); hidden behavioral project gates remain to be authored`,
       chapter.number % 5 === 0 && cumulative === 0 ? "missing cumulative checkpoint" : "",
     ].filter(Boolean).join("; ");
     lines.push(`| **${chapter.number}** | **${esc(chapter.title)}** | — | — | 0 | ${esc(chapterGaps || `chapter test ${chapterTests}; cumulative checkpoint ${cumulative || "none"}`)} |`);
@@ -64,11 +64,11 @@ for (const course of courses) {
       const distinct = new Set(cases.map((testCase) => testCase.expected)).size;
       const gaps = [
         depth === "scaffolded" ? "content remains scaffolded; author to topic-appropriate depth" : depth === "unclassified" ? "authorship depth is not explicitly tagged; review before promotion" : "",
-        `${hidden} hidden case(s); hidden cases not supported by the current TestCase schema`,
-        `${distinct} distinct expected output(s); add 4+ varied behavioral cases`,
+        `${hidden} hidden case(s); add behaviorally distinct hidden cases to this lesson corpus`,
+        `${distinct} distinct expected output(s); add at least 4 behaviorally distinct outputs including edges`,
         "alternate passing reference solution missing",
         "hardcoded-output cheat rejection missing",
-        "appended harness/expected-throws/state/timeout modes not implemented; simple stdin is supported via TestCase.input",
+        "append/input/throws/state/timeout are supported by the schema and grader; migrate lesson-specific hidden behavioral tests and an alternative passing implementation",
       ].filter(Boolean).join("; ");
       lines.push(`| ${chapter.number} | ${esc(chapter.title)} | ${esc(lesson.title)} | ${depth} | ${hidden} | ${esc(gaps)} |`);
     }
@@ -92,11 +92,11 @@ lines.push(
   "",
   "## Global work still required before any chapter can be called COMPLETE",
   "",
-  "- Add and test behavioral grading modes for appended harness code, expected throws, state, timeout, and hidden cases; simple per-case stdin already exists through TestCase.input. Run the hidden corpus through supported real executors and show labeled hidden failures.",
-  "- Gate exercises on 4+ distinct outputs, a failing hardcoded-output cheat, a passing alternative solution, and a failing starter.",
-  "- Complete JavaScript chapters 5–25 before claiming a complete JavaScript course; fill genuine Python gaps without rewriting its 25-chapter curriculum; proceed through Java, C++, then HTML/CSS in the requested order.",
+  "- The behavioral-grading schema, grader, hidden-failure reporting, and runner limits are implemented and unit/corpus-tested. Add hidden cases to real lesson/project corpus rows; keep each lesson at 4+ distinct behaviors with boundary cases, a passing alternative reference, and a failing hardcoded-output cheat.",
+  "- Migrate JavaScript chapters 1–4 through those behavior gates, one chapter batch at a time, before beginning JavaScript 5–25. No JavaScript chapter 5 migration is started in this snapshot.",
+  "- After JS1–4 gates, continue JavaScript 5–25; append genuine Python gap content without rewriting existing material; then proceed through Java, C++, and HTML/CSS in the requested order.",
   "- Expand chapter tests to 8–12 mixed items and add executed-code, cumulative, and realistic hidden-tested project checks.",
-  "- Extend partial runtime diagnostics consistently: JavaScript/Python already have Worker timeouts and error-line fields, but timeout is not separately labeled and static-check line feedback is heuristic; add error categories, regression tests, and keep Java/C++ explicitly static-only. Add parsed DOM/style assessment for HTML/CSS.",
+  "- JavaScript/Python wall-clock, code/input, and output caps are implemented; timeout, syntax/type/compile/runtime/logic/test-failure/resource-limit classes are explicit, and source highlighting occurs only for runner-reported user lines. A hard memory cap is not implemented or claimed. Java/C++ share static-only pattern review (no compiler). HTML/CSS now uses parse5 DOM and PostCSS checks; actual browser layout/accessibility verification remains open.",
   "- Browser walkthrough, accessibility verification, and dependency findings remain separate evidence obligations; never infer them from this static map.",
   "",
 );

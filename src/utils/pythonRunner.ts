@@ -1,13 +1,31 @@
+export type RunFailureKind = "syntax" | "type" | "compile" | "runtime" | "logic" | "test-failure" | "timeout" | "limit";
+
 export type RunResult = {
   output: string;
   error?: string;
   errorLine?: number;
   timedOut?: boolean;
+  failureKind?: RunFailureKind;
+  outputTruncated?: boolean;
 };
 
 type WorkerMessage = RunResult & { id: number };
 
+const MAX_CODE_LENGTH = 30_000;
+const MAX_INPUT_LENGTH = 20_000;
+const MAX_TIMEOUT_MS = 10_000;
+const MAX_OUTPUT_CHARS = 12_000;
+const MAX_ERROR_CHARS = 4_000;
+const MAX_OUTPUT_MARKER = "[output truncated after sandbox safety limit]";
+const MAX_ERROR_MARKER = "[stderr truncated after sandbox safety limit]";
+
 export const pythonWorkerSource = `
+const MAX_CODE_LENGTH = ${MAX_CODE_LENGTH};
+const MAX_INPUT_LENGTH = ${MAX_INPUT_LENGTH};
+const MAX_OUTPUT_CHARS = ${MAX_OUTPUT_CHARS};
+const MAX_ERROR_CHARS = ${MAX_ERROR_CHARS};
+const MAX_OUTPUT_MARKER = ${JSON.stringify(MAX_OUTPUT_MARKER)};
+const MAX_ERROR_MARKER = ${JSON.stringify(MAX_ERROR_MARKER)};
 let pyodideInstance;
 let loadingPromise;
 const hasJspi = typeof WebAssembly.Suspending === "function";
@@ -22,19 +40,48 @@ async function getPyodide() {
   return pyodideInstance;
 }
 
+function appendBounded(current, text, limit, marker) {
+  const addition = String(text) + "\\n";
+  const contentLimit = Math.max(0, limit - marker.length - 1);
+  if (current.length + addition.length <= contentLimit) return { value: current + addition, truncated: false };
+  const prefix = (current + addition).slice(0, contentLimit);
+  return { value: prefix + (prefix ? "\\n" : "") + marker, truncated: true };
+}
+
+function classifyPythonFailure(message) {
+  if (/SyntaxError|IndentationError|TabError/i.test(message)) return "syntax";
+  if (/TypeError/i.test(message)) return "type";
+  if (/CompileError|CompilationError|Compilation failed|compile error/i.test(message)) return "compile";
+  if (/too large|limit/i.test(message)) return "limit";
+  return "runtime";
+}
+
 self.onmessage = async (event) => {
   const { id, code, input } = event.data;
   let output = "";
   let errorOutput = "";
+  let outputTruncated = false;
+  let errorOutputTruncated = false;
   let globals;
   let pyodide;
   let response;
   let setupLineOffset = 0;
   try {
-    if (code.length > 30000) throw new Error("Program is too large for the practice sandbox.");
+    if (code.length > MAX_CODE_LENGTH) throw new Error("Program is too large for the practice sandbox.");
+    if (String(input || "").length > MAX_INPUT_LENGTH) throw new Error("Test input is too large for the practice sandbox.");
     pyodide = await getPyodide();
-    pyodide.setStdout({ batched: (text) => { if (output.length < 12000) output += text + "\\n"; } });
-    pyodide.setStderr({ batched: (text) => { if (errorOutput.length < 4000) errorOutput += text + "\\n"; } });
+    pyodide.setStdout({ batched: (text) => {
+      if (outputTruncated) return;
+      const next = appendBounded(output, text, MAX_OUTPUT_CHARS, MAX_OUTPUT_MARKER);
+      output = next.value;
+      outputTruncated = next.truncated;
+    } });
+    pyodide.setStderr({ batched: (text) => {
+      if (errorOutputTruncated) return;
+      const next = appendBounded(errorOutput, text, MAX_ERROR_CHARS, MAX_ERROR_MARKER);
+      errorOutput = next.value;
+      errorOutputTruncated = next.truncated;
+    } });
     // Import any bundled packages before creating an isolated namespace for this submission.
     await pyodide.loadPackagesFromImports(code);
     const values = String(input || "").split("\\n");
@@ -99,7 +146,9 @@ self.onmessage = async (event) => {
     }
     response = { id };
   } catch (error) {
+    const errorName = error && error.name ? error.name : "Error";
     const message = error && error.message ? error.message : String(error);
+    const classificationMessage = errorName + ": " + message;
     const userLine = message.match(/<codeforge-user>.*?line (\\d+)/i);
     const anyLine = hasJspi ? message.match(/line (\\d+)/i) : undefined;
     const line = userLine ? Number(userLine[1]) : anyLine ? Number(anyLine[1]) - setupLineOffset : undefined;
@@ -107,6 +156,7 @@ self.onmessage = async (event) => {
       id,
       error: message,
       errorLine: line === undefined ? undefined : Math.max(1, line),
+      failureKind: classifyPythonFailure(classificationMessage),
     };
   } finally {
     if (globals) {
@@ -120,6 +170,7 @@ self.onmessage = async (event) => {
   }
   response.output = output.replace(/\\n$/, "");
   if (response.error) response.error = (errorOutput + response.error).trim();
+  if (outputTruncated || errorOutputTruncated) response.outputTruncated = true;
   self.postMessage(response);
 };
 `;
@@ -137,13 +188,22 @@ export class PythonRunner {
   }
 
   run(code: string, input = "", timeout = 5000): Promise<RunResult> {
+    if (code.length > MAX_CODE_LENGTH) {
+      return Promise.resolve({ output: "", error: `Program is too large for the practice sandbox (limit ${MAX_CODE_LENGTH} characters).`, failureKind: "limit" });
+    }
+    if (input.length > MAX_INPUT_LENGTH) {
+      return Promise.resolve({ output: "", error: `Test input is too large for the practice sandbox (limit ${MAX_INPUT_LENGTH} characters).`, failureKind: "limit" });
+    }
+
+    const requestedTimeout = Number.isFinite(timeout) ? timeout : 5000;
+    const timeoutLimit = Math.max(1, Math.min(requestedTimeout, MAX_TIMEOUT_MS));
     const worker = this.getWorker();
     const id = ++this.sequence;
     return new Promise((resolve) => {
       const timer = window.setTimeout(() => {
         this.reset();
-        resolve({ output: "", error: "The program took too long, so the sandbox stopped it. Check for a loop that never ends.", timedOut: true });
-      }, timeout);
+        resolve({ output: "", error: "The program took too long, so the sandbox stopped it. Check for a loop that never ends.", timedOut: true, failureKind: "timeout" });
+      }, timeoutLimit);
       const listener = (event: MessageEvent<WorkerMessage>) => {
         if (event.data.id !== id) return;
         window.clearTimeout(timer);

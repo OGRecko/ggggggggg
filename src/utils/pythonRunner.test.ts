@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PythonRunner, pythonWorkerSource } from "./pythonRunner";
+import type { RunResult } from "./pythonRunner";
 
-type WorkerListener = (event: MessageEvent<{ id: number; output?: string; error?: string; errorLine?: number }>) => void;
+type WorkerResult = RunResult & { id: number };
+type WorkerRequest = { id: number; code: string; input: string };
+type WorkerListener = (event: MessageEvent<WorkerResult>) => void;
 
 class MockWorker {
   static instances: MockWorker[] = [];
@@ -11,7 +14,7 @@ class MockWorker {
   }
 
   readonly listeners = new Set<WorkerListener>();
-  readonly postedMessages: Array<{ id: number; code: string; input: string }> = [];
+  readonly postedMessages: WorkerRequest[] = [];
   terminated = false;
 
   constructor(readonly source: string | URL) {
@@ -26,7 +29,7 @@ class MockWorker {
     if (type === "message") this.listeners.delete(listener);
   }
 
-  postMessage(message: { id: number; code: string; input: string }) {
+  postMessage(message: WorkerRequest) {
     this.postedMessages.push(message);
   }
 
@@ -34,10 +37,8 @@ class MockWorker {
     this.terminated = true;
   }
 
-  dispatch(data: { id: number; output?: string; error?: string; errorLine?: number }) {
-    for (const listener of [...this.listeners]) {
-      listener({ data } as MessageEvent<{ id: number; output?: string; error?: string; errorLine?: number }>);
-    }
+  dispatch(data: WorkerResult) {
+    for (const listener of [...this.listeners]) listener({ data } as MessageEvent<WorkerResult>);
   }
 }
 
@@ -47,14 +48,18 @@ type FakePyGlobals = {
   set(name: string, value: unknown): void;
   destroy(): void;
 };
+type OutputBatch = (text: string) => void;
+type SimulatePython = (stdout: OutputBatch, stderr: OutputBatch, source: string) => void;
 
-function makePythonWorkerHarness(webAssembly: { Suspending?: unknown }) {
+function makePythonWorkerHarness(webAssembly: { Suspending?: unknown }, simulate?: SimulatePython) {
   const runs: Array<{ source: string; globals: FakePyGlobals }> = [];
   const namespaces: FakePyGlobals[] = [];
-  const messages: Array<{ id: number; output?: string; error?: string }> = [];
+  const messages: WorkerResult[] = [];
+  let stdout: OutputBatch = () => {};
+  let stderr: OutputBatch = () => {};
   const pyodide = {
-    setStdout: () => {},
-    setStderr: () => {},
+    setStdout: (config: { batched: OutputBatch }) => { stdout = config.batched; },
+    setStderr: (config: { batched: OutputBatch }) => { stderr = config.batched; },
     loadPackagesFromImports: async () => {},
     runPython: () => {
       const globals: FakePyGlobals = {
@@ -68,10 +73,11 @@ function makePythonWorkerHarness(webAssembly: { Suspending?: unknown }) {
     },
     runPythonAsync: async (source: string, options: { globals: FakePyGlobals }) => {
       runs.push({ source, globals: options.globals });
+      if (!source.startsWith("import sys") && simulate) simulate(stdout, stderr, source);
     },
   };
   const self: {
-    postMessage: (message: { id: number; output?: string; error?: string }) => void;
+    postMessage: (message: WorkerResult) => void;
     onmessage?: (event: { data: { id: number; code: string; input?: string } }) => Promise<void>;
   } = { postMessage: (message) => messages.push(message) };
   const createWorker = new Function("self", "importScripts", "loadPyodide", "WebAssembly", pythonWorkerSource);
@@ -115,9 +121,40 @@ describe("Python worker source", () => {
     const harness = makePythonWorkerHarness({ Suspending: function Suspending() {} });
     const code = "import asyncio\\nasyncio.run(main())";
     await harness.self.onmessage!({ data: { id: 1, code } });
-
     expect(harness.runs[0].source).toContain(code);
     expect(harness.runs[0].source).not.toContain("__CodeForgeRunToAwait");
+  });
+
+  it("caps actual Worker stdout and marks the result so truncated output cannot pass", async () => {
+    const harness = makePythonWorkerHarness({}, (stdout) => stdout("x".repeat(20_000)));
+    await harness.self.onmessage!({ data: { id: 1, code: "print('x')" } });
+    const result = harness.messages[0];
+    expect(result.output.length).toBeLessThanOrEqual(12_000);
+    expect(result.output).toContain("[output truncated after sandbox safety limit]");
+    expect(result.outputTruncated).toBe(true);
+  });
+
+  it("caps stderr as well as stdout", async () => {
+    const harness = makePythonWorkerHarness({}, (_stdout, stderr) => {
+      stderr("e".repeat(6_000));
+      throw new Error("ValueError: test failure");
+    });
+    await harness.self.onmessage!({ data: { id: 1, code: "raise ValueError('test failure')" } });
+    const result = harness.messages[0];
+    expect(result.error?.length).toBeLessThanOrEqual(4_100);
+    expect(result.error).toContain("[stderr truncated after sandbox safety limit]");
+    expect(result.outputTruncated).toBe(true);
+    expect(result.failureKind).toBe("runtime");
+  });
+
+  it("returns Python syntax and type classifications from real exception names", async () => {
+    const syntaxHarness = makePythonWorkerHarness({}, () => { throw new SyntaxError("invalid Python syntax"); });
+    await syntaxHarness.self.onmessage!({ data: { id: 1, code: "if" } });
+    expect(syntaxHarness.messages[0].failureKind).toBe("syntax");
+
+    const typeHarness = makePythonWorkerHarness({}, () => { throw new TypeError("unsupported operand"); });
+    await typeHarness.self.onmessage!({ data: { id: 1, code: "1 + 'a'" } });
+    expect(typeHarness.messages[0].failureKind).toBe("type");
   });
 });
 
@@ -139,64 +176,64 @@ describe("PythonRunner", () => {
 
   it("sends code and input to the worker and resolves the matching Python result", async () => {
     const runner = new PythonRunner();
-
-    let resolved = false;
-    const run = runner.run('name = input()\nprint(name)', "Ada").then((value) => {
-      resolved = true;
-      return value;
-    });
-
+    const run = runner.run('name = input()\nprint(name)', "Ada");
     expect(MockWorker.instances).toHaveLength(1);
     const worker = MockWorker.instances[0];
     expect(worker.postedMessages).toEqual([{ id: 1, code: 'name = input()\nprint(name)', input: "Ada" }]);
 
     worker.dispatch({ id: 77, output: "ignore me" });
     await Promise.resolve();
-    expect(resolved).toBe(false);
-
     worker.dispatch({ id: 1, output: "Ada" });
     await expect(run).resolves.toEqual({ id: 1, output: "Ada" });
     expect(worker.listeners.size).toBe(0);
   });
 
-  it("returns worker errors with the reported line number", async () => {
+  it("returns worker errors with a reported line and classification", async () => {
     const runner = new PythonRunner();
     const run = runner.run("print(1/0)");
-
-    expect(MockWorker.instances).toHaveLength(1);
     const worker = MockWorker.instances[0];
-    worker.dispatch({ id: 1, output: "", error: "ZeroDivisionError: division by zero", errorLine: 1 });
-
-    await expect(run).resolves.toEqual({ id: 1, output: "", error: "ZeroDivisionError: division by zero", errorLine: 1 });
+    worker.dispatch({ id: 1, output: "", error: "ZeroDivisionError: division by zero", errorLine: 1, failureKind: "runtime" });
+    await expect(run).resolves.toEqual({ id: 1, output: "", error: "ZeroDivisionError: division by zero", errorLine: 1, failureKind: "runtime" });
   });
 
-  it("times out long-running code, resets the worker, and creates a new worker for the retry", async () => {
+  it("times out code, resets the worker, and creates a new worker for the retry", async () => {
     const runner = new PythonRunner();
     const timedOutRun = runner.run("while True:\n    pass", "", 40);
-
-    expect(MockWorker.instances).toHaveLength(1);
     const firstWorker = MockWorker.instances[0];
-
     await vi.advanceTimersByTimeAsync(40);
     await expect(timedOutRun).resolves.toEqual({
       output: "",
       error: "The program took too long, so the sandbox stopped it. Check for a loop that never ends.",
       timedOut: true,
+      failureKind: "timeout",
     });
     expect(firstWorker.terminated).toBe(true);
 
     const retriedRun = runner.run('print("done")');
-    expect(MockWorker.instances).toHaveLength(2);
     const secondWorker = MockWorker.instances[1];
     secondWorker.dispatch({ id: 2, output: "done" });
     await expect(retriedRun).resolves.toEqual({ id: 2, output: "done" });
   });
 
+  it("clamps test timeouts to ten seconds", async () => {
+    const runner = new PythonRunner();
+    const pending = runner.run("while True: pass", "", 90_000);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(MockWorker.instances[0].terminated).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toMatchObject({ timedOut: true, failureKind: "timeout" });
+  });
+
+  it("rejects oversized code and input before starting Pyodide", async () => {
+    const runner = new PythonRunner();
+    await expect(runner.run("x".repeat(30_001))).resolves.toMatchObject({ failureKind: "limit" });
+    await expect(runner.run("print(1)", "x".repeat(20_001))).resolves.toMatchObject({ failureKind: "limit" });
+    expect(MockWorker.instances).toHaveLength(0);
+  });
+
   it("terminates the current worker when reset is called explicitly", () => {
     const runner = new PythonRunner();
     void runner.run('print("keep worker alive")');
-
-    expect(MockWorker.instances).toHaveLength(1);
     const worker = MockWorker.instances[0];
     runner.reset();
     expect(worker.terminated).toBe(true);

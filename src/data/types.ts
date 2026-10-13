@@ -21,10 +21,37 @@ export type LessonKind =
 
 export type AuthoredDepth = "scaffolded" | "authored" | "deep-dive";
 
+export type TestCaseKind = "output" | "throws" | "state";
+
 export type TestCase = {
+  /** Keep this case out of lesson-facing examples and solution hints. */
+  hidden?: boolean;
+  /** Test-only code appended after the learner program; never rendered in feedback. */
+  append?: string;
+  /** Line-oriented input supplied to the executable sandbox. */
   input?: string;
+  /** Expected console output, or an error name/message for `kind: "throws"`. */
   expected: string;
   label: string;
+  /** Defaults to output comparison for existing course data. */
+  kind?: TestCaseKind;
+  /** Per-case wall-clock limit; runners still clamp this to their hard maximum. */
+  timeoutMs?: number;
+};
+
+export type HTMLStructureAssertions = {
+  requiredElements?: Array<{ tag: string; minimumCount?: number; textIncludes?: string }>;
+  requiredAttributes?: Array<{ name: string; value?: string; tag?: string }>;
+  requiredCssDeclarations?: Array<{ property: string; valueIncludes?: string }>;
+  requiredCssSelectors?: string[];
+  requiredAtRules?: Array<{ name: string; paramsIncludes?: string }>;
+  requireUniqueIds?: boolean;
+  requireAccessibleNames?: boolean;
+  requireImageAlt?: boolean;
+  requireAssociatedLabels?: boolean;
+  requireHeadingOrder?: boolean;
+  requireResponsiveViewport?: boolean;
+  requireResponsiveLayout?: boolean;
 };
 
 export type Example = {
@@ -49,6 +76,8 @@ export type Exercise = {
     requiredOneOf?: string[][];
     forbiddenPatterns?: string[];
     successMessage?: string;
+    /** Semantic DOM and parsed CSS checks. Legacy HTML patterns are translated to these checks. */
+    htmlAssertions?: HTMLStructureAssertions;
   };
 };
 

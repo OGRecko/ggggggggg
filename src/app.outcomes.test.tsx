@@ -114,13 +114,14 @@ describe("practice outcomes", () => {
     await waitForFeedback(view, /RUNTIME ERROR/);
     expect(feedbackText(view), "the sandbox's own error text is shown").toContain("invalid literal for int()");
 
-    // The editor marks the blamed line with its own class; a failed Check adds the instruction.
+    // The editor marks only the line the sandbox actually reported.
     await waitFor(() => expect(document.querySelector(".cm-error-line"), `line 2 (${expectedLine}) is marked`).not.toBeNull());
     expect(document.querySelector(".cm-error-line")?.textContent?.trim(), "the marked line is the one the sandbox named").toBe(expectedLine);
 
     fireEvent.click(screen.getByRole("button", { name: /check answer/i }));
-    await waitForFeedback(view, /Fix the highlighted line and try again/);
-    expect(feedbackText(view)).toContain("RUNTIME ERROR:");
+    await waitForFeedback(view, /Fix the runner-reported line and try again/);
+    expect(feedbackText(view)).toContain("RUNTIME ERROR on Ticket cost");
+    expect(feedbackText(view)).toContain("The runner reported line 2.");
   });
 
   it("names the failing test case and both texts when the output is wrong", async () => {
@@ -136,10 +137,46 @@ describe("practice outcomes", () => {
     const first = lesson.exercise.testCases[0];
     const text = feedbackText(view);
     expect(text, `the failing case is named: ${first.label}`).toContain(`LOGIC ERROR on ${first.label}`);
-    expect(text).toContain(`Expected ${JSON.stringify(first.expected)}`);
-    expect(text).toContain(`but received ${JSON.stringify("definitely not the expected output")}`);
-    expect(text).toContain("Review highlighted line");
+    expect(text).toContain(`Expected: ${JSON.stringify(first.expected)}`);
+    expect(text).toContain(`Actual: ${JSON.stringify("definitely not the expected output")}`);
+    expect(text).toContain("Revise your code and try again.");
+    expect(text).not.toContain("Review highlighted line");
     expect(loadProgress().completedExercises).not.toContain(lesson.id);
+  });
+
+  it("shows hidden failure fields without rendering its appended test or solution", async () => {
+    const host = firstLessonWith((lesson) => lesson.id.startsWith("javascript-") && !lesson.exercise.checker);
+    const originalExercise = host.lesson.exercise;
+    const hiddenAppend = "console.log(classifyForHiddenTest(readLine())); // PRIVATE_HIDDEN_ASSERTION";
+    host.lesson.exercise = {
+      ...originalExercise,
+      starterCode: "function classifyForHiddenTest(text) { return text; }",
+      solution: "SECRET_REFERENCE_IMPLEMENTATION",
+      testCases: [
+        { label: "Visible sample", input: "visible", expected: "public", append: "console.log(classifyForHiddenTest(readLine()));" },
+        { label: "Private normalization boundary", hidden: true, input: "secret-input", expected: "approved", append: hiddenAppend },
+      ],
+    };
+    try {
+      answer = (message) => ({ output: message.input === "visible" ? "public" : "not approved" });
+      seedThrough(host.course.id, host.lesson.id);
+      saveProgress({ ...loadProgress(), code: { [host.lesson.id]: "function classifyForHiddenTest(text) { return 'public'; }" } });
+      route(pathFor(host.course, host.lesson));
+      const view = render(<App />);
+
+      fireEvent.click(screen.getByRole("button", { name: /check answer/i }));
+      await waitForFeedback(view, /Hidden test 1 failed: Private normalization boundary \(LOGIC ERROR\)/);
+      const feedback = feedbackText(view);
+      expect(feedback).toContain('Input: "secret-input"');
+      expect(feedback).toContain('Expected: "approved"');
+      expect(feedback).toContain('Actual: "not approved"');
+      expect(feedback).not.toContain("PRIVATE_HIDDEN_ASSERTION");
+      expect(feedback).not.toContain("SECRET_REFERENCE_IMPLEMENTATION");
+      expect(view.container.querySelector(".console pre")?.textContent).not.toContain("PRIVATE_HIDDEN_ASSERTION");
+      expect(loadProgress().completedExercises).not.toContain(host.lesson.id);
+    } finally {
+      host.lesson.exercise = originalExercise;
+    }
   });
 
   it("stops after the first wrong case instead of reporting success", async () => {

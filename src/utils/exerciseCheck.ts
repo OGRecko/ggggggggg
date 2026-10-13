@@ -1,4 +1,5 @@
 import type { Exercise } from "../data/types";
+import { checkHTMLStructure } from "./htmlStructure";
 
 export type StructureCheckResult = {
   passed: boolean;
@@ -6,6 +7,7 @@ export type StructureCheckResult = {
   forbidden: string[];
   invalidPatterns: string[];
   emptyPatterns: string[];
+  invalidCode: string[];
 };
 
 function stripComments(code: string) {
@@ -58,6 +60,7 @@ function findMissingAlternatives(source: string, groups: string[][], invalidPatt
 // Java, C++, and HTML/CSS exercises use this transparent on-device review.
 // It intentionally reports structural evidence only; it never impersonates a compiler.
 export function checkRequiredPatterns(code: string, checker: NonNullable<Exercise["checker"]>): StructureCheckResult {
+  if (checker.mode === "html") return checkHTMLStructure(code, checker);
   const source = stripComments(code);
   const invalidPatterns: string[] = [];
   const emptyPatterns: string[] = [];
@@ -100,5 +103,6 @@ export function checkRequiredPatterns(code: string, checker: NonNullable<Exercis
     forbidden,
     invalidPatterns,
     emptyPatterns,
+    invalidCode: [],
   };
 }

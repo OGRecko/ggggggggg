@@ -3,12 +3,16 @@ import type { RunResult } from "./pythonRunner";
 type WorkerMessage = RunResult & { id: number };
 
 const MAX_CODE_LENGTH = 20_000;
+const MAX_INPUT_LENGTH = 20_000;
+const MAX_TIMEOUT_MS = 10_000;
 const MAX_OUTPUT_LINES = 200;
 const MAX_OUTPUT_CHARS = 8_000;
+const MAX_SCHEDULED_TIMERS = 100;
 
 export const javascriptWorkerSource = `
 const MAX_OUTPUT_LINES = ${MAX_OUTPUT_LINES};
 const MAX_OUTPUT_CHARS = ${MAX_OUTPUT_CHARS};
+const MAX_SCHEDULED_TIMERS = ${MAX_SCHEDULED_TIMERS};
 
 // Indirect eval and the global Function constructor resolve outside the shadowed parameter list,
 // so they are replaced at the worker scope. The real Function is captured first because this
@@ -130,23 +134,69 @@ function stringifyValue(value) {
 }
 
 self.onmessage = async (event) => {
-  const { id, code } = event.data;
+  const { id, code, input } = event.data;
   const output = [];
   let outputChars = 0;
   let truncated = false;
+  const timeouts = new Set();
+  const intervals = new Set();
+  let scheduledTimers = 0;
+  const truncationMarker = "[output truncated after browser safety limits]";
+
+  const markTruncated = () => {
+    if (truncated) return;
+    truncated = true;
+    while (output.length && output.length >= MAX_OUTPUT_LINES) output.pop();
+    while (output.length && output.join("\\n").length + 1 + truncationMarker.length > MAX_OUTPUT_CHARS) output.pop();
+    const prefix = output.join("\\n");
+    const transcript = prefix ? prefix + "\\n" + truncationMarker : truncationMarker;
+    output.length = 0;
+    output.push(transcript.slice(0, MAX_OUTPUT_CHARS));
+    outputChars = output[0].length;
+  };
 
   const pushLine = (line) => {
     if (truncated) return;
     const normalized = String(line);
     const nextLength = outputChars + normalized.length + (output.length > 0 ? 1 : 0);
-    if (output.length >= MAX_OUTPUT_LINES || nextLength > MAX_OUTPUT_CHARS) {
-      truncated = true;
-      output.push("[output truncated after browser safety limits]");
+    if (output.length >= MAX_OUTPUT_LINES || nextLength + truncationMarker.length + 1 > MAX_OUTPUT_CHARS) {
+      markTruncated();
       return;
     }
     output.push(normalized);
     outputChars = nextLength;
   };
+
+  const readLines = input === undefined
+    ? []
+    : String(input).replace(/\\r\\n?/g, "\\n").split("\\n");
+  let inputIndex = 0;
+  const readLine = () => {
+    if (inputIndex >= readLines.length) throw new Error("No more test input available.");
+    return readLines[inputIndex++];
+  };
+  const schedule = (handler, delay, repeat) => {
+    if (scheduledTimers >= MAX_SCHEDULED_TIMERS) throw new RangeError("The JavaScript runner limits each submission to 100 scheduled timers.");
+    if (typeof handler !== "function") throw new TypeError("The JavaScript runner only accepts function timer callbacks.");
+    scheduledTimers += 1;
+    const boundedDelay = Math.max(0, Math.min(Number(delay) || 0, 5000));
+    if (repeat) {
+      const timer = setInterval(() => handler(), boundedDelay);
+      intervals.add(timer);
+      return timer;
+    }
+    let timer;
+    timer = setTimeout(() => {
+      timeouts.delete(timer);
+      handler();
+    }, boundedDelay);
+    timeouts.add(timer);
+    return timer;
+  };
+  const limitedSetTimeout = (handler, delay, ...args) => schedule(() => handler(...args), delay, false);
+  const limitedSetInterval = (handler, delay, ...args) => schedule(() => handler(...args), delay, true);
+  const limitedClearTimeout = (timer) => { clearTimeout(timer); timeouts.delete(timer); };
+  const limitedClearInterval = (timer) => { clearInterval(timer); intervals.delete(timer); };
 
   try {
     const log = (...values) => pushLine(values.map(stringifyValue).join(" "));
@@ -170,6 +220,11 @@ self.onmessage = async (event) => {
       "console",
       "globalThis",
       "self",
+      "readLine",
+      "setTimeout",
+      "clearTimeout",
+      "setInterval",
+      "clearInterval",
       "fetch",
       "XMLHttpRequest",
       "WebSocket",
@@ -182,11 +237,16 @@ self.onmessage = async (event) => {
       "Function",
       '"use strict";\\n' + code,
     );
-    const shared = Object.freeze({ setTimeout, clearTimeout, setInterval, clearInterval, Promise, Math, Date, JSON });
+    const shared = Object.freeze({ readLine, setTimeout: limitedSetTimeout, clearTimeout: limitedClearTimeout, setInterval: limitedSetInterval, clearInterval: limitedClearInterval, Promise, Math, Date, JSON });
     const result = runner(
       consoleShim,
       shared,
       shared,
+      readLine,
+      limitedSetTimeout,
+      limitedClearTimeout,
+      limitedSetInterval,
+      limitedClearInterval,
       blocked,
       blocked,
       blocked,
@@ -200,16 +260,24 @@ self.onmessage = async (event) => {
     );
     await Promise.resolve(result);
     await Promise.resolve();
-    self.postMessage({ id, output: output.join("\\n") });
+    self.postMessage({ id, output: output.join("\\n"), ...(truncated ? { outputTruncated: true } : {}) });
   } catch (error) {
     const stack = error && error.stack ? error.stack : String(error);
     const match = stack.match(/<anonymous>:(\\d+):(\\d+)/);
+    const errorName = error && error.name ? error.name : "Error";
+    const errorMessage = error && error.message ? error.message : String(error);
+    const failureKind = errorName === "SyntaxError" ? "syntax" : errorName === "TypeError" ? "type" : errorName === "RangeError" && errorMessage.includes("runner limits") ? "limit" : "runtime";
     self.postMessage({
       id,
       output: output.join("\\n"),
       error: error && error.message ? error.message : String(error),
       errorLine: match ? Math.max(1, Number(match[1]) - 1) : undefined,
+      failureKind,
+      ...(truncated ? { outputTruncated: true } : {}),
     });
+  } finally {
+    for (const timer of timeouts) clearTimeout(timer);
+    for (const timer of intervals) clearInterval(timer);
   }
 };
 `;
@@ -226,21 +294,31 @@ export class JavaScriptRunner {
     return this.worker;
   }
 
-  run(code: string, timeout = 2500): Promise<RunResult> {
+  run(code: string, timeout = 2500, input?: string): Promise<RunResult> {
     if (code.length > MAX_CODE_LENGTH) {
       return Promise.resolve({
         output: "",
-        error: `This JavaScript submission is too large for the in-browser runner (${code.length} characters). Keep examples focused or split the work into smaller functions.`,
+        error: `This JavaScript submission is too large for the in-browser runner (${code.length} characters; limit ${MAX_CODE_LENGTH}). Keep examples focused or split the work into smaller functions.`,
+        failureKind: "limit",
+      });
+    }
+    if ((input?.length ?? 0) > MAX_INPUT_LENGTH) {
+      return Promise.resolve({
+        output: "",
+        error: `This JavaScript test input is too large for the in-browser runner (limit ${MAX_INPUT_LENGTH} characters).`,
+        failureKind: "limit",
       });
     }
 
+    const requestedTimeout = Number.isFinite(timeout) ? timeout : 2500;
+    const timeoutLimit = Math.max(1, Math.min(requestedTimeout, MAX_TIMEOUT_MS));
     const worker = this.getWorker();
     const id = ++this.sequence;
     return new Promise((resolve) => {
       const timer = window.setTimeout(() => {
         this.reset();
-        resolve({ output: "", error: "The JavaScript worker took too long, so CodeForge stopped it. Check for a loop that never ends.", timedOut: true });
-      }, timeout);
+        resolve({ output: "", error: "The JavaScript worker took too long, so CodeForge stopped it. Check for a loop that never ends.", timedOut: true, failureKind: "timeout" });
+      }, timeoutLimit);
       const listener = (event: MessageEvent<WorkerMessage>) => {
         if (event.data.id !== id) return;
         window.clearTimeout(timer);
@@ -248,7 +326,7 @@ export class JavaScriptRunner {
         resolve(event.data);
       };
       worker.addEventListener("message", listener);
-      worker.postMessage({ id, code });
+      worker.postMessage(input === undefined ? { id, code } : { id, code, input });
     });
   }
 

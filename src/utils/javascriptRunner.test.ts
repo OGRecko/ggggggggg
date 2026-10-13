@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JavaScriptRunner, javascriptWorkerSource } from "./javascriptRunner";
+import type { RunResult } from "./pythonRunner";
 
-type WorkerListener = (event: MessageEvent<{ id: number; output?: string; error?: string }>) => void;
+type WorkerResult = RunResult & { id: number };
+type WorkerRequest = { id: number; code: string; input?: string };
+type WorkerListener = (event: MessageEvent<WorkerResult>) => void;
 
 class MockWorker {
   static instances: MockWorker[] = [];
@@ -11,7 +14,7 @@ class MockWorker {
   }
 
   readonly listeners = new Set<WorkerListener>();
-  readonly postedMessages: Array<{ id: number; code: string }> = [];
+  readonly postedMessages: WorkerRequest[] = [];
   terminated = false;
 
   constructor(readonly source: string | URL) {
@@ -26,7 +29,7 @@ class MockWorker {
     if (type === "message") this.listeners.delete(listener);
   }
 
-  postMessage(message: { id: number; code: string }) {
+  postMessage(message: WorkerRequest) {
     this.postedMessages.push(message);
   }
 
@@ -34,24 +37,23 @@ class MockWorker {
     this.terminated = true;
   }
 
-  dispatch(data: { id: number; output?: string; error?: string }) {
-    for (const listener of [...this.listeners]) {
-      listener({ data } as MessageEvent<{ id: number; output?: string; error?: string }>);
-    }
+  dispatch(data: WorkerResult) {
+    for (const listener of [...this.listeners]) listener({ data } as MessageEvent<WorkerResult>);
   }
 }
 
-type WorkerResult = { id: number; output?: string; error?: string; errorLine?: number };
-
-/** Runs the real worker source in this process, so the sandbox semantics are actually exercised. */
-async function runWorkerSource(code: string): Promise<WorkerResult> {
+/** Runs the real Worker source here so formatting, appended input, and output limits are exercised. */
+async function runWorkerSource(code: string, input?: string): Promise<WorkerResult> {
   const messages: WorkerResult[] = [];
-  const fakeSelf: { postMessage: (message: WorkerResult) => void; onmessage?: (event: { data: { id: number; code: string } }) => Promise<void>; eval?: unknown; Function?: unknown } = {
-    postMessage: (message) => messages.push(message),
-  };
+  const fakeSelf: {
+    postMessage: (message: WorkerResult) => void;
+    onmessage?: (event: { data: WorkerRequest }) => Promise<void>;
+    eval?: unknown;
+    Function?: unknown;
+  } = { postMessage: (message) => messages.push(message) };
   const evaluate = new Function("self", "setTimeout", "clearTimeout", "setInterval", "clearInterval", "Promise", `${javascriptWorkerSource}`);
   evaluate(fakeSelf, setTimeout, clearTimeout, setInterval, clearInterval, Promise);
-  await fakeSelf.onmessage!({ data: { id: 1, code } });
+  await fakeSelf.onmessage!({ data: input === undefined ? { id: 1, code } : { id: 1, code, input } });
   return messages[messages.length - 1];
 }
 
@@ -89,10 +91,42 @@ describe("JavaScript worker source", () => {
     expect(result.output).toBe("{ label: 'loop', self: [Circular] }");
   });
 
+  it("reads line-oriented test input from the same Worker run", async () => {
+    const result = await runWorkerSource('console.log(readLine());\nconsole.log(readLine());', "Ada\nChen");
+    expect(result.error).toBeUndefined();
+    expect(result.output).toBe("Ada\nChen");
+  });
+
+  it("reports missing test input rather than inventing an empty line", async () => {
+    const result = await runWorkerSource("readLine();");
+    expect(result.error).toContain("No more test input available");
+    expect(result.failureKind).toBe("runtime");
+  });
+
   it("awaits async work before reporting the output", async () => {
     const result = await runWorkerSource('async function status() { return "ready"; }\nstatus().then(console.log);');
     expect(result.error).toBeUndefined();
     expect(result.output).toBe("ready");
+  });
+
+  it("caps console output and reports truncation rather than passing a partial transcript", async () => {
+    const result = await runWorkerSource('console.log("x".repeat(9000));');
+    expect(result.output?.length).toBeLessThanOrEqual(8_000);
+    expect(result.output).toContain("[output truncated after browser safety limits]");
+    expect(result.outputTruncated).toBe(true);
+  });
+
+  it("caps the number of printed lines and keeps the transcript bounded", async () => {
+    const result = await runWorkerSource('for (let i = 0; i < 250; i += 1) console.log(i);');
+    expect(result.output?.length).toBeLessThanOrEqual(8_000);
+    expect(result.output?.split("\n")).toHaveLength(200);
+    expect(result.outputTruncated).toBe(true);
+  });
+
+  it("limits timer scheduling within one submission", async () => {
+    const result = await runWorkerSource('for (let i = 0; i < 101; i += 1) setTimeout(() => {}, 0);');
+    expect(result.error).toContain("limits each submission to 100 scheduled timers");
+    expect(result.failureKind).toBe("limit");
   });
 
   it("reports a failing console.assert as output instead of throwing", async () => {
@@ -110,19 +144,19 @@ describe("JavaScript worker source", () => {
   it("blocks shadowed networking and worker names with an honest message", async () => {
     const result = await runWorkerSource('fetch("https://example.test");');
     expect(result.error).toBe("CodeForge blocks browser-side networking and nested worker creation in the JavaScript runner.");
+    expect(result.failureKind).toBe("runtime");
     expect(result.output).toBe("");
   });
 
   it("blocks indirect eval at the worker scope", async () => {
-    // In a real Worker, self is the global object, so assigning self.eval replaces indirect eval.
-    // This harness mirrors that one assignment on globalThis and restores it afterwards; the
-    // Function constructor is shadowed through the parameter list, which the harness exercises
-    // directly.
     const savedEval = globalThis.eval;
     const messages: WorkerResult[] = [];
-    const fakeSelf: { postMessage: (message: WorkerResult) => void; onmessage?: (event: { data: { id: number; code: string } }) => Promise<void>; eval?: unknown; Function?: unknown } = {
-      postMessage: (message) => messages.push(message),
-    };
+    const fakeSelf: {
+      postMessage: (message: WorkerResult) => void;
+      onmessage?: (event: { data: WorkerRequest }) => Promise<void>;
+      eval?: unknown;
+      Function?: unknown;
+    } = { postMessage: (message) => messages.push(message) };
     const mirror = new Proxy(fakeSelf, {
       set(target, property, value) {
         if (property === "eval") (globalThis as { eval: unknown }).eval = value;
@@ -144,8 +178,7 @@ describe("JavaScript worker source", () => {
     const result = await runWorkerSource('const title = document.querySelector("h1");');
     expect(result.output).toBe("");
     expect(result.error).toContain("document is not defined");
-    // The exact number depends on how the host formats stack frames, so the test only asserts that
-    // the runner reports a usable line instead of inventing a browser-specific one.
+    expect(result.failureKind).toBe("runtime");
     expect(result.errorLine).toBeGreaterThanOrEqual(1);
   });
 });
@@ -168,21 +201,12 @@ describe("JavaScriptRunner", () => {
 
   it("routes worker output back to the matching run and reuses one worker", async () => {
     const runner = new JavaScriptRunner();
-
-    let resolved = false;
-    const firstRun = runner.run('console.log("first")').then((value) => {
-      resolved = true;
-      return value;
-    });
-
-    expect(MockWorker.instances).toHaveLength(1);
+    const firstRun = runner.run('console.log("first")');
     const worker = MockWorker.instances[0];
     expect(worker.postedMessages).toEqual([{ id: 1, code: 'console.log("first")' }]);
 
     worker.dispatch({ id: 999, output: "ignore me" });
     await Promise.resolve();
-    expect(resolved).toBe(false);
-
     worker.dispatch({ id: 1, output: "first" });
     await expect(firstRun).resolves.toEqual({ id: 1, output: "first" });
     expect(worker.listeners.size).toBe(0);
@@ -192,23 +216,34 @@ describe("JavaScriptRunner", () => {
     expect(worker.postedMessages[1]).toEqual({ id: 2, code: 'console.log("second")' });
     worker.dispatch({ id: 2, output: "second" });
     await expect(secondRun).resolves.toEqual({ id: 2, output: "second" });
-
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:javascript-runner");
   });
 
-  it("times out long-running code, resets the worker, and creates a fresh worker next time", async () => {
+  it("sends a case's input only when one is supplied", async () => {
+    const runner = new JavaScriptRunner();
+    const noInput = runner.run("console.log(1)");
+    const worker = MockWorker.instances[0];
+    expect(worker.postedMessages[0]).toEqual({ id: 1, code: "console.log(1)" });
+    worker.dispatch({ id: 1, output: "1" });
+    await noInput;
+
+    const withInput = runner.run("console.log(readLine())", 500, "Ada");
+    expect(worker.postedMessages[1]).toEqual({ id: 2, code: "console.log(readLine())", input: "Ada" });
+    worker.dispatch({ id: 2, output: "Ada" });
+    await withInput;
+  });
+
+  it("times out code, resets the worker, and uses a fresh worker for the retry", async () => {
     const runner = new JavaScriptRunner();
     const timedOutRun = runner.run("while (true) {}", 25);
-
-    expect(MockWorker.instances).toHaveLength(1);
     const firstWorker = MockWorker.instances[0];
-
     await vi.advanceTimersByTimeAsync(25);
     await expect(timedOutRun).resolves.toEqual({
       output: "",
       error: "The JavaScript worker took too long, so CodeForge stopped it. Check for a loop that never ends.",
       timedOut: true,
+      failureKind: "timeout",
     });
     expect(firstWorker.terminated).toBe(true);
 
@@ -219,22 +254,25 @@ describe("JavaScriptRunner", () => {
     await expect(retriedRun).resolves.toEqual({ id: 2, output: "after reset" });
   });
 
-  it("rejects oversized code before creating a worker", async () => {
+  it("clamps test timeouts to ten seconds", async () => {
     const runner = new JavaScriptRunner();
-    const largeProgram = "x".repeat(20_001);
+    const pending = runner.run("while (true) {}", 90_000);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(MockWorker.instances[0].terminated).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toMatchObject({ timedOut: true, failureKind: "timeout" });
+  });
 
-    await expect(runner.run(largeProgram)).resolves.toEqual({
-      output: "",
-      error: `This JavaScript submission is too large for the in-browser runner (${largeProgram.length} characters). Keep examples focused or split the work into smaller functions.`,
-    });
+  it("rejects oversized code and input before creating a worker", async () => {
+    const runner = new JavaScriptRunner();
+    await expect(runner.run("x".repeat(20_001))).resolves.toMatchObject({ failureKind: "limit" });
+    await expect(runner.run("console.log(1)", 2500, "x".repeat(20_001))).resolves.toMatchObject({ failureKind: "limit" });
     expect(MockWorker.instances).toHaveLength(0);
   });
 
   it("terminates the current worker when reset is called explicitly", () => {
     const runner = new JavaScriptRunner();
     void runner.run('console.log("keep worker alive")');
-
-    expect(MockWorker.instances).toHaveLength(1);
     const worker = MockWorker.instances[0];
     runner.reset();
     expect(worker.terminated).toBe(true);

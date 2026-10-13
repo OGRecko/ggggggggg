@@ -7,18 +7,17 @@ import {
 import { CodeEditor } from "./components/CodeEditor";
 import { courseById, courses } from "./courses/catalog";
 import type { Chapter, Course, Exercise, LanguageId, Lesson, StoredProgress } from "./data/types";
-import { PythonRunner, type RunResult } from "./utils/pythonRunner";
+import { PythonRunner, type RunFailureKind } from "./utils/pythonRunner";
 import { JavaScriptRunner } from "./utils/javascriptRunner";
 import { clearProgress, defaultProgress, loadProgress, saveProgress } from "./utils/storage";
 import { coverageAudit } from "./data/coverageAudit";
 import { checkRequiredPatterns } from "./utils/exerciseCheck";
+import { classifyExecutionError, formatCaseFailure, gradeExercise } from "./utils/behavioralGrader";
 import { firstLessonId, lessonsForChapter, resolveExportTargets } from "./utils/exportTargets";
 
 type Route = { page: "home" | "progress" | "settings" | "export" | "audit" | "course" | "chapter" | "lesson"; language?: string; chapter?: number; lesson?: number };
 type CheckState = { kind: "idle" | "running" | "success" | "error"; message?: string };
 type ExportPreference = { scope: "course" | "chapter" | "lesson"; language?: LanguageId; chapter?: number; lessonId?: string };
-
-const normalizeOutput = (value: string) => value.replace(/\r/g, "").split("\n").map((line) => line.trimEnd()).join("\n").trim();
 
 function readRoute(path: string): Route {
   const pieces = path.split("/").filter(Boolean);
@@ -274,24 +273,35 @@ function PracticeEditor({ id, language = "python", title, exercise, progress, up
   useEffect(() => () => { pythonRunner.current?.reset(); javascriptRunner.current?.reset(); }, []);
   useEffect(() => { setCode(progress.code[id] ?? exercise.starterCode); setOutput(""); setErrorLine(undefined); }, [id, exercise.starterCode]);
   const persist = (nextCode: string) => { setCode(nextCode); updateProgress((current) => ({ ...updateLessonState(current, id, { practiced: true }), code: { ...current.code, [id]: nextCode } })); };
-  const execute = async (input = "") => language === "javascript" ? javascriptRunner.current!.run(code) : pythonRunner.current!.run(code, input);
+  const execute = async (source = code, input?: string, timeoutMs?: number) => language === "javascript"
+    ? javascriptRunner.current!.run(source, timeoutMs ?? 2500, input)
+    : pythonRunner.current!.run(source, input ?? "", timeoutMs ?? 5000);
   const staticCheck = () => {
     const checker = exercise.checker;
     if (!checker) return null;
-    const { missing, forbidden, passed, invalidPatterns, emptyPatterns } = checkRequiredPatterns(code, checker);
+    const { missing, forbidden, passed, invalidPatterns, emptyPatterns, invalidCode } = checkRequiredPatterns(code, checker);
     if (invalidPatterns.length || emptyPatterns.length) {
       setState({ kind: "error", message: "This exercise check is misconfigured. CodeForge did not grade your work. Please report the lesson authoring issue." });
-      setOutput("Checker configuration issue: the required pattern list contains an invalid or empty pattern.");
+      setOutput(`Checker configuration issue: ${[...invalidPatterns, ...emptyPatterns].join(", ") || "an invalid or empty requirement"}.`);
+      return false;
+    }
+    if (invalidCode.length) {
+      setErrorLine(undefined);
+      setOutput(invalidCode.join("\n"));
+      setState({ kind: "error", message: `CSS SYNTAX ERROR: ${invalidCode[0]}. The structural parser did not identify a source line. Fix the CSS and try again.` });
       return false;
     }
     if (missing.length || forbidden.length) {
-      const line = findLikelyLogicLine(code);
-      setErrorLine(line);
-      setOutput(`Code review: ${missing.length ? `missing ${missing.length} required construct${missing.length === 1 ? "" : "s"}` : "found a construct this exercise asks you not to use"}.`);
-      setState({ kind: "error", message: missing.length ? `TRY AGAIN: add the required language construct and run the check again. Review highlighted line ${line}.` : `TRY AGAIN: use the requested approach rather than the highlighted construct.` });
+      setErrorLine(undefined);
+      setOutput(`${checker.mode === "html" ? "DOM/CSS structure review" : "Static code review"}: ${missing.length ? `missing ${missing.length} requirement${missing.length === 1 ? "" : "s"}` : "found a forbidden construct"}.`);
+      setState({ kind: "error", message: checker.mode === "html"
+        ? `STRUCTURE CHECK FAILURE: ${missing.length ? missing.join("; ") : `forbidden: ${forbidden.join("; ")}`}. No exact source line is known. Update the markup or CSS and try again.`
+        : `STATIC CHECK FAILURE: ${missing.length ? `missing ${missing.join("; ")}` : `forbidden ${forbidden.join("; ")}`}. No compiler ran, and no exact source line is known. Review the requirements and try again.` });
       return false;
     }
-    setOutput(checker.mode === "html" ? "HTML/CSS structure check passed. Your rendered preview is shown below." : "Static code review passed. This browser checks required constructs because this language has no local compiler sandbox." );
+    setOutput(checker.mode === "html"
+      ? "DOM and parsed CSS structure checks passed. The sandboxed preview is shown; this is not a browser layout measurement or assistive-technology audit."
+      : "Static code review passed. This browser checks required constructs because this language has no local compiler sandbox.");
     return passed;
   };
   const runProgram = async () => {
@@ -300,14 +310,22 @@ function PracticeEditor({ id, language = "python", title, exercise, progress, up
       setState({ kind: "idle" });
       return;
     }
-    if (language === "htmlcss") { setOutput("Rendered HTML/CSS preview is shown below. Use Check answer to verify the requested accessible structure."); setState({ kind: "idle" }); return; }
+    if (language === "htmlcss") { setOutput("Rendered HTML/CSS preview is shown below. Use Check answer to verify the requested DOM, CSS, and accessibility structure."); setState({ kind: "idle" }); return; }
     setState({ kind: "running", message: `Starting the ${language === "javascript" ? "JavaScript" : "Python"} sandbox...` });
     setErrorLine(undefined);
-    const result = await execute();
+    const result = await execute(code);
     setOutput(result.output || (result.error ? "" : "Program finished with no output."));
-    if (result.error) { setErrorLine(result.errorLine); setState({ kind: "error", message: `${isSyntaxError(result) ? "SYNTAX ERROR" : "RUNTIME ERROR"}: ${shortError(result.error)}` }); } else setState({ kind: "idle" });
+    if (result.error) {
+      const kind = classifyExecutionError(result);
+      setErrorLine(result.errorLine);
+      const lineNote = result.errorLine ? ` (runner-reported line ${result.errorLine})` : " (the runner did not identify a source line)";
+      setState({ kind: "error", message: `${failureLabel(kind)}: ${shortError(result.error)}${lineNote}` });
+    } else if (result.outputTruncated) {
+      setErrorLine(undefined);
+      setState({ kind: "error", message: "RESOURCE LIMIT: the output transcript was truncated; review a smaller run." });
+    } else setState({ kind: "idle" });
   };
-  const markSuccess = (message = "Nice work! Every executable test passed. The next step is unlocked.") => {
+  const markSuccess = (message = "Nice work! The grading checks passed. The next step is unlocked.") => {
     setState({ kind: "success", message });
     updateProgress((current) => {
       const next = updateLessonState(current, id, { viewed: true, practiced: true, passed: true });
@@ -315,16 +333,41 @@ function PracticeEditor({ id, language = "python", title, exercise, progress, up
     });
   };
   const check = async () => {
-    setState({ kind: "running", message: language === "java" || language === "cpp" || language === "htmlcss" ? "Reviewing the requested code structure..." : `Checking ${exercise.testCases.length} test ${exercise.testCases.length === 1 ? "case" : "cases"}...` });
+    const hiddenCount = exercise.testCases.filter((testCase) => testCase.hidden).length;
+    const caseCount = exercise.testCases.length;
+    setState({ kind: "running", message: language === "java" || language === "cpp" || language === "htmlcss"
+      ? "Reviewing the requested code structure..."
+      : hiddenCount
+        ? `Checking visible examples and ${hiddenCount} hidden behavioral test${hiddenCount === 1 ? "" : "s"}...`
+        : `Checking ${caseCount} test ${caseCount === 1 ? "case" : "cases"}...` });
     setErrorLine(undefined);
-    if (exercise.checker) { if (staticCheck()) markSuccess("Nice work! The requested on-device structure review passed. This is not a compiler or runtime execution result, and the next step is unlocked."); return; }
-    for (const testCase of exercise.testCases) {
-      const result = await execute(testCase.input ?? "");
-      setOutput(result.output || (result.error ?? ""));
-      if (result.error) { setErrorLine(result.errorLine); setState({ kind: "error", message: `${isSyntaxError(result) ? "SYNTAX ERROR" : "RUNTIME ERROR"}: ${shortError(result.error)}. Fix the highlighted line and try again.` }); return; }
-      if (normalizeOutput(result.output) !== normalizeOutput(testCase.expected)) { const likely = findLikelyLogicLine(code); setErrorLine(likely); setState({ kind: "error", message: `LOGIC ERROR on ${testCase.label}. Expected ${JSON.stringify(testCase.expected)} but received ${JSON.stringify(result.output)}. Review highlighted line ${likely}.` }); return; }
+    if (exercise.checker) {
+      if (staticCheck()) markSuccess("Nice work! The requested on-device structure review passed. This is not a compiler or runtime execution result, and the next step is unlocked.");
+      return;
     }
-    markSuccess();
+    const grade = await gradeExercise(exercise, code, (source, input, timeoutMs) => execute(source, input, timeoutMs));
+    if (grade.failure) {
+      const lineNote = grade.failure.errorLine ? " Fix the runner-reported line and try again." : " Revise your code and try again.";
+      const message = `${formatCaseFailure(grade.failure)}${lineNote}`;
+      setOutput(message);
+      setErrorLine(grade.failure.errorLine);
+      setState({ kind: "error", message });
+      return;
+    }
+    const visibleOutcomes = grade.outcomes.filter((outcome) => !outcome.testCase.hidden);
+    const visibleFailures = visibleOutcomes.filter((outcome) => !outcome.passed);
+    const lastVisible = visibleOutcomes[visibleOutcomes.length - 1];
+    const visibleOutput = lastVisible ? lastVisible.rawOutput || "Program finished with no output." : "Hidden test output is not displayed.";
+    if (visibleFailures.length) {
+      setOutput(`Visible example feedback (not grading):\n${visibleFailures.map(formatCaseFailure).join("\n\n")}`);
+      markSuccess("Hidden behavioral checks passed. Review the visible-example feedback above; visible examples do not determine completion.");
+    } else if (grade.hasHiddenCases) {
+      setOutput(visibleOutput);
+      markSuccess("All hidden behavioral checks passed. The visible examples are for learning and did not determine completion.");
+    } else {
+      setOutput(visibleOutput);
+      markSuccess();
+    }
   };
   const reset = () => { pythonRunner.current?.reset(); javascriptRunner.current?.reset(); setOutput(""); setErrorLine(undefined); setState({ kind: "idle" }); setShowAnswer(false); setHintsShown(0); persist(exercise.starterCode); };
   const complete = progress.completedExercises.includes(id) || progress.projectComplete.includes(id);
@@ -433,6 +476,16 @@ function ExportPage({ progress }: { progress: StoredProgress }) {
 }
 
 function NotFound() { return <main className="page-width not-found"><span className="section-label">404</span><h1>That learning path is not here.</h1><p>The page may not be authored yet, or the URL has a typo.</p><button className="primary-button" onClick={() => navigate("/")}>Return home <ArrowRight size={16} /></button></main>; }
-function isSyntaxError(result: RunResult) { return /SyntaxError|IndentationError|TabError/i.test(result.error ?? ""); }
+function failureLabel(kind: RunFailureKind) {
+  return ({
+    syntax: "SYNTAX ERROR",
+    type: "TYPE ERROR",
+    compile: "COMPILE ERROR",
+    runtime: "RUNTIME ERROR",
+    logic: "LOGIC ERROR",
+    "test-failure": "TEST FAILURE",
+    timeout: "TIMEOUT",
+    limit: "RESOURCE LIMIT",
+  } satisfies Record<RunFailureKind, string>)[kind];
+}
 function shortError(error: string) { return error.split("\n").filter(Boolean).slice(-1)[0] ?? error; }
-function findLikelyLogicLine(code: string) { const lines = code.split("\n"); const index = [...lines].map((line, i) => ({ line, i })).reverse().find(({ line }) => /print\(|return |\+=|=|if |for /.test(line))?.i; return (index ?? 0) + 1; }
