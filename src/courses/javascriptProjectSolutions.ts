@@ -12,9 +12,16 @@ import type { ProjectSolution } from "./chapterPlanHelpers";
 export const javascriptProjectSolutions: Partial<Record<number, ProjectSolution>> = {
   // Chapter 1: Getting Started
   1: {
-    solution: 'const learner = "Mina";\nconst completed = 0;\nconsole.log("Learner: " + learner);\nconsole.log("Completed: " + completed);\nconsole.log("Next: begin");',
-    solutionExplanation: "The named constants keep source data visible, zero remains a valid numeric count, and three ordered log calls produce the session card. The same worker-safe program is executed by CodeForge's JavaScript Worker.",
+    solution: 'const learner = readLine();\nconst completed = Number(readLine());\nconst next = readLine();\nconsole.log("Learner: " + learner);\nconsole.log("Completed: " + completed);\nconsole.log("Next: " + next);',
+    solutionExplanation: "The three supplied lines become named values, Number keeps the completed count numeric, and three ordered log calls build a session summary that still prints zero. CodeForge's Worker executes it with the visible sample input.",
     expected: "Learner: Mina\nCompleted: 0\nNext: begin",
+    testCases: [
+      { label: "Zero-progress session", input: "Mina\n0\nbegin", expected: "Learner: Mina\nCompleted: 0\nNext: begin" },
+      { label: "One completed lesson", hidden: true, input: "Ada\n1\nreview", expected: "Learner: Ada\nCompleted: 1\nNext: review" },
+      { label: "Numeric-looking learner", hidden: true, input: "0\n1\ncontinue", expected: "Learner: 0\nCompleted: 1\nNext: continue" },
+      { label: "Large completed count", hidden: true, input: "Grace\n999999\ncapstone", expected: "Learner: Grace\nCompleted: 999999\nNext: capstone" },
+      { label: "Empty learner label", hidden: true, input: "\n2\ncontinue", expected: "Learner: \nCompleted: 2\nNext: continue" },
+    ],
   },
   // Chapter 2: Types and Operators
   2: {

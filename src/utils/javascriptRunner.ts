@@ -8,11 +8,17 @@ const MAX_TIMEOUT_MS = 10_000;
 const MAX_OUTPUT_LINES = 200;
 const MAX_OUTPUT_CHARS = 8_000;
 const MAX_SCHEDULED_TIMERS = 100;
+const MAX_STATE_CHARS = 8_000;
+const MAX_STATE_DEPTH = 8;
+const MAX_STATE_ITEMS = 100;
 
 export const javascriptWorkerSource = `
 const MAX_OUTPUT_LINES = ${MAX_OUTPUT_LINES};
 const MAX_OUTPUT_CHARS = ${MAX_OUTPUT_CHARS};
 const MAX_SCHEDULED_TIMERS = ${MAX_SCHEDULED_TIMERS};
+const MAX_STATE_CHARS = ${MAX_STATE_CHARS};
+const MAX_STATE_DEPTH = ${MAX_STATE_DEPTH};
+const MAX_STATE_ITEMS = ${MAX_STATE_ITEMS};
 
 // Indirect eval and the global Function constructor resolve outside the shadowed parameter list,
 // so they are replaced at the worker scope. The real Function is captured first because this
@@ -133,6 +139,61 @@ function stringifyValue(value) {
   return inspectValue(value, 0, new Set(), false);
 }
 
+function snapshotStructuredState(value, depth, seen, budget) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    if (typeof value === "string") budget.chars += value.length;
+    return value;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError("CodeForge structured state only accepts finite JSON numbers.");
+    return value;
+  }
+  if (typeof value !== "object") {
+    throw new TypeError("CodeForge structured state only accepts JSON-compatible values.");
+  }
+  if (depth >= MAX_STATE_DEPTH) throw new RangeError("The JavaScript runner limits structured state to depth 8.");
+  if (seen.has(value)) throw new TypeError("CodeForge structured state must not contain circular references.");
+
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (value.length > MAX_STATE_ITEMS - budget.items) throw new RangeError("The JavaScript runner limits structured state to 100 items.");
+      const copy = [];
+      for (let index = 0; index < value.length; index += 1) {
+        budget.items += 1;
+        if (!(index in value)) throw new TypeError("CodeForge structured state arrays must not contain empty slots.");
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor || !("value" in descriptor)) throw new TypeError("CodeForge structured state does not accept accessor properties.");
+        copy.push(snapshotStructuredState(descriptor.value, depth + 1, seen, budget));
+      }
+      return copy;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError("CodeForge structured state accepts only plain objects and arrays.");
+    }
+    const keys = Object.keys(value);
+    if (keys.length > MAX_STATE_ITEMS - budget.items) throw new RangeError("The JavaScript runner limits structured state to 100 items.");
+    const copy = {};
+    for (const key of keys) {
+      budget.items += 1;
+      budget.chars += key.length;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !("value" in descriptor)) throw new TypeError("CodeForge structured state does not accept accessor properties.");
+      Object.defineProperty(copy, key, {
+        value: snapshotStructuredState(descriptor.value, depth + 1, seen, budget),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+    return copy;
+  } finally {
+    seen.delete(value);
+  }
+}
+
 self.onmessage = async (event) => {
   const { id, code, input } = event.data;
   const output = [];
@@ -197,6 +258,15 @@ self.onmessage = async (event) => {
   const limitedSetInterval = (handler, delay, ...args) => schedule(() => handler(...args), delay, true);
   const limitedClearTimeout = (timer) => { clearTimeout(timer); timeouts.delete(timer); };
   const limitedClearInterval = (timer) => { clearInterval(timer); intervals.delete(timer); };
+  let stateCaptured = false;
+  let capturedState;
+  const reportState = (value) => {
+    const snapshot = snapshotStructuredState(value, 0, new Set(), { items: 0, chars: 0 });
+    const serialized = JSON.stringify(snapshot);
+    if (serialized.length > MAX_STATE_CHARS) throw new RangeError("The JavaScript runner limits structured state returns to 8,000 characters.");
+    capturedState = JSON.parse(serialized);
+    stateCaptured = true;
+  };
 
   try {
     const log = (...values) => pushLine(values.map(stringifyValue).join(" "));
@@ -235,6 +305,7 @@ self.onmessage = async (event) => {
       "postMessage",
       "close",
       "Function",
+      "__codeforgeReportState",
       '"use strict";\\n' + code,
     );
     const shared = Object.freeze({ readLine, setTimeout: limitedSetTimeout, clearTimeout: limitedClearTimeout, setInterval: limitedSetInterval, clearInterval: limitedClearInterval, Promise, Math, Date, JSON });
@@ -257,10 +328,11 @@ self.onmessage = async (event) => {
       blocked,
       blocked,
       undefined,
+      reportState,
     );
     await Promise.resolve(result);
     await Promise.resolve();
-    self.postMessage({ id, output: output.join("\\n"), ...(truncated ? { outputTruncated: true } : {}) });
+    self.postMessage({ id, output: output.join("\\n"), ...(truncated ? { outputTruncated: true } : {}), ...(stateCaptured ? { state: capturedState, stateCaptured: true } : {}) });
   } catch (error) {
     const stack = error && error.stack ? error.stack : String(error);
     const match = stack.match(/<anonymous>:(\\d+):(\\d+)/);
@@ -274,6 +346,7 @@ self.onmessage = async (event) => {
       errorLine: match ? Math.max(1, Number(match[1]) - 1) : undefined,
       failureKind,
       ...(truncated ? { outputTruncated: true } : {}),
+      ...(stateCaptured ? { state: capturedState, stateCaptured: true } : {}),
     });
   } finally {
     for (const timer of timeouts) clearTimeout(timer);

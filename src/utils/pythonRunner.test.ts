@@ -49,7 +49,7 @@ type FakePyGlobals = {
   destroy(): void;
 };
 type OutputBatch = (text: string) => void;
-type SimulatePython = (stdout: OutputBatch, stderr: OutputBatch, source: string) => void;
+type SimulatePython = (stdout: OutputBatch, stderr: OutputBatch, source: string, globals: FakePyGlobals) => void;
 
 function makePythonWorkerHarness(webAssembly: { Suspending?: unknown }, simulate?: SimulatePython) {
   const runs: Array<{ source: string; globals: FakePyGlobals }> = [];
@@ -73,7 +73,7 @@ function makePythonWorkerHarness(webAssembly: { Suspending?: unknown }, simulate
     },
     runPythonAsync: async (source: string, options: { globals: FakePyGlobals }) => {
       runs.push({ source, globals: options.globals });
-      if (!source.startsWith("import sys") && simulate) simulate(stdout, stderr, source);
+      if (!source.startsWith("import sys") && simulate) simulate(stdout, stderr, source, options.globals);
     },
   };
   const self: {
@@ -103,6 +103,29 @@ describe("Python worker source", () => {
     expect(flushRuns[0].globals).toBe(harness.namespaces[0]);
     expect(flushRuns[1].globals).toBe(harness.namespaces[1]);
     expect(harness.namespaces.every((globals) => globals.destroyed)).toBe(true);
+  });
+
+  it("returns Python state through the structured Worker channel, separate from stdout", async () => {
+    const harness = makePythonWorkerHarness({}, (_stdout, _stderr, _source, globals) => {
+      const report = globals.values.get("__codeforgeReportState") as (value: unknown) => void;
+      report({ points: 5, completed: false, labels: ["start", "review"] });
+    });
+    await harness.self.onmessage!({ data: { id: 1, code: "__codeforgeReportState({'points': 5})" } });
+    expect(harness.messages[0]).toMatchObject({
+      output: "",
+      stateCaptured: true,
+      state: { points: 5, completed: false, labels: ["start", "review"] },
+    });
+  });
+
+  it("classifies an oversized structured state return as a resource limit", async () => {
+    const harness = makePythonWorkerHarness({}, (_stdout, _stderr, _source, globals) => {
+      const report = globals.values.get("__codeforgeReportState") as (value: unknown) => void;
+      report({ payload: "x".repeat(8_100) });
+    });
+    await harness.self.onmessage!({ data: { id: 1, code: "pass" } });
+    expect(harness.messages[0].failureKind).toBe("limit");
+    expect(harness.messages[0].error).toContain("limits structured state");
   });
 
   it("uses top-level-await AST rewriting when WebAssembly.Suspending is absent", async () => {

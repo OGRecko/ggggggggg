@@ -78,7 +78,8 @@ function verificationLabels(language: LanguageId | undefined, exercise: Exercise
   if (language === "htmlcss") return ["Previewed", "Structurally checked"];
   if (exercise.checker?.mode === "html") return ["Previewed", "Structurally checked"];
   if (exercise.checker?.mode === "patterns") return language === "java" || language === "cpp" ? ["Structurally checked", "Pattern checked"] : ["Pattern checked"];
-  return language === "javascript" || language === "python" ? ["Executed"] : ["Conceptual"];
+  if (language === "javascript" || language === "python") return ["Executed", "No hard memory cap"];
+  return ["Conceptual"];
 }
 
 function verificationNote(language: LanguageId | undefined, exercise: Exercise) {
@@ -86,8 +87,8 @@ function verificationNote(language: LanguageId | undefined, exercise: Exercise) 
   if (language === "java") return "This Java exercise uses transparent browser-side structure review only. CodeForge does not claim JVM compilation or execution.";
   if (language === "cpp") return "This C++ exercise uses transparent browser-side structure review only. CodeForge does not claim native compilation, linking, or execution.";
   if (exercise.checker?.mode === "patterns") return "This exercise uses structural or pattern review for the requested construct. It is not a full runtime verification.";
-  if (language === "javascript") return "This exercise runs in a local JavaScript Worker when the code is browser-safe.";
-  return "This exercise runs in a local Pyodide Worker for browser-safe Python practice.";
+  if (language === "javascript") return "This exercise runs in a local JavaScript Worker when the code is browser-safe. No hard memory cap is provided; source, input, wall-clock, output, and timer limits do not bound heap use.";
+  return "This exercise runs in a local Pyodide Worker for browser-safe Python practice. No hard memory cap is provided; source, input, wall-clock, stdout, and stderr limits do not bound heap use.";
 }
 
 function updateLessonState(current: StoredProgress, id: string, patch: Partial<NonNullable<StoredProgress["lessonStates"]>[string]>) {
@@ -276,6 +277,7 @@ function PracticeEditor({ id, language = "python", title, exercise, progress, up
   const execute = async (source = code, input?: string, timeoutMs?: number) => language === "javascript"
     ? javascriptRunner.current!.run(source, timeoutMs ?? 2500, input)
     : pythonRunner.current!.run(source, input ?? "", timeoutMs ?? 5000);
+  const visibleSampleInput = exercise.testCases.find((testCase) => !testCase.hidden && testCase.input !== undefined)?.input;
   const staticCheck = () => {
     const checker = exercise.checker;
     if (!checker) return null;
@@ -313,7 +315,7 @@ function PracticeEditor({ id, language = "python", title, exercise, progress, up
     if (language === "htmlcss") { setOutput("Rendered HTML/CSS preview is shown below. Use Check answer to verify the requested DOM, CSS, and accessibility structure."); setState({ kind: "idle" }); return; }
     setState({ kind: "running", message: `Starting the ${language === "javascript" ? "JavaScript" : "Python"} sandbox...` });
     setErrorLine(undefined);
-    const result = await execute(code);
+    const result = await execute(code, visibleSampleInput);
     setOutput(result.output || (result.error ? "" : "Program finished with no output."));
     if (result.error) {
       const kind = classifyExecutionError(result);
@@ -357,7 +359,11 @@ function PracticeEditor({ id, language = "python", title, exercise, progress, up
     const visibleOutcomes = grade.outcomes.filter((outcome) => !outcome.testCase.hidden);
     const visibleFailures = visibleOutcomes.filter((outcome) => !outcome.passed);
     const lastVisible = visibleOutcomes[visibleOutcomes.length - 1];
-    const visibleOutput = lastVisible ? lastVisible.rawOutput || "Program finished with no output." : "Hidden test output is not displayed.";
+    const visibleOutput = !lastVisible
+      ? "Hidden test output is not displayed."
+      : lastVisible.testCase.kind === "state"
+        ? `${lastVisible.rawOutput ? `${lastVisible.rawOutput}\n` : ""}Returned state: ${lastVisible.actual}`
+        : lastVisible.rawOutput || "Program finished with no output.";
     if (visibleFailures.length) {
       setOutput(`Visible example feedback (not grading):\n${visibleFailures.map(formatCaseFailure).join("\n\n")}`);
       markSuccess("Hidden behavioral checks passed. Review the visible-example feedback above; visible examples do not determine completion.");
@@ -373,7 +379,7 @@ function PracticeEditor({ id, language = "python", title, exercise, progress, up
   const complete = progress.completedExercises.includes(id) || progress.projectComplete.includes(id);
   const staticLanguage = language === "java" || language === "cpp" || language === "htmlcss";
   const verification = verificationLabels(language, exercise);
-  return <section className={`practice-module ${compact ? "compact" : ""}`}><div className="practice-heading"><div><span className="section-label">Practice lab</span><h2>{title}</h2><p>{exercise.prompt}</p></div>{complete && <span className="completed-mark"><Check size={15} /> Passed</span>}</div><div className="editor-actions"><button className="run-button" type="button" onClick={runProgram} disabled={state.kind === "running"}><Play size={16} /> {language === "htmlcss" ? "Preview" : staticLanguage ? "About checks" : "Run"}</button><button className="check-button" type="button" onClick={check} disabled={state.kind === "running"}>{state.kind === "running" ? "Checking..." : "Check answer"}</button><button className="text-button" type="button" onClick={reset}><RotateCcw size={15} /> Reset</button><span>{staticLanguage ? "This exercise uses transparent browser-side structure checks; no code leaves your device." : "Paste works here if you need it, but typing small examples yourself usually teaches the syntax faster."}</span></div><div className="verification-strip"><b>Verification:</b><div className="verification-badges">{verification.map((label) => <span key={label} className="audit-status partial">{label}</span>)}</div><p>{verificationNote(language, exercise)}</p></div><CodeEditor value={code} onChange={persist} errorLine={errorLine} language={language} /><div className="console" aria-live="polite"><div><Terminal size={15} /> Output</div><pre>{output || "Run your code to see output here."}</pre></div>{language === "htmlcss" && <iframe className="html-preview" title="HTML and CSS preview" sandbox="allow-scripts" srcDoc={code} />}{state.kind !== "idle" && <div className={`check-feedback ${state.kind}`} role="status">{state.kind === "success" ? <Check size={18} /> : <Info size={18} />}<span>{state.message}</span></div>}<div className="practice-footer"><div className="hint-row"><CircleHelp size={16} /><span>{hintsShown ? `${hintsShown} of ${exercise.hints.length} hint${exercise.hints.length === 1 ? "" : "s"} shown` : "Need a nudge?"}</span>{hintsShown < exercise.hints.length && <button type="button" onClick={() => setHintsShown(hintsShown + 1)}>Unlock hint {hintsShown + 1}</button>}</div>{hintsShown > 0 && <ol className="hints-list">{exercise.hints.slice(0, hintsShown).map((hint) => <li key={hint}>{hint}</li>)}</ol>}<button className="answer-button" type="button" onClick={() => setShowAnswer(!showAnswer)}>{showAnswer ? "Hide answer" : "Show answer"}</button>{showAnswer && <div className="solution-reveal"><pre><code>{exercise.solution}</code></pre><p>{exercise.solutionExplanation}</p></div>}</div></section>;
+  return <section className={`practice-module ${compact ? "compact" : ""}`}><div className="practice-heading"><div><span className="section-label">Practice lab</span><h2>{title}</h2><p>{exercise.prompt}</p></div>{complete && <span className="completed-mark"><Check size={15} /> Passed</span>}</div><div className="editor-actions"><button className="run-button" type="button" onClick={runProgram} disabled={state.kind === "running"}><Play size={16} /> {language === "htmlcss" ? "Preview" : staticLanguage ? "About checks" : "Run"}</button><button className="check-button" type="button" onClick={check} disabled={state.kind === "running"}>{state.kind === "running" ? "Checking..." : "Check answer"}</button><button className="text-button" type="button" onClick={reset}><RotateCcw size={15} /> Reset</button><span>{staticLanguage ? "This exercise uses transparent browser-side structure checks; no code leaves your device." : visibleSampleInput !== undefined ? "Run replays the visible test input; Check answer also runs the hidden behavioral cases." : "Paste works here if you need it, but typing small examples yourself usually teaches the syntax faster."}</span></div><div className="verification-strip"><b>Verification:</b><div className="verification-badges">{verification.map((label) => <span key={label} className="audit-status partial">{label}</span>)}</div><p>{verificationNote(language, exercise)}</p></div><CodeEditor value={code} onChange={persist} errorLine={errorLine} language={language} /><div className="console" aria-live="polite"><div><Terminal size={15} /> Output</div><pre>{output || "Run your code to see output here."}</pre></div>{language === "htmlcss" && <iframe className="html-preview" title="HTML and CSS preview" sandbox="allow-scripts" srcDoc={code} />}{state.kind !== "idle" && <div className={`check-feedback ${state.kind}`} role="status">{state.kind === "success" ? <Check size={18} /> : <Info size={18} />}<span>{state.message}</span></div>}<div className="practice-footer"><div className="hint-row"><CircleHelp size={16} /><span>{hintsShown ? `${hintsShown} of ${exercise.hints.length} hint${exercise.hints.length === 1 ? "" : "s"} shown` : "Need a nudge?"}</span>{hintsShown < exercise.hints.length && <button type="button" onClick={() => setHintsShown(hintsShown + 1)}>Unlock hint {hintsShown + 1}</button>}</div>{hintsShown > 0 && <ol className="hints-list">{exercise.hints.slice(0, hintsShown).map((hint) => <li key={hint}>{hint}</li>)}</ol>}<button className="answer-button" type="button" onClick={() => setShowAnswer(!showAnswer)}>{showAnswer ? "Hide answer" : "Show answer"}</button>{showAnswer && <div className="solution-reveal"><pre><code>{exercise.solution}</code></pre><p>{exercise.solutionExplanation}</p></div>}</div></section>;
 }
 
 function ChapterPage({ course, chapter, progress, updateProgress }: { course: Course; chapter: Chapter; progress: StoredProgress; updateProgress: (updater: (current: StoredProgress) => StoredProgress) => void }) {

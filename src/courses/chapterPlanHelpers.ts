@@ -1,4 +1,4 @@
-import type { ChapterTest } from "../data/types";
+import type { ChapterTest, Exercise } from "../data/types";
 import type { AuthoredLessonDraft, ChapterPlan, CourseProjectPlan } from "./courseFactory";
 
 export const q = (question: string, choices: string[], correctIndex: number, explanation: string): ChapterTest => ({ question, choices, correctIndex, explanation });
@@ -21,6 +21,7 @@ export type ProjectSolution = {
   solution: string;
   solutionExplanation: string;
   expected: string;
+  testCases?: Exercise["testCases"];
 };
 
 /**
@@ -39,7 +40,7 @@ export function applyProjectSolutions(plans: ChapterPlan[], solutions: Partial<R
         ...plan.project,
         solution: authored.solution,
         solutionExplanation: authored.solutionExplanation,
-        testCases: [{ label: `${plan.title} project`, expected: authored.expected }],
+        testCases: authored.testCases ?? [{ label: `${plan.title} project`, expected: authored.expected }],
       },
     };
   });

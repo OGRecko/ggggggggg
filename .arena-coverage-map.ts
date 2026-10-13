@@ -12,14 +12,14 @@ const lines: string[] = [
   "## Measurement notes",
   "",
   "- Current catalog census: 5 languages, 125 chapters, 821 lessons, 141 lessons marked `authored`, 1,689 examples (317 inside authored lessons).",
-  "- `hidden-test count` is **0 for every lesson and project** in this snapshot. The `TestCase` schema and behavioral grader support `hidden`, `append`, line-oriented `input`, `kind` (`output`/`throws`/`state`), and clamped `timeoutMs`, but those gates have not yet been attached to the shipped lesson/project corpus. Do not interpret a normal visible case as a hidden case.",
-  "- `distinct outputs` counts distinct strings in the lesson's current `testCases`. A separate real-JavaScript-Worker infrastructure fixture proves starter failure, reference success, alternative-reference success, and hardcoded-transcript-cheat failure across low/standard/high/invalid outputs. Lesson-specific four-plus behavioral tests, alternative solutions, and cheat gates remain to be migrated.",
+  "- The `TestCase` schema and behavioral grader support `hidden`, `append`, line-oriented `input`, `kind` (`output`/`throws`/`state`), and clamped `timeoutMs`. Lesson hidden-case count remains 0; the JavaScript Chapter 1 project has 4 hidden cases. The project is the only curriculum item with hidden behavioral cases in this snapshot.",
+  "- `distinct outputs` counts distinct expected strings in each lesson's test cases. Project rows report their project-case count and distinct expected strings separately. The JavaScript Chapter 1 project has four hidden cases and an execution-tested starter, reference solution, alternative implementation, and hardcoded-sample rejection; no other project has been migrated. Lesson-specific behavioral tests remain to be migrated.",
   "- This map measures current lesson metadata and grading fields. It does not certify browser behavior, compiler execution, correctness, or chapter completion.",
   "",
   "## Per-language totals and in-app execution boundary",
   "",
-  "| Language | Chapters | Lessons | Authored lessons | Hidden lesson cases | Current in-app boundary |",
-  "|---|---:|---:|---:|---:|---|",
+  "| Language | Chapters | Lessons | Authored lessons | Hidden lesson cases | Hidden project cases | Current in-app boundary |",
+  "|---|---:|---:|---:|---:|---:|---|",
 ];
 
 const runtime: Record<string, string> = {
@@ -33,14 +33,16 @@ const runtime: Record<string, string> = {
 for (const course of courses) {
   const lessons = course.chapters.flatMap((chapter) => chapter.lessons);
   const authored = lessons.filter((lesson) => lesson.quality?.authoredDepth === "authored").length;
-  lines.push(`| ${course.name} | ${course.chapters.length} | ${lessons.length} | ${authored} | 0 | ${runtime[course.id]} |`);
+  const hiddenLessonCases = lessons.reduce((total, lesson) => total + lesson.exercise.testCases.filter((testCase) => testCase.hidden).length, 0);
+  const hiddenProjectCases = course.chapters.reduce((total, chapter) => total + (chapter.project?.testCases ?? []).filter((testCase) => testCase.hidden).length, 0);
+  lines.push(`| ${course.name} | ${course.chapters.length} | ${lessons.length} | ${authored} | ${hiddenLessonCases} | ${hiddenProjectCases} | ${runtime[course.id]} |`);
 }
 
 lines.push(
   "",
   "## Language → chapter → lesson detail",
   "",
-  "Each lesson row lists its current authored-depth label, current hidden-case count, and concrete grading/content gaps visible in the shipped corpus. Chapter-level rows record the mixed-test and project checkpoints separately. The schema/grader already model the case modes; absence of lesson cases is a corpus gap, not a missing field.",
+  "Each lesson row lists its current authored-depth label, current hidden lesson-case count, and concrete grading/content gaps visible in the shipped corpus. Chapter-level rows show hidden project-case counts and record the mixed-test/project checkpoints separately. The schema/grader already model the case modes; absence of lesson cases is a corpus gap, not a missing field.",
   "",
 );
 
@@ -48,15 +50,19 @@ for (const course of courses) {
   lines.push(`### ${course.name}`, "", "| Chapter | Chapter title | Lesson | Authorship depth | Hidden tests | Missing work |", "|---:|---|---|---|---:|---|");
   for (const chapter of course.chapters) {
     const chapterTests = chapter.test?.length ?? 0;
-    const projectHidden = 0;
-    const projectCases = chapter.project?.testCases?.length ?? 0;
+    const projectTests = chapter.project?.testCases ?? [];
+    const projectHidden = projectTests.filter((testCase) => testCase.hidden).length;
+    const projectCases = projectTests.length;
+    const projectDistinct = new Set(projectTests.map((testCase) => testCase.expected)).size;
     const cumulative = chapter.cumulativeTest?.length ?? 0;
     const chapterGaps = [
       chapterTests < 8 ? `chapter test has ${chapterTests} questions; target is 8–12 mixed items` : "",
-      `project hidden cases ${projectHidden}; ${projectCases} visible case(s); hidden behavioral project gates remain to be authored`,
+      projectHidden < 4 ? `project has ${projectHidden} hidden case(s); target is at least 4 behaviorally distinct hidden cases` : "",
+      projectDistinct < 4 ? `project has ${projectDistinct} distinct expected result(s); target is at least 4` : "",
+      course.id === "javascript" && chapter.number === 1 ? "" : "verify the project starter fails and a materially different alternative passes while a fixed-output answer fails",
       chapter.number % 5 === 0 && cumulative === 0 ? "missing cumulative checkpoint" : "",
     ].filter(Boolean).join("; ");
-    lines.push(`| **${chapter.number}** | **${esc(chapter.title)}** | — | — | 0 | ${esc(chapterGaps || `chapter test ${chapterTests}; cumulative checkpoint ${cumulative || "none"}`)} |`);
+    lines.push(`| **${chapter.number}** | **${esc(chapter.title)}** | — | — | ${projectHidden} | ${esc(chapterGaps || `project has ${projectCases} case(s); chapter test ${chapterTests}; cumulative checkpoint ${cumulative || "none"}`)} |`);
     for (const lesson of chapter.lessons) {
       const depth = lesson.quality?.authoredDepth ?? "unclassified";
       const cases = lesson.exercise.testCases ?? [];
@@ -92,7 +98,7 @@ lines.push(
   "",
   "## Global work still required before any chapter can be called COMPLETE",
   "",
-  "- The behavioral-grading schema, grader, hidden-failure reporting, and runner limits are implemented and unit/corpus-tested. Add hidden cases to real lesson/project corpus rows; keep each lesson at 4+ distinct behaviors with boundary cases, a passing alternative reference, and a failing hardcoded-output cheat.",
+  "- The behavioral-grading schema, grader, hidden-failure reporting, and runner limits are implemented and unit/corpus-tested. The JavaScript Chapter 1 project has four hidden cases with a passing alternative and a failing hardcoded answer; attach comparable behavioral gates to the remaining lesson/project rows and keep each migrated item at 4+ distinct behaviors with boundary cases.",
   "- Migrate JavaScript chapters 1–4 through those behavior gates, one chapter batch at a time, before beginning JavaScript 5–25. No JavaScript chapter 5 migration is started in this snapshot.",
   "- After JS1–4 gates, continue JavaScript 5–25; append genuine Python gap content without rewriting existing material; then proceed through Java, C++, and HTML/CSS in the requested order.",
   "- Expand chapter tests to 8–12 mixed items and add executed-code, cumulative, and realistic hidden-tested project checks.",

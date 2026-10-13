@@ -7,11 +7,11 @@ import { javascriptWorkerSource } from "../utils/javascriptRunner";
  * assignments the Worker performs against its own global scope: self.eval and self.Function are
  * replaced so indirect eval and the Function constructor cannot escape the sandbox.
  */
-async function runInSandbox(code: string) {
+async function runInSandbox(code: string, input?: string) {
   const messages: Array<{ output?: string; error?: string }> = [];
   const fakeSelf = {
     postMessage: (message: { output?: string; error?: string }) => messages.push(message),
-  } as { postMessage: (message: { output?: string; error?: string }) => void; onmessage?: (event: { data: { id: number; code: string } }) => Promise<void>; eval?: unknown; Function?: unknown };
+  } as { postMessage: (message: { output?: string; error?: string }) => void; onmessage?: (event: { data: { id: number; code: string; input?: string } }) => Promise<void>; eval?: unknown; Function?: unknown };
   const evaluate = new Function(
     "self",
     "setTimeout",
@@ -41,11 +41,11 @@ async function runInSandbox(code: string) {
     ...Array.from({ length: 9 }, () => () => { throw new Error("blocked"); }),
     Function,
   );
-  await fakeSelf.onmessage!({ data: { id: 1, code } });
+  await fakeSelf.onmessage!({ data: { id: 1, code, input } });
   return messages[messages.length - 1];
 }
 
-type SampleRow = { where: string; kind: "example" | "exercise" | "starter" | "project"; code: string; declared: string };
+type SampleRow = { where: string; kind: "example" | "exercise" | "starter" | "project"; code: string; declared: string; input?: string };
 
 function collectJavascriptRows(): SampleRow[] {
   const rows: SampleRow[] = [];
@@ -65,12 +65,15 @@ function collectJavascriptRows(): SampleRow[] {
       }
     }
     if (chapter.project?.solution) {
-      rows.push({
-        where: `ch${chapter.number} project`,
-        kind: "project",
-        code: chapter.project.solution,
-        declared: chapter.project.testCases?.[0]?.expected ?? "",
-      });
+      for (const [index, testCase] of (chapter.project.testCases ?? []).entries()) {
+        rows.push({
+          where: `ch${chapter.number} project / ${testCase.label || index + 1}`,
+          kind: "project",
+          code: chapter.project.solution,
+          declared: testCase.expected,
+          input: testCase.input,
+        });
+      }
     }
   }
   return rows;
@@ -90,7 +93,7 @@ describe("JavaScript samples and the real Worker sandbox", () => {
       const unlabelledBrowserRows: string[] = [];
 
       for (const row of rows) {
-        const result = await runInSandbox(row.code);
+        const result = await runInSandbox(row.code, row.input);
         if (!result) continue;
 
         if (row.declared.startsWith("Does not run:")) {

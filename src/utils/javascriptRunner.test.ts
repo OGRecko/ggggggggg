@@ -109,6 +109,28 @@ describe("JavaScript worker source", () => {
     expect(result.output).toBe("ready");
   });
 
+  it("returns bounded JSON-compatible state separately from console output", async () => {
+    const result = await runWorkerSource('console.log("preview"); __codeforgeReportState({ count: 2, enabled: false, values: [1, "ready"] });');
+    expect(result.error).toBeUndefined();
+    expect(result.output).toBe("preview");
+    expect(result.stateCaptured).toBe(true);
+    expect(result.state).toEqual({ count: 2, enabled: false, values: [1, "ready"] });
+
+    const nullState = await runWorkerSource("__codeforgeReportState(null);");
+    expect(nullState.stateCaptured).toBe(true);
+    expect(nullState.state).toBeNull();
+  });
+
+  it("rejects oversized and circular structured state instead of silently truncating it", async () => {
+    const oversized = await runWorkerSource('__codeforgeReportState({ value: "x".repeat(8100) });');
+    expect(oversized.failureKind).toBe("limit");
+    expect(oversized.error).toContain("runner limits structured state");
+
+    const circular = await runWorkerSource('const state = {}; state.self = state; __codeforgeReportState(state);');
+    expect(circular.failureKind).toBe("type");
+    expect(circular.error).toContain("must not contain circular references");
+  });
+
   it("caps console output and reports truncation rather than passing a partial transcript", async () => {
     const result = await runWorkerSource('console.log("x".repeat(9000));');
     expect(result.output?.length).toBeLessThanOrEqual(8_000);

@@ -49,17 +49,22 @@ const smokeCases = [
   { label: "second run cannot reuse that name", code: "print(worker_private_value)", error: "NameError" },
   { label: "__name__ is __main__", code: "if __name__ == '__main__':\n    print('main entry')", output: "main entry" },
   { label: "input shim is isolated", code: "print(input())", input: "Ada", output: "Ada" },
+  { label: "structured state is returned separately from stdout", code: "__codeforgeReportState({'count': 2, 'enabled': False})", state: { count: 2, enabled: false }, output: "" },
   { label: "asyncio.run works on this host capability", code: "import asyncio\nasync def main():\n    await asyncio.sleep(0)\n    print('awaited')\nasyncio.run(main())", output: "awaited" },
 ];
 for (const [index, test] of smokeCases.entries()) {
   const result = await runWorker(test.code, test.input ?? "", index + 1);
-  const passed = test.error ? result.error?.includes(test.error) : !result.error && result.output === test.output;
+  const passed = test.error
+    ? result.error?.includes(test.error)
+    : Object.hasOwn(test, "state")
+      ? !result.error && result.output === test.output && result.stateCaptured === true && JSON.stringify(result.state) === JSON.stringify(test.state)
+      : !result.error && result.output === test.output;
   if (!passed) {
     console.error(`Worker smoke failed: ${test.label}`, result);
     process.exit(1);
   }
 }
-console.log(`Worker smoke: ${smokeCases.length}/${smokeCases.length} passed (fresh globals, __main__, input, asyncio; JSPI ${jspi ? "present" : "absent"})`);
+console.log(`Worker smoke: ${smokeCases.length}/${smokeCases.length} passed (fresh globals, __main__, input, structured state, asyncio; JSPI ${jspi ? "present" : "absent"})`);
 
 const stats = { matched: 0, mismatch: 0, inputBoundary: 0, error: 0, packageMissing: 0 };
 const anomalies = [];

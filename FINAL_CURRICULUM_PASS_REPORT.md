@@ -3196,3 +3196,84 @@ scan was run. The jsdom app sweeps are not represented as browser verification.
    accessibility rows. Keep the four MISSING coverage areas named in the map, all other unsupported
    rows PARTIAL, and retain the existing compiler/parser, chapter/cumulative assessment, project, PDF,
    advisory, and sandbox-boundary verification debt.
+
+## Appendix AK — canonical state grading and JavaScript Chapter 1 project gate (2026-10-13)
+
+This latest bounded batch adds structured-state feedback/comparison and completes the first
+behavior-tested chapter project. It does **not** start JavaScript Chapter 5, migrate lesson content,
+or change projects in JavaScript Chapters 2–25. The earlier Appendix AJ statement that the shipped
+curriculum had zero hidden cases is superseded: the current coverage map now records four hidden cases
+on the JavaScript Chapter 1 project (lesson hidden-case count remains zero).
+
+### Canonical structured-state grading
+
+- JavaScript and Python Workers can capture a JSON-compatible value through the
+  `__codeforgeReportState(...)` return channel. The value is carried separately from stdout, and
+  `stateCaptured` distinguishes a captured `null` from no state return. JavaScript validates plain
+  objects/arrays and JSON-compatible primitives, with depth, item, and serialized-size limits; Python
+  converts the returned value to JSON and applies its serialized-size limit.
+- `behavioralGrader.ts` parses the expected JSON state and recursively canonicalizes both sides:
+  object keys are sorted at every depth, array order is preserved, and captured state is compared
+  independently of console output. Failure feedback shows canonical expected and actual state, keeps
+  raw state on the outcome, and distinguishes missing state, invalid expectation, and non-JSON actual
+  state. A matching stdout transcript alone cannot pass a state case.
+- The product displays returned state separately from stdout. Run replays a declared visible sample
+  input; Check answer still executes each case's own input. JavaScript/Python UI and audit text both
+  disclose that source/input/time/output caps do not constitute a hard heap-memory cap.
+
+### Chapter 1 project behavior
+
+- The JavaScript learner-session project reads the name, completed count, and next-step label from
+  three supplied lines, keeps the count numeric, and prints the three required lines. It has one
+  visible sample and four hidden behavior cases: one completed item, a numeric-looking learner name,
+  a large count, and an empty learner label.
+- The project solution type now preserves authored per-case tests. When a JavaScript project includes
+  hidden cases, its generated static pattern checker is disabled so the project is actually graded by
+  behavior instead of being blocked by the old structure-only gate. Other projects' solution data is
+  unchanged.
+- Worker-source tests execute all five project cases, verify the starter fails a hidden case, accept
+  a materially different input-driven alternative, and reject a hard-coded copy of the visible
+  sample. The coverage inventory records the single migrated project and continues to show every
+  lesson without hidden cases; no JavaScript 1–4 lesson migration or Chapter 2–25 project migration is
+  claimed.
+
+### Verification run and exact results
+
+| Command/check | Result |
+| --- | --- |
+| `npm test` | **23 test files passed; 189 tests passed.** The jsdom sweeps rendered 821 lesson pages across the five courses (Python 225, Java 155, HTML/CSS 143, C++ 148, JavaScript 150). The initial full run exposed a stale app-test expectation that Run sent empty input; the test was corrected to require the declared visible sample, then the full suite passed. |
+| `npm run typecheck` | Pass (`tsc --noEmit`). |
+| `npm run build` | Pass; Vite transformed 2,272 modules; `dist/index.html` is **4,324.57 kB** (gzip **1,295.15 kB**). |
+| `npx vitest run src/app.integration.test.tsx` | **1 file, 8 tests passed**, including visible-input replay and per-case Check input. |
+| `node .arena-pyodide.mjs --only __no_project_rows__` | Pyodide 0.29.3 / Python 3.13.2, JSPI absent: **Worker smoke 6/6**, including separate structured-state return. The filter deliberately selected 0 corpus rows; this was a smoke test, not a rerun of the full Python corpus. |
+| `npx vite-node .arena-coverage-map.ts` | Wrote the current inventory: **5 courses, 125 chapters, 821 lesson rows**; JavaScript Chapter 1 project has 4 hidden cases, and lesson hidden-case count is 0. |
+| `git diff --check` | Pass. |
+
+Vitest continues to print non-fatal jsdom/CodeMirror traces (`textRange(...).getClientRects is not a function`); they did not fail the suite. No real-browser walkthrough, actual geometry measurement, or assistive-technology audit was run. The JavaScript Worker and Pyodide smoke were exercised with Node transport harnesses, not in a browser. The full Pyodide corpus was not rerun in this batch. The absence of a hard memory cap remains explicit, and Java/C++ remain static-only in the app.
+
+### Files changed in this batch
+
+- Grading contract and canonical feedback: `src/data/types.ts`, `src/utils/behavioralGrader.ts`,
+  `src/utils/behavioralGrader.test.ts`, `src/utils/javascriptRunner.ts`,
+  `src/utils/javascriptRunner.test.ts`, `src/utils/pythonRunner.ts`, `src/utils/pythonRunner.test.ts`,
+  `src/data/behavioralGradingCorpus.test.ts`, `src/App.tsx`, `src/app.integration.test.tsx`,
+  `src/data/coverageAudit.ts`, `.arena-pyodide.mjs`.
+- JavaScript Chapter 1 project only: `src/courses/javascript.ts`,
+  `src/courses/javascriptProjectSolutions.ts`, `src/courses/chapterPlanHelpers.ts`,
+  `src/courses/courseFactory.ts`, `src/courses/javascriptAuthoredContent.test.ts`,
+  `src/data/javascriptRuntime.test.ts`.
+- Current inventory: `.arena-coverage-map.ts`, `CURRICULUM_COVERAGE_MAP.md`.
+- No lesson prose or other chapter project solutions were changed in this bounded pass. Coverage remains
+  conservative: no chapter/language is promoted to COMPLETE, and all four MISSING rows remain MISSING.
+
+### Remaining work
+
+1. Continue behavioral migration one chapter per batch. JavaScript Chapter 1 still needs the lesson
+   exercises migrated; JavaScript Chapters 2–4 need their lesson and project gates before Chapter 5
+   begins. Keep each migrated item at 4+ behaviorally distinct cases, with hidden edge cases, a passing
+   alternative, a failing hard-coded answer, and a starter that fails.
+2. Continue to distinguish actual Pyodide/Worker harness evidence from a real browser run. The Python
+   corpus must be rerun after any relevant runtime change; unavailable package rows are not passes.
+3. Preserve the explicit no-hard-memory-cap disclosure and static-only Java/C++ decision. Browser,
+   accessibility, compiler, package, database, PDF, and sandbox limitations remain unpromoted without
+   their required evidence.

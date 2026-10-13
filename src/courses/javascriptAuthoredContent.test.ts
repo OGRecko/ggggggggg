@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { javascriptCourse } from "./javascript";
 import { javascriptWorkerSource } from "../utils/javascriptRunner";
+import { gradeExercise } from "../utils/behavioralGrader";
 
 type WorkerResponse = { id: number; output?: string; error?: string };
 type FakeSelf = {
   postMessage: (message: WorkerResponse) => void;
-  onmessage?: (event: { data: { id: number; code: string } }) => Promise<void>;
+  onmessage?: (event: { data: { id: number; code: string; input?: string } }) => Promise<void>;
 };
 
 /** Execute the same worker program shipped by CodeForge, with only its outer Worker transport adapted for this test. */
-async function runShippedWorker(code: string): Promise<WorkerResponse> {
+async function runShippedWorker(code: string, input?: string): Promise<WorkerResponse> {
   const messages: WorkerResponse[] = [];
   const fakeSelf: FakeSelf = { postMessage: (message) => messages.push(message) };
   const evaluate = new Function(
@@ -22,7 +23,7 @@ async function runShippedWorker(code: string): Promise<WorkerResponse> {
     javascriptWorkerSource,
   );
   evaluate(fakeSelf, setTimeout, clearTimeout, setInterval, clearInterval, Promise);
-  await fakeSelf.onmessage!({ data: { id: 1, code } });
+  await fakeSelf.onmessage!({ data: { id: 1, code, input } });
   return messages[messages.length - 1];
 }
 
@@ -108,9 +109,33 @@ describe("authored JavaScript chapters 1–4", () => {
 
     for (const chapter of chapters) {
       const project = chapter.project!;
-      const result = await runShippedWorker(project.solution);
-      expect(result.error, project.title).toBeUndefined();
-      expect(result.output, project.title).toBe(project.testCases[0].expected);
+      for (const testCase of project.testCases) {
+        const result = await runShippedWorker(project.solution, testCase.input);
+        expect(result.error, `${project.title} / ${testCase.label}`).toBeUndefined();
+        expect(result.output, `${project.title} / ${testCase.label}`).toBe(testCase.expected);
+      }
     }
+
+    const firstProject = chapters[0].project!;
+    expect(firstProject.checker).toBeUndefined();
+    expect(firstProject.testCases.filter((testCase) => testCase.hidden)).toHaveLength(4);
+    expect(new Set(firstProject.testCases.map((testCase) => testCase.expected)).size).toBeGreaterThanOrEqual(4);
+
+    const runCase = async (source: string, input?: string) => {
+      const result = await runShippedWorker(source, input);
+      return { output: result.output ?? "", error: result.error };
+    };
+    const starterGrade = await gradeExercise(firstProject, firstProject.starterCode, runCase);
+    expect(starterGrade.passed).toBe(false);
+    expect(starterGrade.failure?.testCase.hidden).toBe(true);
+
+    const alternative = 'const fields = [readLine(), readLine(), readLine()];\nconsole.log(`Learner: ${fields[0]}`);\nconsole.log(`Completed: ${Number(fields[1])}`);\nconsole.log(`Next: ${fields[2]}`);';
+    const alternativeGrade = await gradeExercise(firstProject, alternative, runCase);
+    expect(alternativeGrade.passed).toBe(true);
+
+    const hardcodedSample = 'console.log("Learner: Mina");\nconsole.log("Completed: 0");\nconsole.log("Next: begin");';
+    const hardcodedGrade = await gradeExercise(firstProject, hardcodedSample, runCase);
+    expect(hardcodedGrade.passed).toBe(false);
+    expect(hardcodedGrade.failure?.testCase.hidden).toBe(true);
   });
 });

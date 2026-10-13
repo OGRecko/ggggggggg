@@ -134,7 +134,7 @@ describe("CodeForge app shell", () => {
     await waitFor(() => expect(view.container.textContent).toMatch(/does not compile Java or C\+\+ in this browser/i));
   });
 
-  it("sends no input for Run and the test case's input for Check answer, showing the sandbox output", async () => {
+  it("replays the visible sample input for Run and each test case input for Check answer", async () => {
     // A fake Worker that speaks the shipped protocol: it records every message and answers with the
     // output the app should display. The real Worker is executed by the runner tests; this test is
     // about the app's wiring of the protocol, and it is labelled as a stub for that reason.
@@ -150,9 +150,8 @@ describe("CodeForge app shell", () => {
       }
       postMessage(message: { id: number; code: string; input: string }) {
         posted.push(message);
-        // Answer with the output the lesson declares for this input, so a Check that sends the wrong
-        // input cannot pass: the comparison in the app is what decides success. Inputs the lesson
-        // does not declare (for example the empty input Run sends) produce no output.
+        // Answer with the output the lesson declares for this input, so Run and Check must replay
+        // the correct visible/hidden case inputs. Inputs the lesson does not declare produce no output.
         const output = declared.get(message.input) ?? "";
         setTimeout(() => this.listeners.slice().forEach((listener) => listener({ data: { id: message.id, output } } as MessageEvent)), 0);
       }
@@ -165,15 +164,16 @@ describe("CodeForge app shell", () => {
     const chapter = course.chapters.find((candidate) => candidate.number === 2)!;
     const lesson = seedThrough("python", PYTHON_LESSON_WITH_INPUT);
     const declared = new Map(lesson.exercise.testCases.map((testCase) => [testCase.input, testCase.expected]));
+    const visibleSample = lesson.exercise.testCases.find((testCase) => !testCase.hidden && testCase.input !== undefined)!;
     route(`/${course.id}/chapter-${chapter.number}/lesson-${lesson.order}`);
     const view = render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: /^run$/i }));
     await waitFor(() => expect(posted.length).toBe(1));
-    expect(posted[0].input, "Run must not invent input").toBe("");
+    expect(posted[0].input, "Run must replay the visible sample input").toBe(visibleSample.input);
     expect(posted[0].code).toContain("input(");
     // While a run is in flight the Check button reads "Checking...", so wait for the run to finish.
-    await screen.findByText(/program finished with no output/i);
+    await waitFor(() => expect(view.container.textContent).toContain(visibleSample.expected));
 
     fireEvent.click(screen.getByRole("button", { name: /check answer/i }));
     // The app checks every declared test case, in order, on the same worker protocol.

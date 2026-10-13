@@ -113,7 +113,7 @@ describe("behavioral grading corpus: real JavaScript Worker", () => {
     expect(grade.failure?.actual).toMatch(/ReferenceError|Thrown error/);
   });
 
-  it("runs an appended hidden state assertion in the shipped Worker", async () => {
+  it("returns appended hidden state through the shipped Worker without writing it to stdout", async () => {
     const stateExercise: Exercise = {
       ...corpusExercise,
       testCases: [{
@@ -121,13 +121,14 @@ describe("behavioral grading corpus: real JavaScript Worker", () => {
         hidden: true,
         kind: "state",
         input: "2",
-        expected: "count=2",
-        append: "state.count += Number(readLine()); console.log(`count=${state.count}`);",
+        expected: "{\"count\":2}",
+        append: "state.count += Number(readLine()); __codeforgeReportState({ count: state.count });",
       }],
     };
     const grade = await gradeExercise(stateExercise, "const state = { count: 0 };", (source, input) => runInSandbox(source, input));
     expect(grade.passed).toBe(true);
-    expect(grade.outcomes[0].rawOutput).toBe("count=2");
+    expect(grade.outcomes[0].rawOutput).toBe("");
+    expect(grade.outcomes[0].rawState).toEqual({ count: 2 });
   });
 
   it("matches expected throws from the shipped Worker without showing the appended check", async () => {

@@ -30,10 +30,10 @@ export type TestCase = {
   append?: string;
   /** Line-oriented input supplied to the executable sandbox. */
   input?: string;
-  /** Expected console output, or an error name/message for `kind: "throws"`. */
+  /** Expected console output, error name/message (`throws`), or JSON-encoded state (`state`). */
   expected: string;
   label: string;
-  /** Defaults to output comparison for existing course data. */
+  /** Defaults to output comparison. State checks compare JSON-compatible data returned through the Worker channel. */
   kind?: TestCaseKind;
   /** Per-case wall-clock limit; runners still clamp this to their hard maximum. */
   timeoutMs?: number;

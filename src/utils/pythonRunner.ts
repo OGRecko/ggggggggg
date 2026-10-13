@@ -7,6 +7,10 @@ export type RunResult = {
   timedOut?: boolean;
   failureKind?: RunFailureKind;
   outputTruncated?: boolean;
+  /** Structured, JSON-compatible state reported by a test-only append, separate from stdout. */
+  state?: unknown;
+  /** Distinguishes an explicitly reported `null` from no state report. */
+  stateCaptured?: boolean;
 };
 
 type WorkerMessage = RunResult & { id: number };
@@ -16,6 +20,7 @@ const MAX_INPUT_LENGTH = 20_000;
 const MAX_TIMEOUT_MS = 10_000;
 const MAX_OUTPUT_CHARS = 12_000;
 const MAX_ERROR_CHARS = 4_000;
+const MAX_STATE_CHARS = 8_000;
 const MAX_OUTPUT_MARKER = "[output truncated after sandbox safety limit]";
 const MAX_ERROR_MARKER = "[stderr truncated after sandbox safety limit]";
 
@@ -24,6 +29,7 @@ const MAX_CODE_LENGTH = ${MAX_CODE_LENGTH};
 const MAX_INPUT_LENGTH = ${MAX_INPUT_LENGTH};
 const MAX_OUTPUT_CHARS = ${MAX_OUTPUT_CHARS};
 const MAX_ERROR_CHARS = ${MAX_ERROR_CHARS};
+const MAX_STATE_CHARS = ${MAX_STATE_CHARS};
 const MAX_OUTPUT_MARKER = ${JSON.stringify(MAX_OUTPUT_MARKER)};
 const MAX_ERROR_MARKER = ${JSON.stringify(MAX_ERROR_MARKER)};
 let pyodideInstance;
@@ -65,6 +71,8 @@ self.onmessage = async (event) => {
   let globals;
   let pyodide;
   let response;
+  let stateCaptured = false;
+  let capturedState;
   let setupLineOffset = 0;
   try {
     if (code.length > MAX_CODE_LENGTH) throw new Error("Program is too large for the practice sandbox.");
@@ -101,6 +109,31 @@ self.onmessage = async (event) => {
     setupLineOffset = setupLines.length;
     globals = pyodide.runPython("dict()");
     globals.set("__name__", "__main__");
+    const reportPythonState = (value) => {
+      let converted = value;
+      if (value && typeof value.toJs === "function") {
+        try {
+          converted = value.toJs({ depth: 8, create_pyproxies: false, dict_converter: Object.fromEntries });
+        } finally {
+          if (typeof value.destroy === "function") value.destroy();
+        }
+      }
+      let serialized;
+      try {
+        serialized = JSON.stringify(converted);
+      } catch {
+        throw new TypeError("CodeForge structured state must contain JSON-compatible values.");
+      }
+      if (typeof serialized !== "string") {
+        throw new TypeError("CodeForge structured state must contain JSON-compatible values.");
+      }
+      if (serialized.length > MAX_STATE_CHARS) {
+        throw new RangeError("The Python runner limits structured state returns to 8,000 characters.");
+      }
+      capturedState = JSON.parse(serialized);
+      stateCaptured = true;
+    };
+    globals.set("__codeforgeReportState", reportPythonState);
 
     if (hasJspi) {
       await pyodide.runPythonAsync(setup + code, { globals });
@@ -144,7 +177,7 @@ self.onmessage = async (event) => {
       ].join("\\n");
       await pyodide.runPythonAsync(setup + fallback, { globals });
     }
-    response = { id };
+    response = { id, ...(stateCaptured ? { state: capturedState, stateCaptured: true } : {}) };
   } catch (error) {
     const errorName = error && error.name ? error.name : "Error";
     const message = error && error.message ? error.message : String(error);
@@ -157,6 +190,7 @@ self.onmessage = async (event) => {
       error: message,
       errorLine: line === undefined ? undefined : Math.max(1, line),
       failureKind: classifyPythonFailure(classificationMessage),
+      ...(stateCaptured ? { state: capturedState, stateCaptured: true } : {}),
     };
   } finally {
     if (globals) {

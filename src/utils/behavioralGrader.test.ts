@@ -91,15 +91,38 @@ ReferenceError: secretExpectedAnswer is not defined`,
     expect(runCase).toHaveBeenCalledTimes(2);
   });
 
-  it("compares state assertions through the same behavioral output contract", async () => {
+  it("compares structured state separately from stdout and ignores object key order", async () => {
     const current = exercise([
-      { label: "State after update", kind: "state", expected: "count=2; enabled=false", append: "console.log(`count=${state.count}; enabled=${state.enabled}`)" },
+      { label: "State after update", kind: "state", expected: "{\"enabled\":false,\"count\":2}", append: "__codeforgeReportState(state)" },
     ]);
-    const grade = await gradeExercise(current, "const state = { count: 2, enabled: false };", async (source) => {
-      expect(source).toContain("console.log(`count=${state.count}; enabled=${state.enabled}`)");
-      return result("count=2; enabled=false");
+    const sourceCode = "const state = { count: 2, enabled: false };";
+    const grade = await gradeExercise(current, sourceCode, async (source) => {
+      expect(source).toBe(`${sourceCode}\n__codeforgeReportState(state)`);
+      return result("count=2; enabled=false", { state: { count: 2, enabled: false }, stateCaptured: true });
     });
     expect(grade.passed).toBe(true);
+    expect(grade.outcomes[0].rawState).toEqual({ count: 2, enabled: false });
+
+    const transcriptOnly = await gradeExercise(current, sourceCode, async () => result("count=2; enabled=false"));
+    expect(transcriptOnly.passed).toBe(false);
+    expect(transcriptOnly.failure?.actual).toBe("No structured state was returned by the Worker.");
+
+    const mismatch = await gradeExercise(exercise([
+      { label: "Canonical mismatch", kind: "state", expected: "{\"z\":2,\"a\":1}" },
+    ]), sourceCode, async () => result("", { state: { z: 3, a: 1 }, stateCaptured: true }));
+    expect(mismatch.failure?.expected).toBe('structured state {"a":1,"z":2}');
+    expect(mismatch.failure?.actual).toBe('{"a":1,"z":3}');
+
+    const invalidExpectation = await gradeExercise(exercise([
+      { label: "Invalid expected JSON", kind: "state", expected: "not JSON" },
+    ]), sourceCode, async () => result("", { state: { a: 1 }, stateCaptured: true }));
+    expect(invalidExpectation.failure?.expected).toBe('invalid structured state expectation "not JSON"');
+    expect(invalidExpectation.failure?.failureKind).toBe("test-failure");
+
+    const incompatibleState = await gradeExercise(exercise([
+      { label: "Non-JSON actual state", kind: "state", expected: "1" },
+    ]), sourceCode, async () => result("", { state: 1n, stateCaptured: true }));
+    expect(incompatibleState.failure?.actual).toBe("The Worker returned state that was not JSON-compatible.");
   });
 
   it("matches an expected throw by message without treating a timeout or truncated output as success", async () => {

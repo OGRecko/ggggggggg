@@ -619,7 +619,7 @@ function projectFor(definition: CourseDefinition, plan: ChapterPlan, sample: Sam
     solutionExplanation: plan.project.solutionExplanation ?? `This project combines ${plan.concepts.slice(0, 2).join(" and ")} in a deliberate small build. The verification stays honest about what the browser can and cannot check.`,
     testCases: plan.project.testCases ?? [{ label: `${plan.title} project`, expected: sample.output }],
     hints: plan.project.hints ?? sample.hints,
-    checker: definition.id === "javascript" && sample.runtime && !plan.project.requiredPatterns ? undefined : { mode: plan.project.checkerMode ?? (definition.id === "htmlcss" ? "html" : "patterns"), requiredPatterns, successMessage: "Required chapter structure and acceptance criteria evidence are present." },
+    checker: definition.id === "javascript" && (plan.project.testCases?.some((testCase) => testCase.hidden) || sample.runtime && !plan.project.requiredPatterns) ? undefined : { mode: plan.project.checkerMode ?? (definition.id === "htmlcss" ? "html" : "patterns"), requiredPatterns, successMessage: "Required chapter structure and acceptance criteria evidence are present." },
     title: plan.project.title,
     brief: plan.project.brief,
     scenario: plan.project.scenario,

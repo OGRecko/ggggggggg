@@ -10,6 +10,7 @@ export type CaseOutcome = {
   expected: string;
   actual: string;
   rawOutput: string;
+  rawState?: unknown;
   failureKind?: RunFailureKind;
   errorLine?: number;
 };
@@ -43,7 +44,45 @@ function thrownFailureMatches(expected: string, actualError: string) {
 }
 
 function expectedText(testCase: TestCase) {
-  return testCase.kind === "throws" ? `an error containing ${JSON.stringify(testCase.expected)}` : JSON.stringify(testCase.expected);
+  if (testCase.kind === "throws") return `an error containing ${JSON.stringify(testCase.expected)}`;
+  if (testCase.kind === "state") {
+    const expected = expectedStateText(testCase.expected);
+    return expected === undefined
+      ? `invalid structured state expectation ${JSON.stringify(testCase.expected)}`
+      : `structured state ${expected}`;
+  }
+  return JSON.stringify(testCase.expected);
+}
+
+function canonicalStateText(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const items = value.map(canonicalStateText);
+    if (items.some((item) => item === undefined)) return undefined;
+    return `[${items.join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.keys(value as Record<string, unknown>).sort().map((key) => {
+      const item = canonicalStateText((value as Record<string, unknown>)[key]);
+      return item === undefined ? undefined : `${JSON.stringify(key)}:${item}`;
+    });
+    if (entries.some((entry) => entry === undefined)) return undefined;
+    return `{${entries.join(",")}}`;
+  }
+  if (typeof value === "number" && !Number.isFinite(value)) return undefined;
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized === undefined ? undefined : serialized;
+  } catch {
+    return undefined;
+  }
+}
+
+function expectedStateText(expected: string): string | undefined {
+  try {
+    return canonicalStateText(JSON.parse(expected));
+  } catch {
+    return undefined;
+  }
 }
 
 function actualText(result: RunResult, testCase: TestCase) {
@@ -55,6 +94,11 @@ function actualText(result: RunResult, testCase: TestCase) {
     return `${prefix}: ${detail}${truncation}`;
   }
   if (testCase.kind === "throws") return `No error was thrown; output was ${JSON.stringify(result.output)}${truncation}`;
+  if (testCase.kind === "state") {
+    if (result.outputTruncated) return `Output exceeded the runner limit: ${JSON.stringify(result.output)}`;
+    if (!result.stateCaptured) return "No structured state was returned by the Worker.";
+    return canonicalStateText(result.state) ?? "The Worker returned state that was not JSON-compatible.";
+  }
   if (result.outputTruncated) return `Output exceeded the runner limit: ${JSON.stringify(result.output)}`;
   return JSON.stringify(result.output);
 }
@@ -94,6 +138,11 @@ function evaluate(testCase: TestCase, result: RunResult, hiddenIndex?: number): 
     failureKind = "limit";
   } else if (result.error) {
     failureKind = classifyExecutionError(result);
+  } else if (kind === "state") {
+    const expectedState = expectedStateText(testCase.expected);
+    const actualState = result.stateCaptured ? canonicalStateText(result.state) : undefined;
+    passed = expectedState !== undefined && actualState !== undefined && expectedState === actualState;
+    if (!passed) failureKind = expectedState === undefined ? "test-failure" : "logic";
   } else {
     passed = normalizeOutput(result.output) === normalizeOutput(testCase.expected);
     if (!passed) failureKind = "logic";
@@ -106,6 +155,7 @@ function evaluate(testCase: TestCase, result: RunResult, hiddenIndex?: number): 
     expected: expectedText(testCase),
     actual: actualText(result, testCase),
     rawOutput: result.output,
+    rawState: result.state,
     failureKind,
     errorLine: result.errorLine,
   };
@@ -127,7 +177,7 @@ export async function gradeExercise(exercise: Exercise, code: string, runCase: C
     const caseCode = testCase.append ? `${code}\n${testCase.append}` : code;
     const result = await runCase(caseCode, testCase.input, testCase.timeoutMs);
     const outcome = evaluate(testCase, result, hidden ? ++hiddenIndex : undefined);
-    if (testCase.append && outcome.errorLine && outcome.errorLine > code.split("\\n").length) outcome.errorLine = undefined;
+    if (testCase.append && outcome.errorLine && outcome.errorLine > code.split("\n").length) outcome.errorLine = undefined;
     outcomes.push(outcome);
 
     if (!outcome.passed) {
